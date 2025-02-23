@@ -103,7 +103,7 @@ namespace DLT
             // Read-only values
             public static readonly string version = "xdc-0.9.3f"; // DLT Node version
 
-            public static readonly string checkVersionUrl = "https://www.ixian.io/update.txt";
+            public static readonly string checkVersionUrl = "https://resources.ixian.io/update.txt";
             public static readonly int checkVersionSeconds = 6 * 60 * 60; // 6 hours
 
             public static readonly ulong maxBlocksPerDatabase = 1000; // number of blocks to store in a single database file

@@ -164,11 +164,12 @@ namespace DLT
                             bool generateNextBlock = Node.forceNextBlock;
 
                             ulong last_block_num = Node.blockChain.getLastBlockNum();
+                            ulong next_block_num = last_block_num + 1;
                             int block_version = Node.blockChain.getLastBlockVersion();
 
                             if (block_version < Config.maxBlockVersionToGenerate
-                                && (last_block_num + 1) % ConsensusConfig.superblockInterval == 0
-                                && (IxianHandler.isTestNet || last_block_num >= Config.upgradeBlockHeight))
+                                && next_block_num % ConsensusConfig.superblockInterval == 0
+                                && (IxianHandler.isTestNet || next_block_num >= Config.upgradeBlockHeight))
                             {
                                 block_version = Config.maxBlockVersionToGenerate;
                             }
@@ -3094,7 +3095,7 @@ namespace DLT
                 Block last_block = Node.blockChain.getLastBlock();
                 if (last_block != null)
                 {
-                    Network.BlockProtocolMessages.broadcastGetBlock(last_block.blockNum + 1);
+                    BlockProtocolMessages.broadcastGetBlock(last_block.blockNum + 1);
                 }
                 return;
             }
@@ -3108,16 +3109,20 @@ namespace DLT
                     // Create a new block and add all the transactions in the pool
                     localNewBlock = new Block();
                     localNewBlock.timestamp = Clock.getNetworkTimestamp();
-                    if(IxianHandler.getLastBlockVersion() < BlockVer.v10)
-                    {
-                        localNewBlock.blockProposer = IxianHandler.getWalletStorage().getPrimaryAddress().addressWithChecksum;
-                    }
 
                     Block last_block = Node.blockChain.getLastBlock();
                     if (last_block != null)
                     {
                         localNewBlock.blockNum = last_block.blockNum + 1;
                         localNewBlock.lastBlockChecksum = last_block.blockChecksum;
+
+                        // Block timestamp smoothing - force to 30 seconds from last block timestamp if within 10 second margin.
+                        long blockTimeDiff = localNewBlock.timestamp - last_block.timestamp;
+                        if (blockTimeDiff >= ConsensusConfig.blockGenerationInterval
+                            && blockTimeDiff <= ConsensusConfig.blockGenerationInterval + 10)
+                        {
+                            localNewBlock.timestamp = last_block.timestamp + ConsensusConfig.blockGenerationInterval;
+                        }
                     }
                     else
                     {
