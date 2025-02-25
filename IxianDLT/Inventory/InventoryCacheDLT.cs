@@ -117,10 +117,11 @@ namespace DLTNode.Inventory
                     lock (Node.blockProcessor.localBlockLock)
                     {
                         Block local_block = Node.blockProcessor.localNewBlock;
-                        if (local_block == null || local_block.blockNum != block_num)
+                        if (local_block == null)
                         {
-                            return false;
+                            return true;
                         }
+
                         if (!local_block.blockChecksum.SequenceEqual(iis.blockHash)
                             || local_block.hasNodeSignature(address))
                         {

@@ -258,7 +258,7 @@ namespace DLT
                                         {
                                             if (last_block_num < 10)
                                             {
-                                                BlockProtocolMessages.broadcastNewBlock(localNewBlock);
+                                                BlockProtocolMessages.broadcastNewBlock(localNewBlock, null, null, true);
                                             }
                                             Logging.info("Waiting for local block #{0} to reach consensus {1}/{2}.", localNewBlock.blockNum, localNewBlock.signatures.Count, Node.blockChain.getRequiredConsensus());
                                             sleep = true;
@@ -606,10 +606,7 @@ namespace DLT
                                     if (!block_to_update.calculateSignatureChecksum().SequenceEqual(b.calculateSignatureChecksum()))
                                     {
                                         removeSignaturesWithoutPlEntry(b);
-                                        if (!Node.blockChain.refreshSignatures(b) && b.getFrozenSignatureCount() < block_to_update.getFrozenSignatureCount())
-                                        {
-                                            BlockProtocolMessages.broadcastNewBlock(block_to_update, null, endpoint); // TODO TODO TODO this can be optimized, to only send new sigs
-                                        }
+                                        Node.blockChain.refreshSignatures(b);
                                     }
                                 }
                             }
@@ -1491,22 +1488,9 @@ namespace DLT
                                         SignatureProtocolMessages.broadcastBlockSignature(sig, b.blockNum, b.blockChecksum, endpoint, null);
                                     }
                                 }
-                            }else if(localNewBlock.signatures.Count != b.signatures.Count)
-                            {
-                                if (Node.isMasterNode())
-                                {
-                                    BlockProtocolMessages.broadcastNewBlock(localNewBlock, null, endpoint);
-                                }
                             }
 
                             acceptLocalNewBlock();
-                        }
-                        else if(localNewBlock.signatures.Count != b.signatures.Count)
-                        {
-                            if (!Node.isMasterNode())
-                                return;
-                            Logging.info("Block #{0}: Received block has less signatures, re-transmitting local block. (total signatures: {1}).", b.blockNum, localNewBlock.getFrozenSignatureCount());
-                            BlockProtocolMessages.broadcastNewBlock(localNewBlock, null, endpoint);
                         }
                     }
                     else
