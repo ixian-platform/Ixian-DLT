@@ -60,8 +60,8 @@ namespace DLT
 
                                 long rollback_len = mOut.Length;
 
-                                writer.WriteIxiVarInt(ka.address.addressWithChecksum.Length);
-                                writer.Write(ka.address.addressWithChecksum);
+                                writer.WriteIxiVarInt(ka.address.addressNoChecksum.Length);
+                                writer.Write(ka.address.addressNoChecksum);
 
                                 writer.WriteIxiVarInt(ka.deviceId.Length);
                                 writer.Write(ka.deviceId);

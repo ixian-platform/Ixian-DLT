@@ -30,6 +30,7 @@ namespace DLT
         private ulong currentBlockNum = 0; // Mining block number
         public SignerPowSolution lastSignerPowSolution { get; private set; } = null;
         private ulong startedSolvingBlockHeight = 0; // Started solving time
+        private ulong previousSolutionBlockHeight = 0;
         private IxiNumber solvingDifficulty = 0;
 
         public ulong lastHashRate { get; private set; } = 0; // Last reported hash rate
@@ -230,6 +231,9 @@ namespace DLT
                 return;
             }
 
+            activeBlock = candidateBlock;
+            currentBlockNum = candidateBlock.blockNum;
+
             ulong calculationInterval = ConsensusConfig.getPlPowCalculationInterval(IxianHandler.getLastBlockVersion());
 
             ulong highestNetworkBlockHeight = IxianHandler.getHighestKnownNetworkBlockHeight();
@@ -240,16 +244,26 @@ namespace DLT
             }
 
             var submittedSolution = PresenceList.getPowSolution();
-            if (lastSignerPowSolution != null
-                && Node.blockChain.getTimeSinceLastBlock() < CoreConfig.blockSignaturePlCheckTimeout
-                && lastSignerPowSolution.blockNum + calculationInterval + blockOffset > highestNetworkBlockHeight
-                && (submittedSolution != null && solvingDifficulty <= submittedSolution.difficulty))
+
+            if (lastSignerPowSolution != null)
             {
-                // If the chain isn't stuck and we've already processed PoW within the interval
-                return;
+                if (Node.blockChain.getTimeSinceLastBlock() < CoreConfig.blockSignaturePlCheckTimeout
+                    && lastSignerPowSolution.blockNum + calculationInterval > highestNetworkBlockHeight
+                    && (submittedSolution != null && solvingDifficulty <= submittedSolution.difficulty))
+                {
+                    // If the chain isn't stuck and we've already processed PoW within the interval
+                    return;
+                }
+
+                if (previousSolutionBlockHeight == lastSignerPowSolution.blockNum)
+                {
+                    return;
+                }
+
+                previousSolutionBlockHeight = lastSignerPowSolution.blockNum;
             }
 
-            startedSolvingBlockHeight = IxianHandler.getLastBlockHeight();
+            startedSolvingBlockHeight = highestNetworkBlockHeight;
 
             currentKeyPair = CryptoManager.lib.generateKeys(2048, 2); // TODO move to config with v11
             activeBlock = candidateBlock;
@@ -380,7 +394,8 @@ namespace DLT
                     // If the new solution has a lower difficulty than the previously submitted solution and the previously submitted solution is still valid
 
                     // Check if we're mining for at least X minutes and that the blockchain isn't stuck
-                    if (IxianHandler.getHighestKnownNetworkBlockHeight() - startedSolvingBlockHeight > ConsensusConfig.getPlPowMinCalculationBlockTime(IxianHandler.getLastBlockVersion())
+                    if (IxianHandler.getHighestKnownNetworkBlockHeight() - startedSolvingBlockHeight >= ConsensusConfig.getPlPowMinCalculationBlockTime(IxianHandler.getLastBlockVersion())
+                        && previousSolutionBlockHeight != newSolution.blockNum
                         && Node.blockChain.getTimeSinceLastBlock() < CoreConfig.blockSignaturePlCheckTimeout)
                     {
                         // Reset the blockReadyForMining, to stop mining on all threads

@@ -1747,7 +1747,7 @@ namespace DLT
                 if (frozen_sig_count < required_consensus_count
                     && !isBlockchainRecoveryMode(block.blockNum, block.timestamp, frozen_sig_count))
                 {
-                    //Logging.info("Block {0} has less than required signatures ({1} < {2}).", block.blockNum, frozen_sig_count, required_consensus_count);
+                    //Logging.info("Block #{0} has less than required signatures ({1} < {2}).", block.blockNum, frozen_sig_count, required_consensus_count);
                     return false;
                 }
                 if (block.version >= BlockVer.v10 && IxianHandler.getBlockHeader(block.blockNum - 1).version >= BlockVer.v10)
@@ -1756,7 +1756,7 @@ namespace DLT
                     IxiNumber frozen_sig_difficulty = block.getTotalSignerDifficulty();
                     if (frozen_sig_difficulty < required_signer_difficulty)
                     {
-                        //Logging.info("Block {0} has less than required signatures ({1} < {2}).", block.blockNum, frozen_sig_count, required_consensus_count);
+                        //Logging.info("Block #{0} has less than required signatures ({1} < {2}).", block.blockNum, frozen_sig_count, required_consensus_count);
                         return false;
                     }
                 }
@@ -1776,7 +1776,7 @@ namespace DLT
                 if (frozen_sig_count < required_consensus_count
                     && !isBlockchainRecoveryMode(block.blockNum, block.timestamp, frozen_sig_count))
                 {
-                    Logging.info("Block {0} has less than required signatures ({1} < {2}).", block.blockNum, frozen_sig_count, required_consensus_count);
+                    Logging.info("Block #{0} has less than required signatures ({1} < {2}).", block.blockNum, frozen_sig_count, required_consensus_count);
                     return false;
                 }
 
@@ -1792,7 +1792,7 @@ namespace DLT
                     // verify sig difficulty
                     if (frozen_sig_difficulty < required_signer_difficulty_adjusted)
                     {
-                        Logging.info("Block {0} has less than required signer difficulty ({1} < {2}).", block.blockNum, frozen_sig_difficulty, required_signer_difficulty_adjusted);
+                        Logging.info("Block #{0} has less than required signer difficulty ({1} < {2}).", block.blockNum, frozen_sig_difficulty, required_signer_difficulty_adjusted);
                         return false;
                     }
                 }
@@ -1803,7 +1803,7 @@ namespace DLT
                     return false;
                 }
 
-                if (required_consensus_count > 2)
+                if (block.blockNum > 13 && required_consensus_count > 1)
                 {
                     // verify if over 50% signatures are from the previous block
                     if (required_sigs.Count < (required_consensus_count / 2) + 1
@@ -2327,7 +2327,7 @@ namespace DLT
                                 }
                                 else
                                 {
-                                    highestNetworkBlockNum = 0;
+                                    highestNetworkBlockNum = last_block_num;
                                 }
 
                                 CoreProtocolMessage.addToInventory(new char[] { 'W' }, new InventoryItemBlock(current_block.blockChecksum, current_block.blockNum), null);
@@ -3242,6 +3242,7 @@ namespace DLT
                     currentBlockStartTime = DateTime.UtcNow;
                     lastBlockStartTime = DateTime.UtcNow.AddSeconds(-blockGenerationInterval * 10); // TODO TODO TODO make sure that this is ok
 
+                    Node.inventoryCache.setProcessedFlag(InventoryItemTypes.block, localNewBlock.blockChecksum, true);
                     // Broadcast the new block
                     BlockProtocolMessages.broadcastNewBlock(localNewBlock, null, null, true);
 

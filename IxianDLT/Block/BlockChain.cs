@@ -1076,7 +1076,7 @@ namespace DLT
             int sig_count = 0;
             if (signatures != null)
                 sig_count = signatures.Count;
-            Logging.info("Setting {0} frozen signatures for {1}", sig_count, b.blockNum);
+            Logging.info("Setting {0} frozen signatures for #{1}", sig_count, b.blockNum);
             b.setFrozenSignatures(signatures);
             return true;
         }

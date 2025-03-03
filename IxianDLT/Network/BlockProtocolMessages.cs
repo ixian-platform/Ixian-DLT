@@ -481,16 +481,15 @@ namespace DLT
                     endpoint.blockHeight = block.blockNum;
                 }
 
-                Node.blockSync.onBlockReceived(block, endpoint);
-                Node.blockProcessor.onBlockReceived(block, endpoint);
                 lock (Node.blockProcessor.localBlockLock)
                 {
-                    if (block.blockNum <= Node.blockChain.getLastBlockNum()
-                        || (Node.blockProcessor.localNewBlock != null && Node.blockProcessor.localNewBlock.blockNum == block.blockNum && Node.blockProcessor.localNewBlock.blockChecksum.SequenceEqual(block.blockChecksum)))
+                    if (block.blockNum <= Node.blockChain.getLastBlockNum() + 1)
                     {
                         Node.inventoryCache.setProcessedFlag(InventoryItemTypes.block, block.blockChecksum, true);
                     }
                 }
+                Node.blockSync.onBlockReceived(block, endpoint);
+                Node.blockProcessor.onBlockReceived(block, endpoint);
             }
         }
     }

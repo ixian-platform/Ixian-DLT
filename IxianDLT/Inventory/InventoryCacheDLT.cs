@@ -54,7 +54,7 @@ namespace DLTNode.Inventory
             InventoryItemBlock iib = (InventoryItemBlock)item;
             ulong last_block_height = IxianHandler.getLastBlockHeight();
             if (!Node.blockSync.synchronizing
-                && iib.blockNum > last_block_height)
+                && iib.blockNum == last_block_height + 1)
             {
                 byte include_tx = 2;
                 if(Node.isMasterNode())
@@ -62,10 +62,7 @@ namespace DLTNode.Inventory
                     include_tx = 0;
                 }
                 BlockProtocolMessages.broadcastGetBlock(last_block_height + 1, null, endpoint, include_tx, true);
-                if(iib.blockNum == last_block_height + 1)
-                {
-                    return true;
-                }
+                return true;
             }
             return false;
         }
@@ -77,7 +74,7 @@ namespace DLTNode.Inventory
                 return false;
             }
             InventoryItemKeepAlive iika = (InventoryItemKeepAlive)item;
-            byte[] address = iika.address.addressWithChecksum;
+            byte[] address = iika.address.addressNoChecksum;
             Presence p = PresenceList.getPresenceByAddress(iika.address);
             if (p == null)
             {
