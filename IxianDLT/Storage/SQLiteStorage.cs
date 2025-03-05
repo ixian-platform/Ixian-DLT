@@ -183,7 +183,6 @@ namespace DLT
                         if (cache)
                         {
                             connectionCache[path][1] = Clock.getTimestamp();
-                            cleanupCache();
                         }
                         return (SQLiteConnection)connectionCache[path][0];
                     }
@@ -332,13 +331,15 @@ namespace DLT
                         return true;
                     }
 
-                    // Update the current seek number
-                    current_seek = db_blocknum;
-
                     string db_path = pathBase + Path.DirectorySeparatorChar + "0000" + Path.DirectorySeparatorChar + db_blocknum + ".dat";
 
                     // Bind the connection
                     sqlConnection = getSQLiteConnection(db_path, cache);
+
+                    // Update the current seek number
+                    current_seek = db_blocknum;
+
+                    cleanupCache();
                 }
                 return true;
             }
@@ -1035,7 +1036,7 @@ namespace DLT
 
             private Transaction getTransactionFromStorageTransaction(_storage_Transaction tx)
             {
-                Transaction transaction = new Transaction(tx.type)
+                Transaction transaction = new Transaction(tx.type, tx.version)
                 {
                     id = Transaction.txIdLegacyToV8(tx.id),
                     amount = new IxiNumber(tx.amount),
@@ -1045,7 +1046,6 @@ namespace DLT
                     timeStamp = tx.timestamp,
                     checksum = tx.checksum,
                     signature = tx.signature,
-                    version = tx.version,
                     pubKey = new Address(tx.pubKey),
                     applied = (ulong)tx.applied
                 };
@@ -1335,17 +1335,7 @@ namespace DLT
                         {
                             lock (connectionCache)
                             {
-                                string fileName = Path.GetFileNameWithoutExtension(connection.DatabasePath);
                                 string fullFilePath = connection.DatabasePath;
-                                if (fileName == "superblocks")
-                                {
-                                    if (superBlocksSqlConnection != null)
-                                    {
-                                        superBlocksSqlConnection.Close();
-                                        superBlocksSqlConnection.Dispose();
-                                        superBlocksSqlConnection = null;
-                                    }
-                                }
 
                                 resetConnectionCache();
 
@@ -1432,7 +1422,7 @@ namespace DLT
                             foreach (var block in blocks)
                             {
                                 string sql = "INSERT OR REPLACE INTO `blocks`(`blockNum`,`blockChecksum`,`lastBlockChecksum`,`walletStateChecksum`,`sigFreezeChecksum`, `difficulty`, `powField`, `transactions`,`signatures`,`timestamp`,`version`,`lastSuperBlockChecksum`,`lastSuperBlockNum`,`superBlockSegments`,`compactedSigs`,`blockProposer`,`signerDifficulty`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-                                executeSQL(sql, block.blockNum, block.blockChecksum, block.lastBlockChecksum, block.walletStateChecksum, block.sigFreezeChecksum, block.difficulty, block.powField, block.transactions, block.signatures, block.timestamp, block.version, block.lastSuperBlockChecksum, block.lastSuperBlockNum, block.superBlockSegments, block.compactedSigs, block.blockProposer, block.signerDifficulty);
+                                destCon.Execute(sql, block.blockNum, block.blockChecksum, block.lastBlockChecksum, block.walletStateChecksum, block.sigFreezeChecksum, block.difficulty, block.powField, block.transactions, block.signatures, block.timestamp, block.version, block.lastSuperBlockChecksum, block.lastSuperBlockNum, block.superBlockSegments, block.compactedSigs, block.blockProposer, block.signerDifficulty);
                             }
                         }
                         catch (Exception e)
@@ -1554,6 +1544,8 @@ namespace DLT
                 foreach(string fileName in fileNames)
                 {
                     File.Delete(fileName);
+                    File.Delete(fileName + "-shm");
+                    File.Delete(fileName + "-wal");
                 }
                 File.Delete(Config.dataFolderPath + Path.DirectorySeparatorChar + "blocks" + Path.DirectorySeparatorChar + "superblocks.dat");
                 File.Delete(Config.dataFolderPath + Path.DirectorySeparatorChar + "blocks" + Path.DirectorySeparatorChar + "superblocks.dat-shm");
@@ -1672,6 +1664,13 @@ namespace DLT
                         SQLiteConnection connection = (SQLiteConnection)entry.Value[0];
                         connection.Close();
                         connection.Dispose();
+                    }
+
+                    if (superBlocksSqlConnection != null)
+                    {
+                        superBlocksSqlConnection.Close();
+                        superBlocksSqlConnection.Dispose();
+                        superBlocksSqlConnection = null;
                     }
 
                     // Fix for occasional locked database error
