@@ -142,6 +142,9 @@ namespace DLT
                                         break;
                                     }
                                     txs_in_chunk++;
+                                } else
+                                {
+                                    Logging.warn("Transaction {0} missing from storage.", txIdArr[i]);
                                 }
                             }
 

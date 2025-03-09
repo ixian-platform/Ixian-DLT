@@ -252,6 +252,12 @@ namespace DLT
                 {
                     Transaction t = TransactionPool.getAppliedTransaction(txid, b.blockNum, true);
 
+                    if (t == null)
+                    {
+                        Logging.warn("Transaction {0} missing from storage.", txid);
+                        continue;
+                    }
+
                     if (endpoint.isSubscribedToAddress(NetworkEvents.Type.transactionFrom, t.pubKey.addressNoChecksum))
                     {
                         endpoint.sendData(ProtocolMessageCode.transactionData2, t.getBytes(true, true), null);
