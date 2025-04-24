@@ -16,8 +16,10 @@ using IXICore;
 using IXICore.Meta;
 using IXICore.Network;
 using IXICore.RegNames;
+using IXICore.Streaming;
 using IXICore.Utils;
 using System;
+using System.Collections.Generic;
 
 namespace DLTNode
 {
@@ -160,7 +162,7 @@ namespace DLTNode
             return Block.maxVersion - 1;          
         }
 
-        public override bool addTransaction(Transaction tx, bool force_broadcast)
+        public override bool addTransaction(Transaction tx, List<Address> relayNodeAddresses, bool force_broadcast)
         {
             return true;
         }
@@ -206,6 +208,41 @@ namespace DLTNode
         }
 
         public override byte[] getBlockHash(ulong blockNum)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override bool receivedNewTransaction(Transaction tx)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override FriendMessage addMessageWithType(byte[] id, FriendMessageType type, Address wallet_address, int channel, string message, bool local_sender = false, Address sender_address = null, long timestamp = 0, bool fire_local_notification = true, int payable_data_len = 0)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override byte[] resizeImage(byte[] imageData, int width, int height, int quality)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void resubscribeEvents()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void receiveStreamData(byte[] data, RemoteEndpoint endpoint, bool fireLocalNotification)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override long getTimeSinceLastBlock()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void triggerSignerPowSolutionFound()
         {
             throw new NotImplementedException();
         }

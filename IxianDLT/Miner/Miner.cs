@@ -814,7 +814,7 @@ namespace DLT
 
             if (TransactionPool.addTransaction(tx))
             {
-                PendingTransactions.addPendingLocalTransaction(tx);
+                PendingTransactions.addPendingLocalTransaction(tx, null);
             }
             else
             {
@@ -863,7 +863,7 @@ namespace DLT
 
             if (TransactionPool.addTransaction(tx))
             {
-                PendingTransactions.addPendingLocalTransaction(tx);
+                PendingTransactions.addPendingLocalTransaction(tx, null);
             }
             else
             {

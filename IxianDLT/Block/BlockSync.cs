@@ -1131,7 +1131,7 @@ namespace DLT
 
             Node.blockProcessor.firstBlockAfterSync = true;
             Node.blockProcessor.resumeOperation();
-            Node.signerPowMiner.start();
+            Node.signerPowMiner.start(Config.cpuThreads > 2 ? (int)Config.cpuThreads / 2 : 1);
 
             lock (pendingBlocks)
             {

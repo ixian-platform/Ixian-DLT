@@ -22,7 +22,7 @@ jobs:
     - name: Checkout Ixian-Core
       uses: actions/checkout@v2
       with:
-        repository: ProjectIxian/Ixian-Core
+        repository: ixian-platform/Ixian-Core
         path: Ixian-Core
         ref: ${{ github.event.push.ref }}
 

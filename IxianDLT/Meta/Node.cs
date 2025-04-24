@@ -19,8 +19,10 @@ using DLTNode.Meta;
 using IXICore;
 using IXICore.Inventory;
 using IXICore.Meta;
+using IXICore.Miner;
 using IXICore.Network;
 using IXICore.RegNames;
+using IXICore.Streaming;
 using IXICore.Utils;
 using Newtonsoft.Json;
 using System;
@@ -365,7 +367,7 @@ namespace DLT.Meta
             // Check if this is a genesis node
             if (genesisFunds > (long)0)
             {
-                Logging.info(String.Format("Genesis {0} specified. Starting operation.", genesisFunds));
+                Logging.info("Genesis {0} specified. Starting operation.", genesisFunds);
 
                 distributeGenesisFunds(genesisFunds);
 
@@ -375,7 +377,7 @@ namespace DLT.Meta
                 genesisNode = true;
                 PresenceList.myPresenceType = 'M';
                 blockProcessor.resumeOperation();
-                signerPowMiner.start();
+                signerPowMiner.start(Config.cpuThreads > 2 ? (int)Config.cpuThreads / 2 : 1);
                 serverStarted = true;
                 if (!isMasterNode())
                 {
@@ -454,6 +456,7 @@ namespace DLT.Meta
                 }
 
                 // Start the network client manager
+                NetworkClientManager.init(new NetworkClientManagerRandomized(CoreConfig.simultaneousConnectedNeighbors));
                 if (Config.recoverFromFile)
                 {
                     NetworkClientManager.start(0);
@@ -984,7 +987,7 @@ namespace DLT.Meta
             return false;
         }
 
-        public override bool addTransaction(Transaction transaction, bool force_broadcast)
+        public override bool addTransaction(Transaction transaction, List<Address> relayNodeAddresses, bool force_broadcast)
         {
             return TransactionPool.addTransaction(transaction, false, null, true, force_broadcast);
         }
@@ -1176,6 +1179,46 @@ namespace DLT.Meta
         public override RegisteredNameRecord getRegName(byte[] name, bool useAbsoluteId = true)
         {
             return regNameState.getName(name, useAbsoluteId);
+        }
+
+        public override bool receivedNewTransaction(Transaction tx)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override FriendMessage addMessageWithType(byte[] id, FriendMessageType type, Address wallet_address, int channel, string message, bool local_sender = false, Address sender_address = null, long timestamp = 0, bool fire_local_notification = true, int payable_data_len = 0)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override byte[] resizeImage(byte[] imageData, int width, int height, int quality)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void resubscribeEvents()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void receiveStreamData(byte[] data, RemoteEndpoint endpoint, bool fireLocalNotification)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override long getTimeSinceLastBlock()
+        {
+            return blockChain.getTimeSinceLastBlock();
+        }
+
+        public override void triggerSignerPowSolutionFound()
+        {
+            if (IxianHandler.getTimeSinceLastBlock() > CoreConfig.blockSignaturePlCheckTimeout)
+            {
+                blockProcessor.applyUpdatedSolutionSignature();
+            }
+
+            blockProcessor.acceptLocalNewBlock();
         }
     }
 

@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading;
 using System.Collections.Generic;
 using System;
+using IXICore.Meta;
+using SQLitePCL;
 
 namespace UnitTests
 {
@@ -36,7 +38,9 @@ namespace UnitTests
                 version = Block.maxVersion,
                 walletStateChecksum = new byte[64],
                 regNameStateChecksum = new byte[64],
-                timestamp = Clock.getNetworkTimestamp()
+                timestamp = Clock.getNetworkTimestamp(),
+                signerBits = SignerPowSolution.maxTargetBits,
+                totalSignerDifficulty = SignerPowSolution.maxTargetBits
             };
             block.blockChecksum = block.calculateChecksum();
             db.insertBlock(block);
@@ -49,7 +53,8 @@ namespace UnitTests
             {
                 applied = applied,
                 blockHeight = blockHeight,
-                nonce = nonce
+                nonce = nonce,
+                pubKey = new Address("16LUmwUnU9M4Wn92nrvCStj83LDCRwvAaSio6Xtb3yvqqqCCz")
             };
             tx.generateChecksums();
             db.insertTransaction(tx);

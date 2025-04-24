@@ -14,13 +14,20 @@ using IXICore;
 using IXICore.Meta;
 using IXICore.Network;
 using IXICore.RegNames;
+using IXICore.Streaming;
 using System;
+using System.Collections.Generic;
 
 namespace UnitTests
 {
     public class DummyIxianNode : IxianNode
     {
-        public override bool addTransaction(Transaction tx, bool force_broadcast)
+        public override FriendMessage addMessageWithType(byte[] id, FriendMessageType type, Address wallet_address, int channel, string message, bool local_sender = false, Address sender_address = null, long timestamp = 0, bool fire_local_notification = true, int payable_data_len = 0)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override bool addTransaction(Transaction tx, List<Address> relayNodeAddresses, bool force_broadcast)
         {
             throw new NotImplementedException();
         }
@@ -65,6 +72,11 @@ namespace UnitTests
             throw new NotImplementedException();
         }
 
+        public override long getTimeSinceLastBlock()
+        {
+            throw new NotImplementedException();
+        }
+
         public override Wallet getWallet(Address id)
         {
             throw new NotImplementedException();
@@ -85,7 +97,32 @@ namespace UnitTests
             throw new NotImplementedException();
         }
 
+        public override bool receivedNewTransaction(Transaction tx)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void receiveStreamData(byte[] data, RemoteEndpoint endpoint, bool fireLocalNotification)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override byte[] resizeImage(byte[] imageData, int width, int height, int quality)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void resubscribeEvents()
+        {
+            throw new NotImplementedException();
+        }
+
         public override void shutdown()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void triggerSignerPowSolutionFound()
         {
             throw new NotImplementedException();
         }
