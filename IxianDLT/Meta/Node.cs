@@ -146,14 +146,18 @@ namespace DLT.Meta
                 return;
             }
 
-            // Setup the stats console
-            statsConsoleScreen = new StatsConsoleScreen();
-
             // Initialize the wallet state
             walletState = new WalletState();
             regNameState = new RegisteredNames(regNamesMemoryStorage);
 
             inventoryCache = new InventoryCacheDLT();
+
+            NetworkClientManager.init(new NetworkClientManagerRandomized(CoreConfig.simultaneousConnectedNeighbors));
+
+            RelaySectors.init(CoreConfig.relaySectorLevels, null);
+
+            // Setup the stats console
+            statsConsoleScreen = new StatsConsoleScreen();
         }
 
         private bool initWallet()
@@ -456,7 +460,6 @@ namespace DLT.Meta
                 }
 
                 // Start the network client manager
-                NetworkClientManager.init(new NetworkClientManagerRandomized(CoreConfig.simultaneousConnectedNeighbors));
                 if (Config.recoverFromFile)
                 {
                     NetworkClientManager.start(0);

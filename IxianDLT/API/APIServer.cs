@@ -77,11 +77,6 @@ namespace DLTNode
                 response = onWalletList();
             }
 
-            if (methodName.Equals("pl", StringComparison.OrdinalIgnoreCase))
-            {
-                response = onPl();
-            }
-
             if (methodName.Equals("tx", StringComparison.OrdinalIgnoreCase))
             {
                 response = onTx(parameters);
@@ -637,19 +632,6 @@ namespace DLTNode
 
 
             return new JsonResponse { result = outputRecords, error = null };
-        }
-
-        public JsonResponse onPl()
-        {
-            JsonError error = null;
-
-            List<Presence> presences = PresenceList.getPresences();
-            // Show a list of presences
-            lock (presences)
-            {
-                return new JsonResponse { result = presences, error = error };
-            }
-
         }
 
         public JsonResponse onTx(Dictionary<string, object> parameters)

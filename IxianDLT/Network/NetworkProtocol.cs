@@ -20,6 +20,7 @@ using IXICore.Utils;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 
 namespace DLT
 {
@@ -182,8 +183,12 @@ namespace DLT
                             handleGetNameRecord(data, endpoint);
                             break;
 
+                        case ProtocolMessageCode.getSectorNodes:
+                            handleGetSectorNodes(data, endpoint);
+                            break;
+
                         default:
-                            Logging.warn("Unknown protocol message: {0}", code);
+                            Logging.warn("Unknown protocol message: {0}, from {1} ({2})", code, endpoint.getFullAddress(), endpoint.serverWalletAddress);
                             break;
                     }
 
@@ -191,6 +196,56 @@ namespace DLT
                 catch (Exception e)
                 {
                     Logging.error("Error parsing network message. Details: {0}", e.ToString());
+                }
+            }
+
+            public static void handleGetSectorNodes(byte[] data, RemoteEndpoint endpoint)
+            {
+                int offset = 0;
+                var addressWithOffset = data.ReadIxiBytes(offset);
+                offset += addressWithOffset.bytesRead;
+
+                var maxRelayCountWithOffset = data.GetIxiVarUInt(offset);
+                offset += maxRelayCountWithOffset.bytesRead;
+                int maxRelayCount = (int)maxRelayCountWithOffset.num;
+
+                if (maxRelayCount > 20)
+                {
+                    maxRelayCount = 20;
+                }
+
+                var relayList = RelaySectors.Instance.getSectorNodes(addressWithOffset.bytes, maxRelayCount);
+
+                sendSectorNodes(addressWithOffset.bytes, relayList, endpoint);
+
+            }
+
+            private static void sendSectorNodes(byte[] prefix, List<Address> relayList, RemoteEndpoint endpoint)
+            {
+                using (MemoryStream m = new MemoryStream())
+                {
+                    using (BinaryWriter writer = new BinaryWriter(m))
+                    {
+                        writer.WriteIxiVarInt(prefix.Length);
+                        writer.Write(prefix);
+
+                        writer.WriteIxiVarInt(relayList.Count);
+
+                        foreach (var relay in relayList)
+                        {
+                            var p = PresenceList.getPresenceByAddress(relay);
+                            if (p == null)
+                            {
+                                continue;
+                            }
+
+                            var pBytes = p.getBytes();
+                            writer.WriteIxiVarInt(pBytes.Length);
+                            writer.Write(pBytes);
+                        }
+                    }
+
+                    endpoint.sendData(ProtocolMessageCode.sectorNodes, m.ToArray(), null, 0, MessagePriority.high);
                 }
             }
 

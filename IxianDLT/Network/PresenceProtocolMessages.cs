@@ -160,6 +160,23 @@ namespace DLT
                 }
             }
 
+            private static void forwardKeepAlivePresence(byte[] ka_bytes, byte[] hash, Address address, long last_seen, byte[] device_id, char node_type, RemoteEndpoint endpoint)
+            {
+                if (node_type == 'M' || node_type == 'H')
+                {
+                    // Send this keepalive to all connected clients
+                    CoreProtocolMessage.addToInventory(['M', 'H', 'W', 'R'], new InventoryItemKeepAlive(hash, last_seen, address, device_id), endpoint);
+                }
+                else
+                {
+                    // Send this keepalive to all connected non-clients
+                    CoreProtocolMessage.addToInventory(['M', 'H', 'W'], new InventoryItemKeepAlive(hash, last_seen, address, device_id), endpoint);
+                }
+
+                // Send this keepalive message to all subscribed clients
+                CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.keepAlive, address.addressNoChecksum, ProtocolMessageCode.keepAlivePresence, ka_bytes, address.addressNoChecksum, endpoint);
+            }
+
             public static void handleKeepAlivesChunk(byte[] data, RemoteEndpoint endpoint)
             {
                 using (MemoryStream m = new MemoryStream(data))
@@ -190,15 +207,14 @@ namespace DLT
                             Address address;
                             long last_seen;
                             byte[] device_id;
-                            bool updated = PresenceList.receiveKeepAlive(ka_bytes, out address, out last_seen, out device_id, endpoint);
+                            char node_type;
+
+                            bool updated = PresenceList.receiveKeepAlive(ka_bytes, out address, out last_seen, out device_id, out node_type, endpoint);
 
                             // If a presence entry was updated, broadcast this message again
                             if (updated && Node.isMasterNode() && !Node.blockSync.synchronizing)
                             {
-                                CoreProtocolMessage.addToInventory(new char[] { 'M', 'H', 'W' }, new InventoryItemKeepAlive(hash, last_seen, address, device_id), endpoint);
-
-                                // Send this keepalive message to all subscribed clients
-                                CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.keepAlive, address.addressNoChecksum, ProtocolMessageCode.keepAlivePresence, ka_bytes, address.addressNoChecksum, endpoint);
+                                forwardKeepAlivePresence(ka_bytes, hash, address, last_seen, device_id, node_type, endpoint);
                             }
                         }
                     }
@@ -239,20 +255,18 @@ namespace DLT
                 Address address = null;
                 long last_seen = 0;
                 byte[] device_id = null;
+                char node_type;
 
                 byte[] hash = CryptoManager.lib.sha3_512sqTrunc(data);
 
                 Node.inventoryCache.setProcessedFlag(InventoryItemTypes.keepAlive, hash, true);
 
-                bool updated = PresenceList.receiveKeepAlive(data, out address, out last_seen, out device_id, endpoint);
+                bool updated = PresenceList.receiveKeepAlive(data, out address, out last_seen, out device_id, out node_type, endpoint);
 
                 // If a presence entry was updated, broadcast this message again
                 if (updated && Node.isMasterNode() && !Node.blockSync.synchronizing)
                 {
-                    CoreProtocolMessage.addToInventory(new char[] { 'M', 'H', 'W' }, new InventoryItemKeepAlive(hash, last_seen, address, device_id), endpoint);
-
-                    // Send this keepalive message to all subscribed clients
-                    CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.keepAlive, address.addressNoChecksum, ProtocolMessageCode.keepAlivePresence, data, address.addressNoChecksum, endpoint);
+                    forwardKeepAlivePresence(data, hash, address, last_seen, device_id, node_type, endpoint);
                 }
             }
 
@@ -297,7 +311,7 @@ namespace DLT
                 // If a presence entry was updated, broadcast this message again
                 if (updated_presence != null)
                 {
-                    CoreProtocolMessage.broadcastProtocolMessage(new char[] { 'M', 'H', 'W' }, ProtocolMessageCode.updatePresence, data, updated_presence.wallet.addressNoChecksum, endpoint);
+                    CoreProtocolMessage.broadcastProtocolMessage(['M', 'H', 'W'], ProtocolMessageCode.updatePresence, data, updated_presence.wallet.addressNoChecksum, endpoint);
 
                     // Send this keepalive message to all subscribed clients
                     CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.keepAlive, updated_presence.wallet.addressNoChecksum, ProtocolMessageCode.updatePresence, data, updated_presence.wallet.addressNoChecksum, endpoint);
