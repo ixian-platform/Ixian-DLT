@@ -93,7 +93,7 @@ namespace DLT
                             break;
 
                         case ProtocolMessageCode.getKeepAlives:
-                            PresenceProtocolMessages.handleGetKeepAlives(data, endpoint);
+                            CoreProtocolMessage.processGetKeepAlives(data, endpoint);
                             break;
 
                         case ProtocolMessageCode.keepAlivesChunk:
@@ -366,8 +366,16 @@ namespace DLT
                                 switch (item.type)
                                 {
                                     case InventoryItemTypes.keepAlive:
-                                        ka_list.Add((InventoryItemKeepAlive)item);
-                                        pii.lastRequested = Clock.getTimestamp();
+                                        var iika = (InventoryItemKeepAlive)item;
+                                        if (PresenceList.getPresenceByAddress(iika.address) != null)
+                                        {
+                                            ka_list.Add(iika);
+                                            pii.lastRequested = Clock.getTimestamp();
+                                        }
+                                        else
+                                        {
+                                            InventoryCache.Instance.processInventoryItem(pii);
+                                        }
                                         break;
 
                                     case InventoryItemTypes.transaction:

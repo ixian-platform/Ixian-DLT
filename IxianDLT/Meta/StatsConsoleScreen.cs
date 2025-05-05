@@ -125,7 +125,7 @@ namespace DLT.Meta
             writeLine(" ██║██╔╝ ██╗██║██║  ██║██║ ╚████║    ██████╔╝███████╗██║    ");
             writeLine(" ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝    ╚═════╝ ╚══════╝╚═╝    ");
             writeLine(" {0}", (Config.version + " BETA ").PadLeft(59));
-            writeLine(" {0}", url);
+            writeLine(" {0}", url.PadLeft(59));
             writeLine("────────────────────────────────────────────────────────────");
             if (update_avail)
             {

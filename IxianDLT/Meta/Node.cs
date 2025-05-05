@@ -301,6 +301,10 @@ namespace DLT.Meta
         public void start(bool verboseConsoleOutput)
         {
             char node_type = 'W';
+            if (Config.recoverFromFile)
+            {
+                node_type = 'M';
+            }
 
             // Check if we're in worker-only mode
             if (Config.workerOnly)
