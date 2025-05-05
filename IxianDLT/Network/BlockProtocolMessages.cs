@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2020 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -491,7 +491,7 @@ namespace DLT
                 {
                     if (block.blockNum <= Node.blockChain.getLastBlockNum() + 1)
                     {
-                        Node.inventoryCache.setProcessedFlag(InventoryItemTypes.block, block.blockChecksum, true);
+                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.block, block.blockChecksum, true);
                     }
                 }
                 Node.blockSync.onBlockReceived(block, endpoint);

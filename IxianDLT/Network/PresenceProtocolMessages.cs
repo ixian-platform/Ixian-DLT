@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2020 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -27,58 +27,6 @@ namespace DLT
     {
         class PresenceProtocolMessages
         {
-            public static void broadcastGetKeepAlives(List<InventoryItemKeepAlive> ka_list, RemoteEndpoint endpoint)
-            {
-                int ka_count = ka_list.Count;
-                int max_ka_per_chunk = CoreConfig.maximumKeepAlivesPerChunk;
-                for (int i = 0; i < ka_count;)
-                {
-                    using (MemoryStream mOut = new MemoryStream(max_ka_per_chunk * 570))
-                    {
-                        using (BinaryWriter writer = new BinaryWriter(mOut))
-                        {
-                            int next_ka_count;
-                            if (ka_count - i > max_ka_per_chunk)
-                            {
-                                next_ka_count = max_ka_per_chunk;
-                            }
-                            else
-                            {
-                                next_ka_count = ka_count - i;
-                            }
-                            writer.WriteIxiVarInt(next_ka_count);
-
-                            for (int j = 0; j < next_ka_count && i < ka_count; j++)
-                            {
-                                InventoryItemKeepAlive ka = ka_list[i];
-                                i++;
-
-                                if (ka == null)
-                                {
-                                    break;
-                                }
-
-                                long rollback_len = mOut.Length;
-
-                                writer.WriteIxiVarInt(ka.address.addressNoChecksum.Length);
-                                writer.Write(ka.address.addressNoChecksum);
-
-                                writer.WriteIxiVarInt(ka.deviceId.Length);
-                                writer.Write(ka.deviceId);
-
-                                if (mOut.Length > CoreConfig.maxMessageSize)
-                                {
-                                    mOut.SetLength(rollback_len);
-                                    i--;
-                                    break;
-                                }
-                            }
-                        }
-                        endpoint.sendData(ProtocolMessageCode.getKeepAlives, mOut.ToArray(), null);
-                    }
-                }
-            }
-
             public static void handleGetKeepAlives(byte[] data, RemoteEndpoint endpoint)
             {
                 using (MemoryStream m = new MemoryStream(data))
@@ -202,7 +150,7 @@ namespace DLT
                             byte[] ka_bytes = reader.ReadBytes(ka_len);
                             byte[] hash = CryptoManager.lib.sha3_512sqTrunc(ka_bytes);
 
-                            Node.inventoryCache.setProcessedFlag(InventoryItemTypes.keepAlive, hash, true);
+                            InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.keepAlive, hash, true);
 
                             Address address;
                             long last_seen;
@@ -259,7 +207,7 @@ namespace DLT
 
                 byte[] hash = CryptoManager.lib.sha3_512sqTrunc(data);
 
-                Node.inventoryCache.setProcessedFlag(InventoryItemTypes.keepAlive, hash, true);
+                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.keepAlive, hash, true);
 
                 bool updated = PresenceList.receiveKeepAlive(data, out address, out last_seen, out device_id, out node_type, endpoint);
 

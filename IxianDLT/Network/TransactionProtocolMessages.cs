@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2020 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -160,54 +160,6 @@ namespace DLT
                     }
                 }
             }
-
-            public static void broadcastGetTransactions(List<byte[]> tx_list, long msg_id, RemoteEndpoint endpoint)
-            {
-                int tx_count = tx_list.Count;
-                int max_tx_per_chunk = CoreConfig.maximumTransactionsPerChunk;
-                for (int i = 0; i < tx_count;)
-                {
-                    using (MemoryStream mOut = new MemoryStream(max_tx_per_chunk * 570))
-                    {
-                        using (BinaryWriter writer = new BinaryWriter(mOut))
-                        {
-                            int next_tx_count = tx_count - i;
-                            if (next_tx_count > max_tx_per_chunk)
-                            {
-                                next_tx_count = max_tx_per_chunk;
-                            }
-                            writer.WriteIxiVarInt(msg_id);
-                            writer.WriteIxiVarInt(next_tx_count);
-
-                            for (int j = 0; j < next_tx_count && i < tx_count; j++)
-                            {
-                                long rollback_len = mOut.Length;
-
-                                writer.WriteIxiVarInt(tx_list[i].Length);
-                                writer.Write(tx_list[i]);
-
-                                i++;
-
-                                if (mOut.Length > CoreConfig.maxMessageSize)
-                                {
-                                    mOut.SetLength(rollback_len);
-                                    i--;
-                                    break;
-                                }
-                            }
-                        }
-                        MessagePriority priority = msg_id > 0 ? MessagePriority.high : MessagePriority.auto;
-                        if(endpoint == null)
-                        {
-                            CoreProtocolMessage.broadcastProtocolMessageToSingleRandomNode(new char[] { 'M', 'H' }, ProtocolMessageCode.getTransactions2, mOut.ToArray(), 0, null);
-                        }else
-                        {
-                            endpoint.sendData(ProtocolMessageCode.getTransactions2, mOut.ToArray(), null, msg_id, priority);
-                        }
-                    }
-                }
-            }
-
 
             public static void handleGetTransactions2(byte[] data, RemoteEndpoint endpoint)
             {

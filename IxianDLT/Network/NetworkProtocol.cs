@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2020 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -20,7 +20,6 @@ using IXICore.Utils;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Net;
 
 namespace DLT
 {
@@ -216,37 +215,7 @@ namespace DLT
 
                 var relayList = RelaySectors.Instance.getSectorNodes(addressWithOffset.bytes, maxRelayCount);
 
-                sendSectorNodes(addressWithOffset.bytes, relayList, endpoint);
-
-            }
-
-            private static void sendSectorNodes(byte[] prefix, List<Address> relayList, RemoteEndpoint endpoint)
-            {
-                using (MemoryStream m = new MemoryStream())
-                {
-                    using (BinaryWriter writer = new BinaryWriter(m))
-                    {
-                        writer.WriteIxiVarInt(prefix.Length);
-                        writer.Write(prefix);
-
-                        writer.WriteIxiVarInt(relayList.Count);
-
-                        foreach (var relay in relayList)
-                        {
-                            var p = PresenceList.getPresenceByAddress(relay);
-                            if (p == null)
-                            {
-                                continue;
-                            }
-
-                            var pBytes = p.getBytes();
-                            writer.WriteIxiVarInt(pBytes.Length);
-                            writer.Write(pBytes);
-                        }
-                    }
-
-                    endpoint.sendData(ProtocolMessageCode.sectorNodes, m.ToArray(), null, 0, MessagePriority.high);
-                }
+                CoreProtocolMessage.sendSectorNodes(addressWithOffset.bytes, relayList, endpoint);
             }
 
             public static void handleGetNameRecord(byte[] data, RemoteEndpoint endpoint)
@@ -256,7 +225,7 @@ namespace DLT
                 offset += name.bytesRead;
 
                 List<RegisteredNameDataRecord> nameData = Node.regNameState.getNameData(name.bytes);
-                CoreProtocolMessage.sendRegisteredNameRecord(endpoint, nameData);
+                CoreProtocolMessage.sendRegisteredNameRecord(endpoint, name.bytes, nameData);
             }
 
             public static void handleHello(byte[] data, RemoteEndpoint endpoint)
@@ -302,7 +271,7 @@ namespace DLT
 
                         int block_version = (int)reader.ReadIxiVarUInt();
 
-                        Node.blockProcessor.highestNetworkBlockNum = Node.blockProcessor.determineHighestNetworkBlockNum();
+                        Node.blockProcessor.highestNetworkBlockNum = CoreProtocolMessage.determineHighestNetworkBlockNum();
 
                         ulong highest_block_height = IxianHandler.getHighestKnownNetworkBlockHeight();
                         if (last_block_num + 15 < highest_block_height)
@@ -322,12 +291,12 @@ namespace DLT
             static void requestNextBlock(ulong blockNum, byte[] blockHash, RemoteEndpoint endpoint)
             {
                 InventoryItemBlock iib = new InventoryItemBlock(blockHash, blockNum);
-                PendingInventoryItem pii = Node.inventoryCache.add(iib, endpoint);
+                PendingInventoryItem pii = InventoryCache.Instance.add(iib, endpoint);
                 if (!pii.processed
                     && pii.lastRequested == 0)
                 {
                     pii.lastRequested = Clock.getTimestamp();
-                    Node.inventoryCache.processInventoryItem(pii);
+                    InventoryCache.Instance.processInventoryItem(pii);
                 }
             }
 
@@ -367,7 +336,7 @@ namespace DLT
                             {
                                 PendingTransactions.increaseReceivedCount(item.hash, endpoint.presence.wallet);
                             }
-                            PendingInventoryItem pii = Node.inventoryCache.add(item, endpoint);
+                            PendingInventoryItem pii = InventoryCache.Instance.add(item, endpoint);
 
                             // First update endpoint blockheights
                             switch (item.type)
@@ -410,13 +379,13 @@ namespace DLT
                                         var iis = (InventoryItemSignature)item;
                                         if (iis.blockNum + 4 < last_accepted_block_height)
                                         {
-                                            Node.inventoryCache.setProcessedFlag(iis.type, iis.hash, true);
+                                            InventoryCache.Instance.setProcessedFlag(iis.type, iis.hash, true);
                                             continue;
                                         }
 
                                         if (iis.blockNum + 4 < network_block_height)
                                         {
-                                            Node.inventoryCache.setProcessedFlag(iis.type, iis.hash, true);
+                                            InventoryCache.Instance.setProcessedFlag(iis.type, iis.hash, true);
                                             requestNextBlock(iis.blockNum, iis.blockHash, endpoint);
                                             continue;
                                         }
@@ -441,24 +410,24 @@ namespace DLT
                                         var iib = ((InventoryItemBlock)item);
                                         if (iib.blockNum <= last_accepted_block_height)
                                         {
-                                            Node.inventoryCache.setProcessedFlag(iib.type, iib.hash, true);
+                                            InventoryCache.Instance.setProcessedFlag(iib.type, iib.hash, true);
                                             continue;
                                         }
                                         requestNextBlock(iib.blockNum, iib.hash, endpoint);
                                         break;
 
                                     default:
-                                        Node.inventoryCache.processInventoryItem(pii);
+                                        InventoryCache.Instance.processInventoryItem(pii);
                                         break;
                                 }
                             }
                         }
 
-                        PresenceProtocolMessages.broadcastGetKeepAlives(ka_list, endpoint);
+                        CoreProtocolMessage.broadcastGetKeepAlives(ka_list, endpoint);
 
                         if (updated_block_height)
                         {
-                            Node.blockProcessor.highestNetworkBlockNum = Node.blockProcessor.determineHighestNetworkBlockNum();
+                            Node.blockProcessor.highestNetworkBlockNum = CoreProtocolMessage.determineHighestNetworkBlockNum();
                             Node.blockSync.determineSyncTargetBlockNum();
                         }
 
@@ -467,7 +436,7 @@ namespace DLT
                             return;
                         }
 
-                        TransactionProtocolMessages.broadcastGetTransactions(tx_list, 0, endpoint);
+                        CoreProtocolMessage.broadcastGetTransactions(tx_list, 0, endpoint);
 
                         foreach (var sig_list in sig_lists)
                         {

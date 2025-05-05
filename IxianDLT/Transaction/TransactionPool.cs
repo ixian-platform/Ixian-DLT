@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2020 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -977,7 +977,7 @@ namespace DLT
         {
             if (verifyTx)
             {
-                Node.inventoryCache.setProcessedFlag(InventoryItemTypes.transaction, transaction.id, true);
+                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.transaction, transaction.id, true);
                 if (!verifyTransaction(transaction, endpoint))
                 {
                     return false;
@@ -2883,7 +2883,7 @@ namespace DLT
             return tx_list;
         }
 
-        // Returs total value of transactions connected to this block 
+        // Returns total value of transactions connected to this block 
         public static IxiNumber getTotalTransactionsValueInBlock(Block block)
         {
             IxiNumber val = 0;

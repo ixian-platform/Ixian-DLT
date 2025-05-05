@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2020 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -14,6 +14,7 @@ using DLT;
 using DLT.Meta;
 using DLTNode.Meta;
 using IXICore;
+using IXICore.Inventory;
 using IXICore.Meta;
 using IXICore.Network;
 using IXICore.RegNames;
@@ -855,8 +856,8 @@ namespace DLTNode
                 queues.Add("Logging", Logging.getRemainingStatementsCount());
                 queues.Add("Pending Transactions", PendingTransactions.pendingTransactionCount());
                 queues.Add("Storage", Node.storage.getQueuedQueryCount());
-                queues.Add("Inventory", Node.inventoryCache.getItemCount());
-                queues.Add("Inventory Processed", Node.inventoryCache.getProcessedItemCount());
+                queues.Add("Inventory", InventoryCache.Instance.getItemCount());
+                queues.Add("Inventory Processed", InventoryCache.Instance.getProcessedItemCount());
                 queues.Add("Activity", ActivityStorage.getQueuedQueryCount());
 
                 networkArray.Add("Queues", queues);

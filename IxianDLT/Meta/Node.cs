@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2020 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -46,7 +46,6 @@ namespace DLT.Meta
         public static RegNamesMemoryStorage regNamesMemoryStorage = null;
         public static RegisteredNames regNameState = null;
         public static IStorage storage = null;
-        public static InventoryCacheDLT inventoryCache = null;
 
         public static StatsConsoleScreen statsConsoleScreen = null;
 
@@ -150,7 +149,7 @@ namespace DLT.Meta
             walletState = new WalletState();
             regNameState = new RegisteredNames(regNamesMemoryStorage);
 
-            inventoryCache = new InventoryCacheDLT();
+            InventoryCache.init(new InventoryCacheDLT());
 
             NetworkClientManager.init(new NetworkClientManagerRandomized(CoreConfig.simultaneousConnectedNeighbors));
 
@@ -312,7 +311,7 @@ namespace DLT.Meta
             UpdateVerify.start();
 
             // Generate presence list
-            PresenceList.init(IxianHandler.publicIP, Config.serverPort, node_type);
+            PresenceList.init(IxianHandler.publicIP, Config.serverPort, node_type, CoreConfig.serverKeepAliveInterval);
 
             ActivityStorage.prepareStorage();
 
@@ -723,7 +722,7 @@ namespace DLT.Meta
                     BlockSignature blockSig = b.applySignature(PresenceList.getPowSolution());
                     if (blockSig != null)
                     {
-                        inventoryCache.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum), true);
+                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum), true);
                         SignatureProtocolMessages.broadcastBlockSignature(blockSig, b.blockNum, b.blockChecksum, null, null);
                     }
                 }
@@ -815,7 +814,7 @@ namespace DLT.Meta
                         // Cleanup the presence list
                         PresenceList.performCleanup();
 
-                        inventoryCache.processCache();
+                        InventoryCache.Instance.processCache();
 
                         if (update() == false)
                         {
@@ -1222,6 +1221,8 @@ namespace DLT.Meta
             }
 
             blockProcessor.acceptLocalNewBlock();
+
+            PresenceList.forceSendKeepAlive = true;
         }
     }
 

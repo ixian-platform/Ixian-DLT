@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2024 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -1079,7 +1079,7 @@ namespace DLT
                     if (fetchTransactions)
                     {
                         Logging.info("Missing transaction '{0}', adding to fetch queue.", Transaction.getTxIdString(txid));
-                        var pii = Node.inventoryCache.add(new InventoryItem(InventoryItemTypes.transaction, txid), endpoint);
+                        var pii = InventoryCache.Instance.add(new InventoryItem(InventoryItemTypes.transaction, txid), endpoint);
                         if (pii.processed || pii.lastRequested == 0)
                         {
                             pii.lastRequested = Clock.getTimestamp();
@@ -1087,7 +1087,7 @@ namespace DLT
                         }
                     }else
                     {
-                        var pii = Node.inventoryCache.add(new InventoryItem(InventoryItemTypes.transaction, txid), endpoint);
+                        var pii = InventoryCache.Instance.add(new InventoryItem(InventoryItemTypes.transaction, txid), endpoint);
                         if (!pii.processed && Clock.getTimestamp() - pii.lastRequested > 5)
                         {
                             pii.lastRequested = 0;
@@ -1190,7 +1190,7 @@ namespace DLT
 
             if(fetchTransactions)
             {
-                TransactionProtocolMessages.broadcastGetTransactions(txs_to_fetch, -(long)b.blockNum, endpoint);
+                CoreProtocolMessage.broadcastGetTransactions(txs_to_fetch, -(long)b.blockNum, endpoint);
             }
 
             // Pass #2 verifications for multisigs after all transactions have been received
@@ -1283,7 +1283,7 @@ namespace DLT
                     }
                 }
                 Logging.info("Waiting for missing transactions for Block #{0}.", b.blockNum);
-                var pii = Node.inventoryCache.add(new InventoryItemBlock(b.blockChecksum, b.blockNum), endpoint);
+                var pii = InventoryCache.Instance.add(new InventoryItemBlock(b.blockChecksum, b.blockNum), endpoint);
                 if (pii != null)
                 {
                     pii.retryCount = 0;
@@ -1484,7 +1484,7 @@ namespace DLT
                                 {
                                     foreach (var sig in added_signatures)
                                     {
-                                        Node.inventoryCache.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum), true);
+                                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum), true);
                                         SignatureProtocolMessages.broadcastBlockSignature(sig, b.blockNum, b.blockChecksum, endpoint, null);
                                     }
                                 }
@@ -1857,7 +1857,7 @@ namespace DLT
                         {
                             foreach (var sig in added_signatures)
                             {
-                                Node.inventoryCache.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, block.blockChecksum), true);
+                                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, block.blockChecksum), true);
                                 SignatureProtocolMessages.broadcastBlockSignature(sig, block.blockNum, block.blockChecksum, endpoint, null);
                             }
                         }
@@ -2166,7 +2166,7 @@ namespace DLT
                             {
                                 foreach (var sig in localNewBlock.signatures)
                                 {
-                                    Node.inventoryCache.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum), true);
+                                    InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum), true);
                                     SignatureProtocolMessages.broadcastBlockSignature(sig, localNewBlock.blockNum, localNewBlock.blockChecksum, null, null);
                                 }
                                 BlockProtocolMessages.broadcastNewBlock(localNewBlock, null, null);
@@ -3229,7 +3229,7 @@ namespace DLT
                     BlockSignature signature_data = localNewBlock.applySignature(PresenceList.getPowSolution());
                     if (signature_data != null)
                     {
-                        Node.inventoryCache.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(signature_data.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum), true);
+                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(signature_data.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum), true);
                     }else
                     {
                         Logging.error("Could not apply signature on a newly generated block {0}.", localNewBlock.blockNum);
@@ -3242,7 +3242,7 @@ namespace DLT
                     currentBlockStartTime = DateTime.UtcNow;
                     lastBlockStartTime = DateTime.UtcNow.AddSeconds(-blockGenerationInterval * 10); // TODO TODO TODO make sure that this is ok
 
-                    Node.inventoryCache.setProcessedFlag(InventoryItemTypes.block, localNewBlock.blockChecksum, true);
+                    InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.block, localNewBlock.blockChecksum, true);
                     // Broadcast the new block
                     BlockProtocolMessages.broadcastNewBlock(localNewBlock, null, null, true);
 
@@ -4078,52 +4078,6 @@ namespace DLT
             }
         }
 
-        /// <summary>
-        ///  Determines highest network block height depending on 2/3rd of connected servers block heights.
-        /// </summary>
-        public ulong determineHighestNetworkBlockNum()
-        {
-            List<ulong> blockHeights = NetworkClientManager.getBlockHeights();
-            blockHeights.AddRange(NetworkServer.getBlockHeights());
-
-            if (blockHeights.Count() < 1)
-            {
-                return 0;
-            }
-
-            blockHeights.Sort();
-
-            int thirdCount = (int)Math.Floor((decimal)blockHeights.Count / 3);
-
-            var blockHeightsMajority = blockHeights;
-
-            if (thirdCount >= 1 && blockHeights.Count > thirdCount)
-            {
-                blockHeightsMajority = blockHeights.Skip(thirdCount).Take(thirdCount).ToList();
-            }
-
-            ulong netBh = blockHeightsMajority.Max();
-
-            if (Node.blockChain == null)
-            {
-                return netBh;
-            }
-
-            Block lastBlock = Node.blockChain.getLastBlock();
-            if (lastBlock == null)
-            {
-                return netBh;
-            }
-
-            ulong maxBlocksGenerated = (ulong)(Clock.getNetworkTimestamp() - lastBlock.timestamp) / (ulong)ConsensusConfig.blockGenerationInterval;
-            ulong maxBlockHeight = lastBlock.blockNum + maxBlocksGenerated;
-            if (maxBlockHeight < netBh)
-            {
-                return maxBlockHeight;
-            }
-            return netBh;
-        }
-
         public void applyUpdatedSolutionSignature()
         {
             lock (localBlockLock)
@@ -4140,7 +4094,7 @@ namespace DLT
                     BlockSignature blockSig = b.applySignature(PresenceList.getPowSolution());
                     if (blockSig != null)
                     {
-                        Node.inventoryCache.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum), true);
+                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum), true);
                         SignatureProtocolMessages.broadcastBlockSignature(blockSig, b.blockNum, b.blockChecksum, null, null);
                     }
                 }
