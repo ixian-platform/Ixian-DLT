@@ -1514,7 +1514,8 @@ namespace DLT
                     // This should happen when node first starts up.
                     Logging.info("Network synchronization started. Target block height: #{0}.", block_height);
 
-                    if (CoreConfig.preventNetworkOperations)
+                    if (CoreConfig.preventNetworkOperations
+                        || Config.recoverFromFile)
                     {
                         Node.blockProcessor.highestNetworkBlockNum = last_block_to_read_from_storage;
                     }

@@ -434,8 +434,9 @@ namespace DLT.Meta
                         blockSync.onHelloDataReceived(blockNum, b.blockChecksum, b.version, b.walletStateChecksum, b.regNameStateChecksum, b.getFrozenSignatureCount(), lastLocalBlockNum);
                     }else
                     {
-                        walletState.clear();
-                        regNameState.clear();
+                        Logging.error("Missing block #{0} in storage, cannot recover from wallet state.", blockNum);
+                        Program.noStart = true;
+                        return;
                     }
                 }else
                 {
@@ -444,7 +445,8 @@ namespace DLT.Meta
                     walletState.clear();
                     regNameState.clear();
 
-                    if (CoreConfig.preventNetworkOperations)
+                    if (CoreConfig.preventNetworkOperations
+                        || Config.recoverFromFile)
                     {
                         Block b = storage.getBlock(lastLocalBlockNum);
                         blockSync.onHelloDataReceived(b.blockNum, b.blockChecksum, b.version, b.walletStateChecksum, b.regNameStateChecksum, b.getFrozenSignatureCount(), lastLocalBlockNum);

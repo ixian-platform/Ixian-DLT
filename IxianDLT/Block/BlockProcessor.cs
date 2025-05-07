@@ -183,7 +183,7 @@ namespace DLT
                                 // First 7 blocks should be generated only by genesis node
                                 if (localNewBlock == null)
                                 {
-                                    if (last_block_num > 7 || Node.genesisNode)
+                                    if (last_block_num > 7 || Node.genesisNode || Config.recoverFromFile)
                                     {
                                         if (timeSinceLastBlock.TotalSeconds > (blockGenerationInterval * 4) + randomInt / 100) // no block for 4 block times + random seconds, we don't want all nodes sending at once
                                         {
