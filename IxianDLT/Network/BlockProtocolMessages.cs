@@ -233,6 +233,11 @@ namespace DLT
                     MemoryStream mOut = new MemoryStream(minimal_pit.Length + 12);
                     using (BinaryWriter w = new BinaryWriter(mOut, Encoding.UTF8, true))
                     {
+                        if (endpoint.presenceAddress.type == 'R')
+                        {
+                            w.WriteIxiVarInt(filter.Length);
+                            w.Write(filter);
+                        }
                         w.WriteIxiVarInt(block_num);
                         w.WriteIxiVarInt(minimal_pit.Length);
                         w.Write(minimal_pit);

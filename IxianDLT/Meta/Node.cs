@@ -1189,31 +1189,6 @@ namespace DLT.Meta
             return regNameState.getName(name, useAbsoluteId);
         }
 
-        public override bool receivedNewTransaction(Transaction tx)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override FriendMessage addMessageWithType(byte[] id, FriendMessageType type, Address wallet_address, int channel, string message, bool local_sender = false, Address sender_address = null, long timestamp = 0, bool fire_local_notification = true, int payable_data_len = 0)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override byte[] resizeImage(byte[] imageData, int width, int height, int quality)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override void resubscribeEvents()
-        {
-            throw new NotImplementedException();
-        }
-
-        public override void receiveStreamData(byte[] data, RemoteEndpoint endpoint, bool fireLocalNotification)
-        {
-            throw new NotImplementedException();
-        }
-
         public override long getTimeSinceLastBlock()
         {
             return blockChain.getTimeSinceLastBlock();
@@ -1221,7 +1196,7 @@ namespace DLT.Meta
 
         public override void triggerSignerPowSolutionFound()
         {
-            if (IxianHandler.getTimeSinceLastBlock() > CoreConfig.blockSignaturePlCheckTimeout)
+            if (blockChain.getTimeSinceLastBlock() > CoreConfig.blockSignaturePlCheckTimeout)
             {
                 blockProcessor.applyUpdatedSolutionSignature();
             }

@@ -1547,8 +1547,11 @@ namespace DLT
                                     || (Node.walletState.calculateWalletStateChecksum().SequenceEqual(walletstate_checksum)
                                         && (b.version < BlockVer.v11 || Node.regNameState.calculateRegNameStateChecksum(b.blockNum).SequenceEqual(regnamestate_checksum))))
                                 {
-                                    wsSyncConfirmedBlockNum = block_height;
-                                    wsSynced = true;
+                                    if (block_height >= 1000)
+                                    {
+                                        wsSyncConfirmedBlockNum = block_height;
+                                        wsSynced = true;
+                                    }
                                 }
                                 else
                                 {
