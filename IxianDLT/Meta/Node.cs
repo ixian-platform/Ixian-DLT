@@ -378,8 +378,8 @@ namespace DLT.Meta
 
                 distributeGenesisFunds(genesisFunds);
 
-                CoreNetworkUtils.seedTestNetNodes = new List<string[]>();
-                CoreNetworkUtils.seedNodes = new List<string[]>();
+                NetworkUtils.seedTestNetNodes = new List<string[]>();
+                NetworkUtils.seedNodes = new List<string[]>();
 
                 genesisNode = true;
                 PresenceList.myPresenceType = 'M';
@@ -528,7 +528,7 @@ namespace DLT.Meta
             TimeSpan last_isolate_time_diff = DateTime.UtcNow - lastIsolateTime;
             if (blockChain.getTimeSinceLastBlock() > 900 && (last_isolate_time_diff.TotalSeconds < 0 || last_isolate_time_diff.TotalSeconds > 1800)) // if no block for over 900 seconds with cooldown of 1800 seconds
             {
-                CoreNetworkUtils.reconnect(false);
+                NetworkUtils.reconnect(false);
                 lastIsolateTime = DateTime.UtcNow;
             }
 

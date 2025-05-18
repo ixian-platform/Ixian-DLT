@@ -314,10 +314,10 @@ namespace DLT
                             externalIp = value;
                             break;
                         case "addPeer":
-                            CoreNetworkUtils.seedNodes.Add(new string[2] { value, null });
+                            NetworkUtils.seedNodes.Add(new string[2] { value, null });
                             break;
                         case "addTestnetPeer":
-                            CoreNetworkUtils.seedTestNetNodes.Add(new string[2] { value, null });
+                            NetworkUtils.seedTestNetNodes.Add(new string[2] { value, null });
                             break;
                         case "maxLogSize":
                             maxLogSize = int.Parse(value);
@@ -558,7 +558,7 @@ namespace DLT
                     switch (networkType)
                     {
                         case NetworkType.main:
-                            CoreNetworkUtils.seedNodes = new List<string[]>
+                            NetworkUtils.seedNodes = new List<string[]>
                             {
                                 new string[2] { seedNode, null }
                             };
@@ -566,7 +566,7 @@ namespace DLT
 
                         case NetworkType.test:
                         case NetworkType.reg:
-                            CoreNetworkUtils.seedTestNetNodes = new List<string[]>
+                            NetworkUtils.seedTestNetNodes = new List<string[]>
                             {
                                 new string[2] { seedNode, null }
                             };
