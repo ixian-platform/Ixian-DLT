@@ -15,12 +15,13 @@ using IXICore.Meta;
 using IXICore.Network;
 using IXICore.RegNames;
 using System;
+using System.Collections.Generic;
 
 namespace UnitTests
 {
     public class DummyIxianNode : IxianNode
     {
-        public override bool addTransaction(Transaction tx, bool force_broadcast)
+        public override bool addTransaction(Transaction tx, List<Address> relayNodeAddresses, bool force_broadcast)
         {
             throw new NotImplementedException();
         }
@@ -65,6 +66,11 @@ namespace UnitTests
             throw new NotImplementedException();
         }
 
+        public override long getTimeSinceLastBlock()
+        {
+            throw new NotImplementedException();
+        }
+
         public override Wallet getWallet(Address id)
         {
             throw new NotImplementedException();
@@ -86,6 +92,11 @@ namespace UnitTests
         }
 
         public override void shutdown()
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void triggerSignerPowSolutionFound()
         {
             throw new NotImplementedException();
         }

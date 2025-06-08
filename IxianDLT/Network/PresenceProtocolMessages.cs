@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2020 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -27,137 +27,21 @@ namespace DLT
     {
         class PresenceProtocolMessages
         {
-            public static void broadcastGetKeepAlives(List<InventoryItemKeepAlive> ka_list, RemoteEndpoint endpoint)
+            private static void forwardKeepAlivePresence(byte[] ka_bytes, byte[] hash, Address address, long last_seen, byte[] device_id, char node_type, RemoteEndpoint endpoint)
             {
-                int ka_count = ka_list.Count;
-                int max_ka_per_chunk = CoreConfig.maximumKeepAlivesPerChunk;
-                for (int i = 0; i < ka_count;)
+                if (node_type == 'M' || node_type == 'H')
                 {
-                    using (MemoryStream mOut = new MemoryStream(max_ka_per_chunk * 570))
-                    {
-                        using (BinaryWriter writer = new BinaryWriter(mOut))
-                        {
-                            int next_ka_count;
-                            if (ka_count - i > max_ka_per_chunk)
-                            {
-                                next_ka_count = max_ka_per_chunk;
-                            }
-                            else
-                            {
-                                next_ka_count = ka_count - i;
-                            }
-                            writer.WriteIxiVarInt(next_ka_count);
-
-                            for (int j = 0; j < next_ka_count && i < ka_count; j++)
-                            {
-                                InventoryItemKeepAlive ka = ka_list[i];
-                                i++;
-
-                                if (ka == null)
-                                {
-                                    break;
-                                }
-
-                                long rollback_len = mOut.Length;
-
-                                writer.WriteIxiVarInt(ka.address.addressNoChecksum.Length);
-                                writer.Write(ka.address.addressNoChecksum);
-
-                                writer.WriteIxiVarInt(ka.deviceId.Length);
-                                writer.Write(ka.deviceId);
-
-                                if (mOut.Length > CoreConfig.maxMessageSize)
-                                {
-                                    mOut.SetLength(rollback_len);
-                                    i--;
-                                    break;
-                                }
-                            }
-                        }
-                        endpoint.sendData(ProtocolMessageCode.getKeepAlives, mOut.ToArray(), null);
-                    }
+                    // Send this keepalive to all connected clients
+                    CoreProtocolMessage.addToInventory(['M', 'H', 'W', 'R'], new InventoryItemKeepAlive(hash, last_seen, address, device_id), endpoint);
                 }
-            }
-
-            public static void handleGetKeepAlives(byte[] data, RemoteEndpoint endpoint)
-            {
-                using (MemoryStream m = new MemoryStream(data))
+                else
                 {
-                    using (BinaryReader reader = new BinaryReader(m))
-                    {
-                        int ka_count = (int)reader.ReadIxiVarUInt();
-
-                        int max_ka_per_chunk = CoreConfig.maximumKeepAlivesPerChunk;
-
-                        for (int i = 0; i < ka_count;)
-                        {
-                            using (MemoryStream mOut = new MemoryStream(max_ka_per_chunk * 570))
-                            {
-                                using (BinaryWriter writer = new BinaryWriter(mOut))
-                                {
-                                    int next_ka_count;
-                                    if (ka_count - i > max_ka_per_chunk)
-                                    {
-                                        next_ka_count = max_ka_per_chunk;
-                                    }
-                                    else
-                                    {
-                                        next_ka_count = ka_count - i;
-                                    }
-                                    writer.WriteIxiVarInt(next_ka_count);
-
-                                    for (int j = 0; j < next_ka_count && i < ka_count; j++)
-                                    {
-                                        i++;
-
-                                        long in_rollback_pos = reader.BaseStream.Position;
-                                        long out_rollback_len = mOut.Length;
-
-                                        if(m.Position == m.Length)
-                                        {
-                                            break;
-                                        }
-
-                                        int address_len = (int)reader.ReadIxiVarUInt();
-                                        Address address = new Address(reader.ReadBytes(address_len));
-
-                                        int device_len = (int)reader.ReadIxiVarUInt();
-                                        byte[] device = reader.ReadBytes(device_len);
-
-                                        Presence p = PresenceList.getPresenceByAddress(address);
-                                        if (p == null)
-                                        {
-                                            Logging.info("I don't have presence: " + address.ToString());
-                                            continue;
-                                        }
-
-                                        PresenceAddress pa = p.addresses.Find(x => x.device.SequenceEqual(device));
-                                        if (pa == null)
-                                        {
-                                            Logging.info("I don't have presence address: " + address.ToString());
-                                            continue;
-                                        }
-
-                                        KeepAlive ka = pa.getKeepAlive(address, p.powSolution);
-                                        byte[] ka_bytes = ka.getBytes();
-                                        byte[] ka_len = IxiVarInt.GetIxiVarIntBytes(ka_bytes.Length);
-                                        writer.Write(ka_len);
-                                        writer.Write(ka_bytes);
-
-                                        if (mOut.Length > CoreConfig.maxMessageSize)
-                                        {
-                                            reader.BaseStream.Position = in_rollback_pos;
-                                            mOut.SetLength(out_rollback_len);
-                                            i--;
-                                            break;
-                                        }
-                                    }
-                                }
-                                endpoint.sendData(ProtocolMessageCode.keepAlivesChunk, mOut.ToArray(), null);
-                            }
-                        }
-                    }
+                    // Send this keepalive to all connected non-clients
+                    CoreProtocolMessage.addToInventory(['M', 'H', 'W'], new InventoryItemKeepAlive(hash, last_seen, address, device_id), endpoint);
                 }
+
+                // Send this keepalive message to all subscribed clients
+                CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.keepAlive, address.addressNoChecksum, ProtocolMessageCode.keepAlivePresence, ka_bytes, address.addressNoChecksum, endpoint);
             }
 
             public static void handleKeepAlivesChunk(byte[] data, RemoteEndpoint endpoint)
@@ -183,23 +67,8 @@ namespace DLT
 
                             int ka_len = (int)reader.ReadIxiVarUInt();
                             byte[] ka_bytes = reader.ReadBytes(ka_len);
-                            byte[] hash = CryptoManager.lib.sha3_512sqTrunc(ka_bytes);
-
-                            Node.inventoryCache.setProcessedFlag(InventoryItemTypes.keepAlive, hash, true);
-
-                            Address address;
-                            long last_seen;
-                            byte[] device_id;
-                            bool updated = PresenceList.receiveKeepAlive(ka_bytes, out address, out last_seen, out device_id, endpoint);
-
-                            // If a presence entry was updated, broadcast this message again
-                            if (updated && Node.isMasterNode() && !Node.blockSync.synchronizing)
-                            {
-                                CoreProtocolMessage.addToInventory(new char[] { 'M', 'H', 'W' }, new InventoryItemKeepAlive(hash, last_seen, address, device_id), endpoint);
-
-                                // Send this keepalive message to all subscribed clients
-                                CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.keepAlive, address.addressNoChecksum, ProtocolMessageCode.keepAlivePresence, ka_bytes, address.addressNoChecksum, endpoint);
-                            }
+                            
+                            handleKeepAlivePresence(ka_bytes, endpoint);
                         }
                     }
                 }
@@ -228,7 +97,7 @@ namespace DLT
                         else
                         {
                             // TODO blacklisting point
-                            Logging.warn(string.Format("Node has requested presence information about {0} that is not in our PL.", wallet.ToString()));
+                            Logging.warn("Node has requested presence information about {0} that is not in our PL.", wallet.ToString());
                         }
                     }
                 }
@@ -239,20 +108,18 @@ namespace DLT
                 Address address = null;
                 long last_seen = 0;
                 byte[] device_id = null;
+                char node_type;
 
                 byte[] hash = CryptoManager.lib.sha3_512sqTrunc(data);
 
-                Node.inventoryCache.setProcessedFlag(InventoryItemTypes.keepAlive, hash, true);
+                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.keepAlive, hash, true);
 
-                bool updated = PresenceList.receiveKeepAlive(data, out address, out last_seen, out device_id, endpoint);
+                bool updated = PresenceList.receiveKeepAlive(data, out address, out last_seen, out device_id, out node_type, endpoint);
 
                 // If a presence entry was updated, broadcast this message again
                 if (updated && Node.isMasterNode() && !Node.blockSync.synchronizing)
                 {
-                    CoreProtocolMessage.addToInventory(new char[] { 'M', 'H', 'W' }, new InventoryItemKeepAlive(hash, last_seen, address, device_id), endpoint);
-
-                    // Send this keepalive message to all subscribed clients
-                    CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.keepAlive, address.addressNoChecksum, ProtocolMessageCode.keepAlivePresence, data, address.addressNoChecksum, endpoint);
+                    forwardKeepAlivePresence(data, hash, address, last_seen, device_id, node_type, endpoint);
                 }
             }
 
@@ -297,7 +164,22 @@ namespace DLT
                 // If a presence entry was updated, broadcast this message again
                 if (updated_presence != null)
                 {
-                    CoreProtocolMessage.broadcastProtocolMessage(new char[] { 'M', 'H', 'W' }, ProtocolMessageCode.updatePresence, data, updated_presence.wallet.addressNoChecksum, endpoint);
+                    foreach (var pa in updated_presence.addresses)
+                    {
+                        byte[] hash = CryptoManager.lib.sha3_512sqTrunc(pa.getBytes());
+                        var iika = new InventoryItemKeepAlive(hash, pa.lastSeenTime, updated_presence.wallet, pa.device);
+
+                        if (pa.type == 'M' || pa.type == 'H')
+                        {
+                            // Send this keepalive to all connected clients
+                            CoreProtocolMessage.addToInventory(['M', 'H', 'W', 'R'], iika, endpoint);
+                        }
+                        else
+                        {
+                            // Send this keepalive to all connected non-clients
+                            CoreProtocolMessage.addToInventory(['M', 'H', 'W'], iika, endpoint);
+                        }
+                    }
 
                     // Send this keepalive message to all subscribed clients
                     CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.keepAlive, updated_presence.wallet.addressNoChecksum, ProtocolMessageCode.updatePresence, data, updated_presence.wallet.addressNoChecksum, endpoint);

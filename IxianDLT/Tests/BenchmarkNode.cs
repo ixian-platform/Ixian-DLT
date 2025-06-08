@@ -16,8 +16,10 @@ using IXICore;
 using IXICore.Meta;
 using IXICore.Network;
 using IXICore.RegNames;
+using IXICore.Streaming;
 using IXICore.Utils;
 using System;
+using System.Collections.Generic;
 
 namespace DLTNode
 {
@@ -160,7 +162,7 @@ namespace DLTNode
             return Block.maxVersion - 1;          
         }
 
-        public override bool addTransaction(Transaction tx, bool force_broadcast)
+        public override bool addTransaction(Transaction tx, List<Address> relayNodeAddresses, bool force_broadcast)
         {
             return true;
         }
@@ -206,6 +208,11 @@ namespace DLTNode
         }
 
         public override byte[] getBlockHash(ulong blockNum)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void triggerSignerPowSolutionFound()
         {
             throw new NotImplementedException();
         }

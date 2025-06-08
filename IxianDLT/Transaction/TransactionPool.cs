@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2020 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -11,10 +11,12 @@
 // MIT License for more details.
 
 using DLT.Meta;
+using DLTNode;
 using IXICore;
 using IXICore.Inventory;
 using IXICore.Meta;
 using IXICore.Network;
+using IXICore.Network.Messages;
 using IXICore.RegNames;
 using IXICore.Utils;
 using System;
@@ -24,7 +26,13 @@ using System.Text;
 using static IXICore.Transaction;
 
 namespace DLT
-{
+{    enum TxErrorDetails
+    {
+        NoDetails = 0,
+        Dust = 1,
+        InsufficientFee = 2,
+    }
+
     class TransactionPool
     {
         private class BlockSolution
@@ -236,8 +244,10 @@ namespace DLT
             return true;
         }
 
-        public static bool verifyTransaction(Transaction transaction, RemoteEndpoint endpoint, bool full_check = true)
+        public static bool verifyTransaction(Transaction transaction, RemoteEndpoint endpoint, out TxErrorDetails errorDetails, bool full_check = true)
         {
+            errorDetails = TxErrorDetails.NoDetails;
+
             if (transaction.type < 0 || transaction.type > (int)Transaction.Type.RegName)
             {
                 Logging.warn("Unknown transaction type, txid: {0}", transaction.getTxIdString());
@@ -529,6 +539,7 @@ namespace DLT
                         if (entry.Value.amount < ConsensusConfig.transactionDustLimit)
                         {
                             Logging.warn("Transaction recipient amount was lower than dust limit for txid {0}.", transaction.getTxIdString());
+                            errorDetails = TxErrorDetails.Dust;
                             return false;
                         }
                     }
@@ -580,6 +591,7 @@ namespace DLT
                 {
                     // Prevent transactions that can't pay the minimum fee
                     Logging.warn("Transaction fee does not cover minimum fee for {{ {0} }}, specified tx fee: {1}, min. expected fee: {2}, tx length: {3}.", transaction.getTxIdString(), transaction.fee, expectedFee, transaction.getBytes(false, true).Length);
+                    errorDetails = TxErrorDetails.InsufficientFee;
                     return false;
                 }
             }
@@ -975,25 +987,59 @@ namespace DLT
         // Returns true if the transaction is added to the pool, false otherwise
         public static bool addTransaction(Transaction transaction, bool no_broadcast = false, RemoteEndpoint endpoint = null, bool verifyTx = true, bool force_broadcast = false)
         {
+            // Search for duplicates
+            if ((transaction.blockHeight <= Node.blockChain.getLastBlockNum() + 1 && appliedTransactions.ContainsKey(transaction.id))
+                || unappliedTransactions.ContainsKey(transaction.id))
+            {
+                if (endpoint != null)
+                {
+                    CoreProtocolMessage.sendRejected(RejectedCode.TxDuplicate, transaction.id, endpoint);
+                } else
+                {
+                    Logging.warn("Duplicate transaction {0}: already exists in the Transaction Pool.", transaction.getTxIdString());
+                }
+                return false;
+            }
+
             if (verifyTx)
             {
-                Node.inventoryCache.setProcessedFlag(InventoryItemTypes.transaction, transaction.id, true);
-                if (!verifyTransaction(transaction, endpoint))
+                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.transaction, transaction.id, true);
+                TxErrorDetails errorDetails;
+                if (!verifyTransaction(transaction, endpoint, out errorDetails))
                 {
+                    RejectedCode rejectedCode = RejectedCode.TxInvalid;
+                    switch (errorDetails)
+                    {
+                        case TxErrorDetails.InsufficientFee:
+                            rejectedCode = RejectedCode.TxInsufficientFee;
+                            break;
+
+                        case TxErrorDetails.Dust:
+                            rejectedCode = RejectedCode.TxDust;
+                            break;
+                    }
+                    CoreProtocolMessage.sendRejected(rejectedCode, transaction.id, endpoint);
                     return false;
                 }
             }
 
             lock (stateLock)
             {
-                // Search for duplicates
+                // Search for duplicates 2nd pass
                 if ((transaction.blockHeight <= Node.blockChain.getLastBlockNum() + 1 && appliedTransactions.ContainsKey(transaction.id))
-                    || unappliedTransactions.ContainsKey(transaction.id))
+                    || !unappliedTransactions.TryAdd(transaction.id, transaction))
                 {
-                    // Logging.warn("Duplicate transaction {0}: already exists in the Transaction Pool.", transaction.getTxIdString());
+                    if (endpoint != null)
+                    {
+                        CoreProtocolMessage.sendRejected(RejectedCode.TxDuplicate, transaction.id, endpoint);
+                    }
+                    else
+                    {
+                        Logging.warn("Duplicate transaction {0}: already exists in the Transaction Pool.", transaction.getTxIdString());
+                    }
                     return false;
                 }
-                unappliedTransactions.Add(transaction.id, transaction);
+
                 if (!transaction.fromLocalStorage)
                 {
                     if (transaction.timeStamp == 0)
@@ -2766,7 +2812,7 @@ namespace DLT
                         else
                         {
                             // check if transaction is still valid
-                            if (getUnappliedTransaction(t.id) == null && !verifyTransaction(t, null, false))
+                            if (getUnappliedTransaction(t.id) == null && !verifyTransaction(t, null, out _, false))
                             {
                                 ActivityStorage.updateStatus(t.id, ActivityStatus.Error, 0);
                                 PendingTransactions.pendingTransactions.RemoveAll(x => x.transaction.id.SequenceEqual(t.id));
@@ -2883,7 +2929,7 @@ namespace DLT
             return tx_list;
         }
 
-        // Returs total value of transactions connected to this block 
+        // Returns total value of transactions connected to this block 
         public static IxiNumber getTotalTransactionsValueInBlock(Block block)
         {
             IxiNumber val = 0;

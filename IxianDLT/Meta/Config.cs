@@ -101,7 +101,7 @@ namespace DLT
             public static ulong forceSyncToBlock = 0;
 
             // Read-only values
-            public static readonly string version = "xdc-0.9.3g"; // DLT Node version
+            public static readonly string version = "xdc-0.9.4-dev"; // DLT Node version
 
             public static readonly string checkVersionUrl = "https://resources.ixian.io/update.txt";
             public static readonly int checkVersionSeconds = 6 * 60 * 60; // 6 hours
@@ -314,10 +314,10 @@ namespace DLT
                             externalIp = value;
                             break;
                         case "addPeer":
-                            CoreNetworkUtils.seedNodes.Add(new string[2] { value, null });
+                            NetworkUtils.seedNodes.Add(new string[2] { value, null });
                             break;
                         case "addTestnetPeer":
-                            CoreNetworkUtils.seedTestNetNodes.Add(new string[2] { value, null });
+                            NetworkUtils.seedTestNetNodes.Add(new string[2] { value, null });
                             break;
                         case "maxLogSize":
                             maxLogSize = int.Parse(value);
@@ -558,7 +558,7 @@ namespace DLT
                     switch (networkType)
                     {
                         case NetworkType.main:
-                            CoreNetworkUtils.seedNodes = new List<string[]>
+                            NetworkUtils.seedNodes = new List<string[]>
                             {
                                 new string[2] { seedNode, null }
                             };
@@ -566,7 +566,7 @@ namespace DLT
 
                         case NetworkType.test:
                         case NetworkType.reg:
-                            CoreNetworkUtils.seedTestNetNodes = new List<string[]>
+                            NetworkUtils.seedTestNetNodes = new List<string[]>
                             {
                                 new string[2] { seedNode, null }
                             };

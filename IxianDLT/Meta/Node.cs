@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2020 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -19,8 +19,10 @@ using DLTNode.Meta;
 using IXICore;
 using IXICore.Inventory;
 using IXICore.Meta;
+using IXICore.Miner;
 using IXICore.Network;
 using IXICore.RegNames;
+using IXICore.Streaming;
 using IXICore.Utils;
 using Newtonsoft.Json;
 using System;
@@ -44,7 +46,6 @@ namespace DLT.Meta
         public static RegNamesMemoryStorage regNamesMemoryStorage = null;
         public static RegisteredNames regNameState = null;
         public static IStorage storage = null;
-        public static InventoryCacheDLT inventoryCache = null;
 
         public static StatsConsoleScreen statsConsoleScreen = null;
 
@@ -144,14 +145,18 @@ namespace DLT.Meta
                 return;
             }
 
-            // Setup the stats console
-            statsConsoleScreen = new StatsConsoleScreen();
-
             // Initialize the wallet state
             walletState = new WalletState();
             regNameState = new RegisteredNames(regNamesMemoryStorage);
 
-            inventoryCache = new InventoryCacheDLT();
+            InventoryCache.init(new InventoryCacheDLT());
+
+            NetworkClientManager.init(new NetworkClientManagerRandomized(CoreConfig.simultaneousConnectedNeighbors));
+
+            RelaySectors.init(CoreConfig.relaySectorLevels, null);
+
+            // Setup the stats console
+            statsConsoleScreen = new StatsConsoleScreen();
         }
 
         private bool initWallet()
@@ -296,6 +301,10 @@ namespace DLT.Meta
         public void start(bool verboseConsoleOutput)
         {
             char node_type = 'W';
+            if (Config.recoverFromFile)
+            {
+                node_type = 'M';
+            }
 
             // Check if we're in worker-only mode
             if (Config.workerOnly)
@@ -306,7 +315,7 @@ namespace DLT.Meta
             UpdateVerify.start();
 
             // Generate presence list
-            PresenceList.init(IxianHandler.publicIP, Config.serverPort, node_type);
+            PresenceList.init(IxianHandler.publicIP, Config.serverPort, node_type, CoreConfig.serverKeepAliveInterval);
 
             ActivityStorage.prepareStorage();
 
@@ -365,17 +374,17 @@ namespace DLT.Meta
             // Check if this is a genesis node
             if (genesisFunds > (long)0)
             {
-                Logging.info(String.Format("Genesis {0} specified. Starting operation.", genesisFunds));
+                Logging.info("Genesis {0} specified. Starting operation.", genesisFunds);
 
                 distributeGenesisFunds(genesisFunds);
 
-                CoreNetworkUtils.seedTestNetNodes = new List<string[]>();
-                CoreNetworkUtils.seedNodes = new List<string[]>();
+                NetworkUtils.seedTestNetNodes = new List<string[]>();
+                NetworkUtils.seedNodes = new List<string[]>();
 
                 genesisNode = true;
                 PresenceList.myPresenceType = 'M';
                 blockProcessor.resumeOperation();
-                signerPowMiner.start();
+                signerPowMiner.start(Config.cpuThreads > 2 ? (int)Config.cpuThreads / 2 : 1);
                 serverStarted = true;
                 if (!isMasterNode())
                 {
@@ -425,8 +434,9 @@ namespace DLT.Meta
                         blockSync.onHelloDataReceived(blockNum, b.blockChecksum, b.version, b.walletStateChecksum, b.regNameStateChecksum, b.getFrozenSignatureCount(), lastLocalBlockNum);
                     }else
                     {
-                        walletState.clear();
-                        regNameState.clear();
+                        Logging.error("Missing block #{0} in storage, cannot recover from wallet state.", blockNum);
+                        Program.noStart = true;
+                        return;
                     }
                 }else
                 {
@@ -435,7 +445,8 @@ namespace DLT.Meta
                     walletState.clear();
                     regNameState.clear();
 
-                    if (CoreConfig.preventNetworkOperations)
+                    if (CoreConfig.preventNetworkOperations
+                        || Config.recoverFromFile)
                     {
                         Block b = storage.getBlock(lastLocalBlockNum);
                         blockSync.onHelloDataReceived(b.blockNum, b.blockChecksum, b.version, b.walletStateChecksum, b.regNameStateChecksum, b.getFrozenSignatureCount(), lastLocalBlockNum);
@@ -517,7 +528,7 @@ namespace DLT.Meta
             TimeSpan last_isolate_time_diff = DateTime.UtcNow - lastIsolateTime;
             if (blockChain.getTimeSinceLastBlock() > 900 && (last_isolate_time_diff.TotalSeconds < 0 || last_isolate_time_diff.TotalSeconds > 1800)) // if no block for over 900 seconds with cooldown of 1800 seconds
             {
-                CoreNetworkUtils.reconnect(false);
+                NetworkUtils.reconnect(false);
                 lastIsolateTime = DateTime.UtcNow;
             }
 
@@ -717,7 +728,7 @@ namespace DLT.Meta
                     BlockSignature blockSig = b.applySignature(PresenceList.getPowSolution());
                     if (blockSig != null)
                     {
-                        inventoryCache.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum), true);
+                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum), true);
                         SignatureProtocolMessages.broadcastBlockSignature(blockSig, b.blockNum, b.blockChecksum, null, null);
                     }
                 }
@@ -809,7 +820,7 @@ namespace DLT.Meta
                         // Cleanup the presence list
                         PresenceList.performCleanup();
 
-                        inventoryCache.processCache();
+                        InventoryCache.Instance.processCache();
 
                         if (update() == false)
                         {
@@ -984,7 +995,7 @@ namespace DLT.Meta
             return false;
         }
 
-        public override bool addTransaction(Transaction transaction, bool force_broadcast)
+        public override bool addTransaction(Transaction transaction, List<Address> relayNodeAddresses, bool force_broadcast)
         {
             return TransactionPool.addTransaction(transaction, false, null, true, force_broadcast);
         }
@@ -1176,6 +1187,23 @@ namespace DLT.Meta
         public override RegisteredNameRecord getRegName(byte[] name, bool useAbsoluteId = true)
         {
             return regNameState.getName(name, useAbsoluteId);
+        }
+
+        public override long getTimeSinceLastBlock()
+        {
+            return blockChain.getTimeSinceLastBlock();
+        }
+
+        public override void triggerSignerPowSolutionFound()
+        {
+            if (blockChain.getTimeSinceLastBlock() > CoreConfig.blockSignaturePlCheckTimeout)
+            {
+                blockProcessor.applyUpdatedSolutionSignature();
+            }
+
+            blockProcessor.acceptLocalNewBlock();
+
+            PresenceList.forceSendKeepAlive = true;
         }
     }
 

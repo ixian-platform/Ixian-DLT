@@ -348,7 +348,7 @@ namespace DLTNode
                 {
                     try
                     {
-                        if (Console.KeyAvailable)
+                        if (!Console.IsInputRedirected && Console.KeyAvailable)
                         {
                             ConsoleKeyInfo key = Console.ReadKey();
                             if (key.Key == ConsoleKey.V)

@@ -45,6 +45,9 @@ namespace DLTNode.Inventory
                 case InventoryItemTypes.transaction:
                     CoreProtocolMessage.broadcastGetTransaction(item.hash, 0, endpoint);
                     return true;
+                default:
+                    Logging.error("Unknown inventory item type {0}", item.type);
+                    break;
             }
             return false;
         }
