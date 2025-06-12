@@ -15,16 +15,16 @@ jobs:
 
     steps:
     - name: Checkout Ixian-DLT
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         path: Ixian-DLT
 
     - name: Checkout Ixian-Core
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         repository: ixian-platform/Ixian-Core
         path: Ixian-Core
-        ref: ${{ github.event.push.ref }}
+        ref: ${{ github.ref_name }}
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
