@@ -173,6 +173,99 @@ namespace DLT
                 }
             }
 
+
+            public static void handleGetRelevantBlockTransactions(byte[] data, RemoteEndpoint endpoint)
+            {
+                using (MemoryStream m = new MemoryStream(data))
+                {
+                    using (BinaryReader reader = new BinaryReader(m))
+                    {
+                        ulong from = reader.ReadIxiVarUInt();
+                        ulong totalCount = reader.ReadIxiVarUInt();
+
+                        int filterLen = (int)reader.ReadIxiVarUInt();
+                        byte[] filterBytes = reader.ReadBytes(filterLen);
+                        
+                        Cuckoo filter = new Cuckoo(filterBytes);
+
+                        if (totalCount < 1)
+                            return;
+
+                        ulong lastBlockNum = Node.blockChain.getLastBlockNum();
+
+                        if (from > lastBlockNum - 1)
+                            return;
+
+                        // Adjust total count if necessary
+                        if (from + totalCount > lastBlockNum)
+                            totalCount = lastBlockNum - from;
+
+                        if (totalCount < 1)
+                            return;
+
+                        // Cap total block headers sent
+                        if (totalCount > (ulong)CoreConfig.maximumBlockHeadersPerChunk)
+                            totalCount = (ulong)CoreConfig.maximumBlockHeadersPerChunk;
+
+                        if (endpoint == null)
+                        {
+                            return;
+                        }
+
+                        if (!endpoint.isConnected())
+                        {
+                            return;
+                        }
+
+                        // TODO TODO TODO block headers should be read from a separate storage and every node should keep a full copy
+                        for (ulong i = 0; i < totalCount;)
+                        {
+                            bool found = false;
+                            using (MemoryStream mOut = new MemoryStream())
+                            {
+                                using (BinaryWriter writer = new BinaryWriter(mOut))
+                                {
+                                    writer.WriteIxiVarInt(data.Length);
+                                    writer.Write(data);
+                                    for (int j = 0; j < CoreConfig.maximumBlockHeadersPerChunk && i < totalCount; j++)
+                                    {
+                                        Block block = Node.blockChain.getBlock(from + i, true, true);
+                                        i++;
+                                        if (block == null)
+                                            break;
+
+                                        long rollback_len = mOut.Length;
+
+                                        found = true;
+                                        Block tmpBlock = new Block(block);
+                                        tmpBlock.signatures.Clear();
+                                        tmpBlock.setFrozenSignatures(null);
+                                        byte[] headerBytes = tmpBlock.getBytes(true, true, true, true);
+                                        writer.WriteIxiVarInt(headerBytes.Length);
+                                        writer.Write(headerBytes);
+
+                                        if (mOut.Length > CoreConfig.maxMessageSize)
+                                        {
+                                            mOut.SetLength(rollback_len);
+                                            i--;
+                                            break;
+                                        }
+
+                                        broadcastRelevantTransactions(block, endpoint, filter);
+                                    }
+                                }
+                                if (!found)
+                                {
+                                    break;
+                                }
+                                endpoint.sendData(ProtocolMessageCode.compactBlockHeaders1, mOut.ToArray());
+                            }
+                        }
+                    }
+                }
+            }
+
+
             public static void handleGetPIT2(byte[] data, RemoteEndpoint endpoint)
             {
                 MemoryStream ms = new MemoryStream(data);
@@ -274,6 +367,43 @@ namespace DLT
                             if (endpoint.isSubscribedToAddress(NetworkEvents.Type.transactionTo, entry.Key.addressNoChecksum))
                             {
                                 endpoint.sendData(ProtocolMessageCode.transactionData2, t.getBytes(true, true), null);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            private static void broadcastRelevantTransactions(Block b, RemoteEndpoint endpoint, Cuckoo filter)
+            {
+                if (!endpoint.isConnected())
+                {
+                    return;
+                }
+
+                foreach (var txid in b.transactions)
+                {
+                    Transaction t = TransactionPool.getAppliedTransaction(txid, b.blockNum, true);
+
+                    if (t == null)
+                    {
+                        Logging.warn("Transaction {0} missing from storage.", txid);
+                        continue;
+                    }
+
+                    if (filter.Contains(t.pubKey.addressNoChecksum))
+                    {
+                        endpoint.sendData(ProtocolMessageCode.transactionData2, t.getBytes(true, true), null);
+                    }
+                    else
+                    {
+                        foreach (var entry in t.toList)
+                        {
+                            if (filter.Contains(entry.Key.addressNoChecksum))
+                            {
+                                endpoint.sendData(ProtocolMessageCode.transactionData2, t.getBytes(true, true), null);
+                                break;
                             }
                         }
                     }

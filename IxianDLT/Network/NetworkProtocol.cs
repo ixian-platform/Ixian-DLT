@@ -145,6 +145,10 @@ namespace DLT
                             BlockProtocolMessages.handleGetBlockHeaders3(data, endpoint);
                             break;
 
+                        case ProtocolMessageCode.getRelevantBlockTransactions:
+                            BlockProtocolMessages.handleGetRelevantBlockTransactions(data, endpoint);
+                            break;
+
                         case ProtocolMessageCode.getPIT2:
                             BlockProtocolMessages.handleGetPIT2(data, endpoint);
                             break;
