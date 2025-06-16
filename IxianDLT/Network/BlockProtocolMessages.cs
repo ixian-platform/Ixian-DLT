@@ -218,50 +218,45 @@ namespace DLT
                         }
 
                         // TODO TODO TODO block headers should be read from a separate storage and every node should keep a full copy
-                        for (ulong i = 0; i < totalCount;)
+                        bool found = false;
+                        using (MemoryStream mOut = new MemoryStream())
                         {
-                            bool found = false;
-                            using (MemoryStream mOut = new MemoryStream())
+                            using (BinaryWriter writer = new BinaryWriter(mOut))
                             {
-                                using (BinaryWriter writer = new BinaryWriter(mOut))
+                                writer.Write(data);
+                                for (uint j = 0; j < totalCount; j++)
                                 {
-                                    writer.Write(data);
-                                    for (int j = 0; j < CoreConfig.maximumBlockHeadersPerChunk && i < totalCount; j++)
+                                    Block block = Node.blockChain.getBlock(from + j, true, true);
+                                    if (block == null)
+                                        break;
+
+                                    long rollback_len = mOut.Length;
+
+                                    found = true;
+                                    Block tmpBlock = new Block(block);
+                                    tmpBlock.signatureCount = tmpBlock.getFrozenSignatureCount();
+                                    tmpBlock.totalSignerDifficulty = tmpBlock.getTotalSignerDifficulty();
+                                    tmpBlock.signatures.Clear();
+                                    tmpBlock.setFrozenSignatures(null);
+
+                                    byte[] headerBytes = tmpBlock.getBytes(true, true, true, true);
+                                    writer.WriteIxiVarInt(headerBytes.Length);
+                                    writer.Write(headerBytes);
+
+                                    if (mOut.Length > CoreConfig.maxMessageSize)
                                     {
-                                        Block block = Node.blockChain.getBlock(from + i, true, true);
-                                        i++;
-                                        if (block == null)
-                                            break;
-
-                                        long rollback_len = mOut.Length;
-
-                                        found = true;
-                                        Block tmpBlock = new Block(block);
-                                        tmpBlock.signatureCount = tmpBlock.getFrozenSignatureCount();
-                                        tmpBlock.totalSignerDifficulty = tmpBlock.getTotalSignerDifficulty();
-                                        tmpBlock.signatures.Clear();
-                                        tmpBlock.setFrozenSignatures(null);
-
-                                        byte[] headerBytes = tmpBlock.getBytes(true, true, true, true);
-                                        writer.WriteIxiVarInt(headerBytes.Length);
-                                        writer.Write(headerBytes);
-
-                                        if (mOut.Length > CoreConfig.maxMessageSize)
-                                        {
-                                            mOut.SetLength(rollback_len);
-                                            i--;
-                                            break;
-                                        }
-
-                                        broadcastRelevantTransactions(block, endpoint, filter);
+                                        mOut.SetLength(rollback_len);
+                                        break;
                                     }
+
+                                    broadcastRelevantTransactions(block, endpoint, filter);
                                 }
-                                if (!found)
-                                {
-                                    break;
-                                }
-                                endpoint.sendData(ProtocolMessageCode.compactBlockHeaders1, mOut.ToArray());
                             }
+                            if (!found)
+                            {
+                                return;
+                            }
+                            endpoint.sendData(ProtocolMessageCode.compactBlockHeaders1, mOut.ToArray());
                         }
                     }
                 }
