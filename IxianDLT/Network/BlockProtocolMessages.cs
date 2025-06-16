@@ -225,7 +225,6 @@ namespace DLT
                             {
                                 using (BinaryWriter writer = new BinaryWriter(mOut))
                                 {
-                                    writer.WriteIxiVarInt(data.Length);
                                     writer.Write(data);
                                     for (int j = 0; j < CoreConfig.maximumBlockHeadersPerChunk && i < totalCount; j++)
                                     {
@@ -238,8 +237,11 @@ namespace DLT
 
                                         found = true;
                                         Block tmpBlock = new Block(block);
+                                        tmpBlock.signatureCount = tmpBlock.getFrozenSignatureCount();
+                                        tmpBlock.totalSignerDifficulty = tmpBlock.getTotalSignerDifficulty();
                                         tmpBlock.signatures.Clear();
                                         tmpBlock.setFrozenSignatures(null);
+
                                         byte[] headerBytes = tmpBlock.getBytes(true, true, true, true);
                                         writer.WriteIxiVarInt(headerBytes.Length);
                                         writer.Write(headerBytes);
