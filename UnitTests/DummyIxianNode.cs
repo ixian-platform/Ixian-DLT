@@ -96,7 +96,7 @@ namespace UnitTests
             throw new NotImplementedException();
         }
 
-        public override void triggerSignerPowSolutionFound()
+        public override void onSignerSolutionFound()
         {
             throw new NotImplementedException();
         }

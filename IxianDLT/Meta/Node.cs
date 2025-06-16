@@ -1198,7 +1198,7 @@ namespace DLT.Meta
             return blockChain.getTimeSinceLastBlock();
         }
 
-        public override void triggerSignerPowSolutionFound()
+        public override void onSignerSolutionFound()
         {
             if (blockChain.getTimeSinceLastBlock() > CoreConfig.blockSignaturePlCheckTimeout)
             {

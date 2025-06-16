@@ -993,7 +993,7 @@ namespace DLT
             {
                 if (endpoint != null)
                 {
-                    CoreProtocolMessage.sendRejected(RejectedCode.TxDuplicate, transaction.id, endpoint);
+                    CoreProtocolMessage.sendRejected(RejectedCode.TransactionDuplicate, transaction.id, endpoint);
                 } else
                 {
                     Logging.warn("Duplicate transaction {0}: already exists in the Transaction Pool.", transaction.getTxIdString());
@@ -1007,15 +1007,15 @@ namespace DLT
                 TxErrorDetails errorDetails;
                 if (!verifyTransaction(transaction, endpoint, out errorDetails))
                 {
-                    RejectedCode rejectedCode = RejectedCode.TxInvalid;
+                    RejectedCode rejectedCode = RejectedCode.TransactionInvalid;
                     switch (errorDetails)
                     {
                         case TxErrorDetails.InsufficientFee:
-                            rejectedCode = RejectedCode.TxInsufficientFee;
+                            rejectedCode = RejectedCode.TransactionInsufficientFee;
                             break;
 
                         case TxErrorDetails.Dust:
-                            rejectedCode = RejectedCode.TxDust;
+                            rejectedCode = RejectedCode.TransactionDust;
                             break;
                     }
                     CoreProtocolMessage.sendRejected(rejectedCode, transaction.id, endpoint);
@@ -1031,7 +1031,7 @@ namespace DLT
                 {
                     if (endpoint != null)
                     {
-                        CoreProtocolMessage.sendRejected(RejectedCode.TxDuplicate, transaction.id, endpoint);
+                        CoreProtocolMessage.sendRejected(RejectedCode.TransactionDuplicate, transaction.id, endpoint);
                     }
                     else
                     {
