@@ -76,8 +76,8 @@ namespace DLT.Meta
         public Node()
         {
             // Prevent including client presences to Presence List
-            // TODO TODO TODO Temporarily disable this for next release and improve
-            CoreConfig.clientPresenceExpiration = 0;
+            // TODO TODO TODO Improve and enable this after new Spixi rollout
+            //CoreConfig.clientPresenceExpiration = 0;
 
             if (Config.maxOutgoingConnections < 8)
             {
