@@ -598,8 +598,13 @@ namespace DLT.RegNames
                     {
                         continue;
                     }
-                    regNames.Add(rnInstance.getName(entry.targetWallet));
-                    addresses.Add(entry.targetWallet, true);
+                    var name = rnInstance.getName(entry.targetWallet);
+                    // TODO TODO TODO handle this better to maybe include the removed item, after/with mtree upgrade
+                    if (name != null)
+                    {
+                        regNames.Add(name);
+                        addresses.Add(entry.targetWallet, true);
+                    }
                 }
                 return regNames;
             }

@@ -387,6 +387,7 @@ namespace DLT.Meta
 
                 genesisNode = true;
                 PresenceList.myPresenceType = 'M';
+                IxianHandler.enableNetworkServer = true;
                 blockProcessor.resumeOperation();
                 signerPowMiner.start(Config.cpuThreads > 2 ? (int)Config.cpuThreads / 2 : 1);
                 serverStarted = true;
@@ -873,6 +874,7 @@ namespace DLT.Meta
             CoreConfig.simultaneousConnectedNeighbors = Config.maxOutgoingConnections / 2;
 
             PresenceList.myPresenceType = 'W';
+            IxianHandler.enableNetworkServer = false;
 
             NetworkClientManager.restartClients();
             NetworkServer.stopNetworkOperations();
@@ -894,6 +896,7 @@ namespace DLT.Meta
             {
                 PresenceList.myPresenceType = 'M';
             }
+            IxianHandler.enableNetworkServer = true;
 
             if (!Node.isMasterNode())
             {
