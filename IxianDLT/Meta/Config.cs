@@ -207,6 +207,7 @@ namespace DLT
                 Console.WriteLine("    --maxIncomingClientNodes\t Max incoming client connections.");
                 Console.WriteLine("    --minActivityBlockHeight\t Prune activity older than specified block height (30000 is default, 0 disables it).");
                 Console.WriteLine("    --forceSyncToBlock\t\t Force sync to specified block height.");
+                Console.WriteLine("    --networkType\t\t mainnet, testnet or regtest.");
                 Console.WriteLine("");
                 Console.WriteLine("----------- Developer CLI flags -----------");
                 Console.WriteLine("    --genesis\t\t\t Start node in genesis mode (to be used only when setting up your own private network)");
@@ -258,6 +259,27 @@ namespace DLT
                 // Do nothing since version is the first thing displayed
 
                 return "";
+            }
+
+            private static NetworkType parseNetworkTypeValue(string value)
+            {
+                NetworkType netType;
+                value = value.ToLower();
+                switch (value)
+                {
+                    case "mainnet":
+                        netType = NetworkType.main;
+                        break;
+                    case "testnet":
+                        netType = NetworkType.test;
+                        break;
+                    case "regtest":
+                        netType = NetworkType.reg;
+                        break;
+                    default:
+                        throw new Exception(string.Format("Unknown network type '{0}'. Possible values are 'mainnet', 'testnet', 'regtest'", value));
+                }
+                return netType;
             }
 
             private static void readConfigFile(string filename)
@@ -342,6 +364,12 @@ namespace DLT
                             break;
                         case "logVerbosity":
                             logVerbosity = int.Parse(value);
+                            break;
+                        case "checksumLock":
+                            checksumLock = Encoding.UTF8.GetBytes(value);
+                            break;
+                        case "networkType":
+                            networkType = parseNetworkTypeValue(value);
                             break;
                         default:
                             // unknown key
@@ -429,6 +457,7 @@ namespace DLT
 
                 // testnet
                 cmd_parser.Setup<bool>('t', "testnet").Callback(value => networkType = NetworkType.test).Required();
+                cmd_parser.Setup<string>("networkType").Callback(value => networkType = parseNetworkTypeValue(value)).Required();
 
                 // Toggle worker-only mode
                 cmd_parser.Setup<bool>("worker").Callback(value => workerOnly = true).Required();

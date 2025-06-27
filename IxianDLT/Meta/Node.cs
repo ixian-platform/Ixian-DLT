@@ -308,6 +308,7 @@ namespace DLT.Meta
             if (Config.recoverFromFile)
             {
                 node_type = 'M';
+                IxianHandler.enableNetworkServer = true;
             }
 
             // Check if we're in worker-only mode
