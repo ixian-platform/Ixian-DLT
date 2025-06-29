@@ -412,6 +412,14 @@ namespace UnitTests
         }
 
         [TestMethod]
+        public void GetClosestItemsEmpty()
+        {
+            PrefixIndexedTree<int> tree = new PrefixIndexedTree<int>(3);
+            var items = tree.GetClosestItems([38, 8, 8, 128, 5, 1], 27);
+            Assert.AreEqual(0, items.Count);
+        }
+
+        [TestMethod]
         [DataRow(1)]
         [DataRow(2)]
         [DataRow(3)]
