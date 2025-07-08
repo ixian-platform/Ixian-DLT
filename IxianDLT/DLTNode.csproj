@@ -12,20 +12,13 @@
     <Content Include="IxianDLT.ico" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.1" />
     <PackageReference Include="FluentCommandLineParser" Version="1.4.3" />
     <PackageReference Include="Open.Nat" Version="2.1.0" />
-    <PackageReference Include="Portable.BouncyCastle" Version="1.9.0" />
-    <PackageReference Include="RocksDbNative" Version="6.2.2" />
-    <PackageReference Include="RocksDbSharp" Version="6.2.2" />
-    <PackageReference Include="sqlite-net-pcl" Version="1.6.292" />
-    <PackageReference Include="SQLitePCLRaw.bundle_green" Version="1.1.14" />
-    <PackageReference Include="SQLitePCLRaw.core" Version="1.1.14" />
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3.linux" Version="1.1.14" />
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3.osx" Version="1.1.14" />
-    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3.v110_xp" Version="1.1.14" />
-    <PackageReference Include="SQLitePCLRaw.provider.e_sqlite3.netstandard11" Version="1.1.14" />
+    <PackageReference Include="RocksDB" Version="10.2.1.58549" />
+    <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="9.0.7" />
   </ItemGroup>
   <PropertyGroup />
   <Import Project="..\..\Ixian-Core\IXICore.projitems" Label="Shared" />

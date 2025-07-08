@@ -152,18 +152,16 @@ namespace DLT
             public readonly double maintenanceInterval = 120.0;
             // Caches (shared with other rocksDb
             private Cache blockCache = null;
-            private Cache compressedBlockCache = null;
             private ulong writeBufferSize = 0;
 
 
-            public RocksDBInternal(string db_path, Cache block_cache = null, Cache compressed_block_cache = null, ulong write_buffer_size = 0)
+            public RocksDBInternal(string db_path, Cache block_cache = null, ulong write_buffer_size = 0)
             {
                 dbPath = db_path;
                 minBlockNumber = 0;
                 maxBlockNumber = 0;
                 dbVersion = 0;
                 blockCache = block_cache;
-                compressedBlockCache = compressed_block_cache;
                 writeBufferSize = write_buffer_size;
             }
 
@@ -189,10 +187,6 @@ namespace DLT
                     if (blockCache != null)
                     {
                         bbto.SetBlockCache(blockCache.Handle);
-                    }
-                    if (compressedBlockCache != null)
-                    {
-                        bbto.SetBlockCacheCompressed(compressedBlockCache.Handle);
                     }
                     //bbto.SetFilterPolicy(BloomFilterPolicy.Create(256, false));
                     //bbto.SetWholeKeyFiltering(true);
@@ -272,10 +266,6 @@ namespace DLT
                     if (blockCache != null)
                     {
                         Logging.info("RocksDB: Common Cache Bytes Used: {0}", blockCache.GetUsage());
-                    }
-                    if (compressedBlockCache != null)
-                    {
-                        Logging.info("RocksDB: Common Compressed Cache Bytes Used: {0}", compressedBlockCache.GetUsage());
                     }
                     Logging.info("RocksDB: Stats [rocksdb.block-cache-usage] '{0}': {1}", dbPath, database.GetProperty("rocksdb.block-cache-usage"));
                     Logging.info("RocksDB: Stats for '{0}': {1}", dbPath, database.GetProperty("rocksdb.dbstats"));
@@ -759,7 +749,6 @@ namespace DLT
             // Runtime stuff
             private ulong writeBufferSize = 0;
             private Cache commonBlockCache = null;
-            private Cache commonCompressedBlockCache = null;
             private Queue<RocksDBInternal> reopenCleanupList = new Queue<RocksDBInternal>();
             private DateTime lastReopenOptimize = DateTime.Now;
 
@@ -789,7 +778,7 @@ namespace DLT
                         }
 
                         Logging.info("RocksDB: Opening a database for blocks {0} - {1}.", baseBlockNum * Config.maxBlocksPerDatabase, (baseBlockNum * Config.maxBlocksPerDatabase) + Config.maxBlocksPerDatabase - 1);
-                        db = new RocksDBInternal(db_path, commonBlockCache, commonCompressedBlockCache, writeBufferSize);
+                        db = new RocksDBInternal(db_path, commonBlockCache, writeBufferSize);
                         openDatabases.Add(baseBlockNum, db);
                     }
                 }
@@ -865,7 +854,6 @@ namespace DLT
                 writeBufferSize = estimateDBWriteBufferSize();
                 ulong blockCacheSize = estimateDBBlockCacheSize();
                 commonBlockCache = Cache.CreateLru(blockCacheSize / 2);
-                commonCompressedBlockCache = Cache.CreateLru(blockCacheSize / 2);
                 // DB optimization
                 if (Config.optimizeDBStorage)
                 {
