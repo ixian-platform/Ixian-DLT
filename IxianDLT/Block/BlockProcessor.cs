@@ -2080,7 +2080,7 @@ namespace DLT
             IxiNumber recoveryRequiredSignerDifficulty = 0;
             if (missingRequiredSigs > 0)
             {
-                recoveryRequiredSignerDifficulty = missingRequiredSigs * requiredSignerDifficulty * ConsensusConfig.blockChainRecoveryMissingRequiredSignerRatio / 100;
+                recoveryRequiredSignerDifficulty = recoveryRequiredSignerDifficulty + (missingRequiredSigs * requiredSignerDifficulty * ConsensusConfig.blockChainRecoveryMissingRequiredSignerRatio / 100);
                 if (totalSignerDifficulty < recoveryRequiredSignerDifficulty)
                 {
                     return false;
@@ -2089,7 +2089,7 @@ namespace DLT
 
             if (missingSigs > 0)
             {
-                if (totalSignerDifficulty < recoveryRequiredSignerDifficulty + (missingSigs * IxianHandler.getMinSignerPowDifficulty(curBlock.blockNum, curBlock.version, curBlock.timestamp)) * ConsensusConfig.blockChainRecoveryMissingSignerMultiplier)
+                if (totalSignerDifficulty < recoveryRequiredSignerDifficulty + (missingSigs * IxianHandler.getMinSignerPowDifficulty(curBlock.blockNum, curBlock.version, curBlock.timestamp) * ConsensusConfig.blockChainRecoveryMissingSignerMultiplier))
                 {
                     return false;
                 }
@@ -2330,17 +2330,11 @@ namespace DLT
                                     highestNetworkBlockNum = last_block_num;
                                 }
 
-                                CoreProtocolMessage.addToInventory(new char[] { 'W' }, new InventoryItemBlock(current_block.blockChecksum, current_block.blockNum), null);
+                                CoreProtocolMessage.addToInventory(new char[] { 'W', 'R' }, new InventoryItemBlock(current_block.blockChecksum, current_block.blockNum), null);
 
                                 if (Node.miner.searchMode != BlockSearchMode.latestBlock)
                                 {
                                     Node.miner.checkActiveBlockSolved();
-                                }
-
-                                // Broadcast blockheight only if the node is synchronized
-                                if (!Node.blockSync.synchronizing)
-                                {
-                                    BlockProtocolMessages.broadcastBlockHeight(last_block_num, current_block.blockChecksum);
                                 }
 
                                 cleanupBlockBlacklist();

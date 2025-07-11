@@ -29,28 +29,6 @@ namespace DLT
     {
         class BlockProtocolMessages
         {
-            // Broadcast the current block height. Called after accepting a new block once the node is fully synced
-            // Returns false when no RemoteEndpoints found to send the message to
-            public static bool broadcastBlockHeight(ulong blockNum, byte[] checksum)
-            {
-                using (MemoryStream mw = new MemoryStream())
-                {
-                    using (BinaryWriter writerw = new BinaryWriter(mw))
-                    {
-                        Block tmp_block = IxianHandler.getLastBlock();
-
-                        // Send the block height
-                        writerw.Write(blockNum);
-
-                        // Send the block checksum for this balance
-                        writerw.Write(checksum.Length);
-                        writerw.Write(checksum);
-
-                        return CoreProtocolMessage.broadcastProtocolMessage(new char[] { 'C' }, ProtocolMessageCode.blockHeight, mw.ToArray(), null, null);
-                    }
-                }
-            }
-
             public static void handleGetNextSuperBlock(byte[] data, RemoteEndpoint endpoint)
             {
                 using (MemoryStream m = new MemoryStream(data))
