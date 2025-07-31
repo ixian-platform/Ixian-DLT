@@ -943,8 +943,15 @@ namespace DLT.Meta
             {
                 Directory.CreateDirectory(Config.dataFolderPath);
             }
-            File.SetAttributes(Config.dataFolderPath, FileAttributes.NotContentIndexed);
 
+            try
+            {
+                File.SetAttributes(Config.dataFolderPath, FileAttributes.NotContentIndexed);
+            }
+            catch (Exception e)
+            {
+                Logging.warn("Exception while setting attributes: " + e);
+            }
 
             if (!Directory.Exists(Config.dataFolderPath + Path.DirectorySeparatorChar + "ws"))
             {
