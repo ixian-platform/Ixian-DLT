@@ -83,7 +83,6 @@ namespace DLT.Meta
             {
                 Config.maxOutgoingConnections = 8;
             }
-            CoreConfig.simultaneousConnectedNeighbors = Config.maxOutgoingConnections / 2;
 
             if (Config.maxIncomingMasterNodes < 100)
             {
@@ -155,7 +154,7 @@ namespace DLT.Meta
 
             InventoryCache.init(new InventoryCacheDLT());
 
-            NetworkClientManager.init(new NetworkClientManagerRandomized(CoreConfig.simultaneousConnectedNeighbors));
+            NetworkClientManager.init(new NetworkClientManagerRandomized(Config.maxOutgoingConnections / 2));
 
             RelaySectors.init(CoreConfig.relaySectorLevels, null);
 
@@ -314,7 +313,7 @@ namespace DLT.Meta
             // Check if we're in worker-only mode
             if (Config.workerOnly)
             {
-                CoreConfig.simultaneousConnectedNeighbors = Config.maxOutgoingConnections;
+                NetworkClientManager.setSimultaneousConnectedNeighbors(Config.maxOutgoingConnections / 2);
             }
 
             UpdateVerify.start();
@@ -872,7 +871,7 @@ namespace DLT.Meta
             if (PresenceList.myPresenceType == 'W')
                 return;
 
-            CoreConfig.simultaneousConnectedNeighbors = Config.maxOutgoingConnections / 2;
+            NetworkClientManager.setSimultaneousConnectedNeighbors(Config.maxOutgoingConnections / 2);
 
             PresenceList.myPresenceType = 'W';
             IxianHandler.enableNetworkServer = false;
@@ -887,7 +886,7 @@ namespace DLT.Meta
             if (PresenceList.myPresenceType == 'M' || PresenceList.myPresenceType == 'H')
                 return;
 
-            CoreConfig.simultaneousConnectedNeighbors = Config.maxOutgoingConnections;
+            NetworkClientManager.setSimultaneousConnectedNeighbors(Config.maxOutgoingConnections);
 
             if (Config.storeFullHistory)
             {

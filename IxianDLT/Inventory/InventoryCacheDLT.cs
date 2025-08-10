@@ -26,7 +26,7 @@ namespace DLTNode.Inventory
     {
         public InventoryCacheDLT():base()
         {
-            typeOptions[InventoryItemTypes.block].maxItems = 10;
+            typeOptions[InventoryItemTypes.block].maxItems = 50;
             typeOptions[InventoryItemTypes.blockSignature].maxItems = 20000;
             typeOptions[InventoryItemTypes.transaction].maxItems = 1000000;
             typeOptions[InventoryItemTypes.keepAlive].maxItems = 1000000;

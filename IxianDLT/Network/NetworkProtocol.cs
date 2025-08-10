@@ -429,6 +429,7 @@ namespace DLT
                                         break;
 
                                     default:
+                                        Logging.warn("Unhandled inventory item {0}", item.type);
                                         InventoryCache.Instance.processInventoryItem(pii);
                                         break;
                                 }

@@ -987,6 +987,8 @@ namespace DLT
         // Returns true if the transaction is added to the pool, false otherwise
         public static bool addTransaction(Transaction transaction, bool no_broadcast = false, RemoteEndpoint endpoint = null, bool verifyTx = true, bool force_broadcast = false)
         {
+            InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.transaction, transaction.id);
+
             // Search for duplicates
             if ((transaction.blockHeight <= Node.blockChain.getLastBlockNum() + 1 && appliedTransactions.ContainsKey(transaction.id))
                 || unappliedTransactions.ContainsKey(transaction.id))
@@ -1003,7 +1005,6 @@ namespace DLT
 
             if (verifyTx)
             {
-                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.transaction, transaction.id);
                 TxErrorDetails errorDetails;
                 if (!verifyTransaction(transaction, endpoint, out errorDetails))
                 {
