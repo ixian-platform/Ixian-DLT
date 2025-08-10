@@ -1003,7 +1003,7 @@ namespace DLT
 
             if (verifyTx)
             {
-                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.transaction, transaction.id, true);
+                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.transaction, transaction.id);
                 TxErrorDetails errorDetails;
                 if (!verifyTransaction(transaction, endpoint, out errorDetails))
                 {

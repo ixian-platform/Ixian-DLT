@@ -601,7 +601,7 @@ namespace DLT
                 {
                     if (block.blockNum <= Node.blockChain.getLastBlockNum() + 1)
                     {
-                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.block, block.blockChecksum, true);
+                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.block, block.blockChecksum);
                     }
                 }
                 Node.blockSync.onBlockReceived(block, endpoint);

@@ -76,7 +76,7 @@ namespace DLT
                     }
                 }
 
-                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, blockSig.blockHash), true);
+                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, blockSig.blockHash));
 
                 if (PresenceList.getPresenceByAddress(blockSig.recipientPubKeyOrAddress) == null)
                 {
@@ -456,7 +456,7 @@ namespace DLT
 
                                 BlockSignature blockSig = new BlockSignature(sig, false);
 
-                                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, checksum), true);
+                                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, checksum));
 
                                 dummy_block.signatures.Add(blockSig);
                             }
@@ -481,7 +481,7 @@ namespace DLT
                                 blockSig.blockHash = checksum;
                                 blockSig.blockNum = block_num;
 
-                                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, checksum), true);
+                                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, checksum));
 
                                 if (PresenceList.getPresenceByAddress(blockSig.recipientPubKeyOrAddress) == null)
                                 {

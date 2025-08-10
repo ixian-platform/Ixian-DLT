@@ -1079,18 +1079,21 @@ namespace DLT
                     if (fetchTransactions)
                     {
                         Logging.info("Missing transaction '{0}', adding to fetch queue.", Transaction.getTxIdString(txid));
-                        var pii = InventoryCache.Instance.add(new InventoryItem(InventoryItemTypes.transaction, txid), endpoint);
-                        if (pii.processed || pii.lastRequested == 0)
+                        var pii = InventoryCache.Instance.add(new InventoryItem(InventoryItemTypes.transaction, txid), endpoint, true);
+                        if (Clock.getTimestamp() - pii.lastRequested > 5)
                         {
+                            pii.retryCount = 0;
                             pii.lastRequested = Clock.getTimestamp();
                             txs_to_fetch.Add(txid);
                         }
                     }else
                     {
-                        var pii = InventoryCache.Instance.add(new InventoryItem(InventoryItemTypes.transaction, txid), endpoint);
-                        if (!pii.processed && Clock.getTimestamp() - pii.lastRequested > 5)
+                        var pii = InventoryCache.Instance.add(new InventoryItem(InventoryItemTypes.transaction, txid), endpoint, true);
+                        if (Clock.getTimestamp() - pii.lastRequested > 5)
                         {
-                            pii.lastRequested = 0;
+                            pii.retryCount = 0;
+                            pii.lastRequested = Clock.getTimestamp();
+                            InventoryCache.Instance.processInventoryItem(pii);
                         }
                     }
                     hasAllTransactions = false;
@@ -1283,11 +1286,10 @@ namespace DLT
                     }
                 }
                 Logging.info("Waiting for missing transactions for Block #{0}.", b.blockNum);
-                var pii = InventoryCache.Instance.add(new InventoryItemBlock(b.blockChecksum, b.blockNum), endpoint);
+                var pii = InventoryCache.Instance.add(new InventoryItemBlock(b.blockChecksum, b.blockNum), endpoint, true);
                 if (pii != null)
                 {
                     pii.retryCount = 0;
-                    pii.processed = false;
                 }
                 return BlockVerifyStatus.Indeterminate;
             }
@@ -1484,7 +1486,7 @@ namespace DLT
                                 {
                                     foreach (var sig in added_signatures)
                                     {
-                                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum), true);
+                                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum));
                                         SignatureProtocolMessages.broadcastBlockSignature(sig, b.blockNum, b.blockChecksum, endpoint, null);
                                     }
                                 }
@@ -1857,7 +1859,7 @@ namespace DLT
                         {
                             foreach (var sig in added_signatures)
                             {
-                                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, block.blockChecksum), true);
+                                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, block.blockChecksum));
                                 SignatureProtocolMessages.broadcastBlockSignature(sig, block.blockNum, block.blockChecksum, endpoint, null);
                             }
                         }
@@ -2166,7 +2168,7 @@ namespace DLT
                             {
                                 foreach (var sig in localNewBlock.signatures)
                                 {
-                                    InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum), true);
+                                    InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum));
                                     SignatureProtocolMessages.broadcastBlockSignature(sig, localNewBlock.blockNum, localNewBlock.blockChecksum, null, null);
                                 }
                                 BlockProtocolMessages.broadcastNewBlock(localNewBlock, null, null);
@@ -3223,7 +3225,7 @@ namespace DLT
                     BlockSignature signature_data = localNewBlock.applySignature(PresenceList.getPowSolution());
                     if (signature_data != null)
                     {
-                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(signature_data.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum), true);
+                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(signature_data.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum));
                     }else
                     {
                         Logging.error("Could not apply signature on a newly generated block {0}.", localNewBlock.blockNum);
@@ -3236,7 +3238,7 @@ namespace DLT
                     currentBlockStartTime = DateTime.UtcNow;
                     lastBlockStartTime = DateTime.UtcNow.AddSeconds(-blockGenerationInterval * 10); // TODO TODO TODO make sure that this is ok
 
-                    InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.block, localNewBlock.blockChecksum, true);
+                    InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.block, localNewBlock.blockChecksum);
                     // Broadcast the new block
                     BlockProtocolMessages.broadcastNewBlock(localNewBlock, null, null, true);
 
@@ -4088,7 +4090,7 @@ namespace DLT
                     BlockSignature blockSig = b.applySignature(PresenceList.getPowSolution());
                     if (blockSig != null)
                     {
-                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum), true);
+                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum));
                         SignatureProtocolMessages.broadcastBlockSignature(blockSig, b.blockNum, b.blockChecksum, null, null);
                     }
                 }

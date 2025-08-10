@@ -112,7 +112,7 @@ namespace DLT
 
                 byte[] hash = CryptoManager.lib.sha3_512sqTrunc(data);
 
-                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.keepAlive, hash, true);
+                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.keepAlive, hash);
 
                 bool updated = PresenceList.receiveKeepAlive(data, out address, out last_seen, out device_id, out node_type, endpoint);
 
