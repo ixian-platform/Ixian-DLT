@@ -43,8 +43,7 @@ namespace DLTNode.Inventory
                 case InventoryItemTypes.keepAlive:
                     return handleKeepAlive(item, endpoint);
                 case InventoryItemTypes.transaction:
-                    CoreProtocolMessage.broadcastGetTransaction(item.hash, 0, endpoint);
-                    return true;
+                    return CoreProtocolMessage.broadcastGetTransaction(item.hash, 0, endpoint);
                 default:
                     Logging.error("Unknown inventory item type {0}", item.type);
                     break;
