@@ -102,15 +102,15 @@ namespace DLT.Meta
 
             Console.SetCursorPosition(0, 0);
 
+            string cur_version = Config.version.Substring(Config.version.IndexOf('-') + 1);
 
-            string server_version = checkForUpdate();
+            string new_version = checkForUpdate();
+            new_version = !new_version.StartsWith("(") ? new_version.Substring(new_version.IndexOf('-') + 1) : cur_version;
+
             bool update_avail = false;
-            if (!server_version.StartsWith("("))
+            if (UpdateVerify.compareVersionsWithSuffix(new_version, cur_version) > 0)
             {
-                if (server_version.CompareTo(Config.version) > 0)
-                {
-                    update_avail = true;
-                }
+                update_avail = true;
             }
 
             int connectionsOut = NetworkClientManager.getConnectedClients(true).Count();
@@ -130,7 +130,7 @@ namespace DLT.Meta
             if (update_avail)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                writeLine(" An update (" + server_version + ") of Ixian DLT is available");
+                writeLine(" An update (" + new_version + ") of Ixian DLT is available");
                 writeLine(" Please visit https://www.ixian.io");
                 Console.ResetColor();
             }

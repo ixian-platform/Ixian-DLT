@@ -54,11 +54,16 @@ namespace DLTNode.Inventory
 
         private bool handleBlock(InventoryItem item, RemoteEndpoint endpoint)
         {
+            if (Node.blockSync.synchronizing)
+            {
+                return false;
+            }
+
             InventoryItemBlock iib = (InventoryItemBlock)item;
             ulong last_block_height = IxianHandler.getLastBlockHeight();
-            if (!Node.blockSync.synchronizing
-                && iib.blockNum == last_block_height + 1)
+            if (iib.blockNum == last_block_height + 1)
             {
+                // Next block
                 byte include_tx = 2;
                 if(Node.isMasterNode())
                 {
@@ -67,6 +72,12 @@ namespace DLTNode.Inventory
                 BlockProtocolMessages.broadcastGetBlock(last_block_height + 1, null, endpoint, include_tx, true);
                 return true;
             }
+            else if (iib.blockNum > last_block_height + 1)
+            {
+                // Future block
+                return true;
+            }
+
             return false;
         }
 
@@ -82,7 +93,7 @@ namespace DLTNode.Inventory
             if (p == null)
             {
                 CoreProtocolMessage.broadcastGetPresence(address, endpoint);
-                return false;
+                return true;
             }
             else
             {

@@ -597,13 +597,11 @@ namespace DLT
                     endpoint.blockHeight = block.blockNum;
                 }
 
-                lock (Node.blockProcessor.localBlockLock)
+                if (block.blockNum <= Node.blockChain.getLastBlockNum())
                 {
-                    if (block.blockNum <= Node.blockChain.getLastBlockNum() + 1)
-                    {
-                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.block, block.blockChecksum);
-                    }
+                    InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.block, block.blockChecksum);
                 }
+
                 Node.blockSync.onBlockReceived(block, endpoint);
                 Node.blockProcessor.onBlockReceived(block, endpoint);
             }

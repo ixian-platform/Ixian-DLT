@@ -754,6 +754,8 @@ namespace DLT
                 return;
             }
 
+            InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.block, b.blockChecksum);
+
             // TODOBLOCK
             lock (localBlockLock)
             {
@@ -1253,7 +1255,7 @@ namespace DLT
                     if (!fetchingTxForBlocks.ContainsKey(b.blockNum))
                     {
                         long cur_time = Clock.getTimestamp();
-                        if (missing < b.transactions.Count / 2 && missing < 50)
+                        if (missing < b.transactions.Count / 2)
                         {
                             cur_time = cur_time - 30;
                             fetchingBulkTxForBlocks.AddOrReplace(b.blockNum, cur_time);
@@ -1263,7 +1265,7 @@ namespace DLT
                         }
                         else
                         {
-                            if(fetchingBulkTxForBlocks.ContainsKey(b.blockNum) && fetchingBulkTxForBlocks[b.blockNum] > cur_time - 10)
+                            if (fetchingBulkTxForBlocks.ContainsKey(b.blockNum) && fetchingBulkTxForBlocks[b.blockNum] > cur_time - 10)
                             {
                                 return BlockVerifyStatus.Indeterminate;
                             }
@@ -1278,6 +1280,7 @@ namespace DLT
                             }
                             BlockProtocolMessages.broadcastGetBlock(b.blockNum, null, endpoint, includeTransactions);
                         }
+
                         Logging.info("Block #{0} is missing {1} transactions, which have been requested from the network.", b.blockNum, missing);
                     }
                     if(fetchTransactions)
@@ -3013,7 +3016,6 @@ namespace DLT
                     if (b == null)
                     {
                         Logging.error("Unable to find block {0} while creating superblock {1}.", i, cur_block_height);
-                        BlockProtocolMessages.broadcastGetBlock(i, endpoint);
                         return false;
                     }
 
