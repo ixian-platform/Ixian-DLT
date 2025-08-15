@@ -75,6 +75,8 @@ namespace DLT.Meta
 
         public Node()
         {
+            CoreConfig.device_id = [0];
+
             // Prevent including client presences to Presence List
             // TODO TODO TODO Improve and enable this after new Spixi rollout
             //CoreConfig.clientPresenceExpiration = 0;
@@ -575,6 +577,8 @@ namespace DLT.Meta
 
         static public void stop()
         {
+            running = false;
+
             Program.noStart = true;
             IxianHandler.forceShutdown = true;
 
