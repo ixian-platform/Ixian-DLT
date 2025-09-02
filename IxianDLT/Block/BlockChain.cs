@@ -805,7 +805,7 @@ namespace DLT
             IxiNumber totalDifficulty = 0;
             ulong blockCount = 0;
             ulong blocksToUseForDifficultyCalculation = ConsensusConfig.superblockInterval;
-            if (blockVersion >= BlockVer.v11)
+            if (getLastBlockVersion() >= BlockVer.v11 && blockVersion >= BlockVer.v11)
             {
                 // Increase number of blocks to use for difficulty from superblockInterval (1000) to blocksToUseForAverageDifficultyCalculation (40000)
                 blocksToUseForDifficultyCalculation = ConsensusConfig.blocksToUseForAverageDifficultyCalculation;
@@ -821,7 +821,7 @@ namespace DLT
                 }
 
                 // Fixes v10 regression bug which calculated an average from last 30 blocks.
-                if (blockVersion >= BlockVer.v11
+                if ((getLastBlockVersion() >= BlockVer.v11 && blockVersion >= BlockVer.v11)
                     || i + blockOffset <= 30)
                 {
                     totalDifficulty += blockTotalSignerDifficulty;
