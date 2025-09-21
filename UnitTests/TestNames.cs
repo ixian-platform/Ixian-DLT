@@ -43,6 +43,8 @@ namespace UnitTests
             Directory.CreateDirectory(Path.Combine("test", "0000"));
             regNames = new RegisteredNames(regNamesMemoryStorage);
 
+            ConsensusConfig.rnPricePerUnit = new IxiNumber("10.0");
+
             IxianHandler.init(new DummyIxianNode(), NetworkType.test, null);
         }
 

@@ -37,5 +37,5 @@ jobs:
     - name: Building Ixian-DLT
       run: dotnet build
 
-    #- name: Running Unit Tests
-    #  run: dotnet test UnitTests\bin\Debug\net8.0\unittests.dll --verbosity normal
+    - name: Running Unit Tests
+      run: dotnet test DLTNode.sln --verbosity normal

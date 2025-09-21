@@ -14,7 +14,7 @@ namespace UnitTests
         string ixian_hex = "697869616e"; // The word "ixian" in hexadecimal representation
 
         [TestMethod]
-        public void TestSha3_256()
+        public void Sha3_256()
         {
             byte[] hash = null;
 
@@ -28,7 +28,7 @@ namespace UnitTests
         }
 
         [TestMethod]
-        public void TestSha3_512()
+        public void Sha3_512()
         {
             byte[] hash = null;
 
@@ -42,7 +42,7 @@ namespace UnitTests
         }
 
         [TestMethod]
-        public void TestSha3_512sq()
+        public void Sha3_512sq()
         {
             byte[] hash = null;
 
