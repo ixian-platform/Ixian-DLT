@@ -993,13 +993,11 @@ namespace DLT
             if ((transaction.blockHeight <= Node.blockChain.getLastBlockNum() + 1 && appliedTransactions.ContainsKey(transaction.id))
                 || unappliedTransactions.ContainsKey(transaction.id))
             {
-                if (endpoint != null)
+                if (IxianHandler.status != NodeStatus.warmUp)
                 {
                     CoreProtocolMessage.sendRejected(RejectedCode.TransactionDuplicate, transaction.id, endpoint);
-                } else
-                {
-                    Logging.warn("Duplicate transaction {0}: already exists in the Transaction Pool.", transaction.getTxIdString());
                 }
+                Logging.warn("Duplicate transaction {0}: already exists in the Transaction Pool.", transaction.getTxIdString());
                 return false;
             }
 
@@ -1019,7 +1017,11 @@ namespace DLT
                             rejectedCode = RejectedCode.TransactionDust;
                             break;
                     }
-                    CoreProtocolMessage.sendRejected(rejectedCode, transaction.id, endpoint);
+                    if (IxianHandler.status != NodeStatus.warmUp)
+                    {
+                        CoreProtocolMessage.sendRejected(rejectedCode, transaction.id, endpoint);
+                    }
+                    Logging.warn("Rejected transaction {0}: {1}.", transaction.getTxIdString(), rejectedCode);
                     return false;
                 }
             }
@@ -1030,14 +1032,11 @@ namespace DLT
                 if ((transaction.blockHeight <= Node.blockChain.getLastBlockNum() + 1 && appliedTransactions.ContainsKey(transaction.id))
                     || !unappliedTransactions.TryAdd(transaction.id, transaction))
                 {
-                    if (endpoint != null)
+                    if (IxianHandler.status != NodeStatus.warmUp)
                     {
                         CoreProtocolMessage.sendRejected(RejectedCode.TransactionDuplicate, transaction.id, endpoint);
                     }
-                    else
-                    {
-                        Logging.warn("Duplicate transaction {0}: already exists in the Transaction Pool.", transaction.getTxIdString());
-                    }
+                    Logging.warn("Duplicate transaction {0}: already exists in the Transaction Pool.", transaction.getTxIdString());
                     return false;
                 }
 
@@ -1111,35 +1110,32 @@ namespace DLT
 
         // Attempts to retrieve a transaction from memory or from storage
         // Returns null if no transaction is found
-        public static Transaction getAppliedTransaction(byte[] txid, ulong block_num = 0, bool search_in_storage = false)
+        public static Transaction getAppliedTransaction(byte[] txid, ulong block_num = 0)
         {
             Transaction transaction = null;
-
-            bool compacted_transaction = false;
-
-            lock (stateLock)
-            {
-                //Logging.info(String.Format("Looking for transaction {{ {0} }}. Pool has {1}.", txid, transactions.Count));
-                compacted_transaction = appliedTransactions.ContainsKey(txid);
-                transaction = compacted_transaction ? appliedTransactions[txid] : null;
-            }
+            appliedTransactions.TryGetValue(txid, out transaction);
 
             if (transaction != null)
                 return transaction;
 
-            if (search_in_storage || compacted_transaction)
-            {
-                // No transaction found in memory, look into storage
-
-                /*var sw = new System.Diagnostics.Stopwatch();
-                sw.Start();*/
-                transaction = Node.storage.getTransaction(txid, block_num);
-                /*sw.Stop();
-                TimeSpan elapsed = sw.Elapsed;
-                Logging.info(string.Format("StopWatch duration: {0}ms", elapsed.TotalMilliseconds));*/
-            }
+            // No transaction found in memory, look into storage
+            transaction = Node.storage.getTransaction(txid, block_num);
 
             return transaction;
+        }
+
+        // Attempts to retrieve a transaction from memory or from storage
+        // Returns null if no transaction is found
+        public static byte[] getAppliedTransactionBytes(byte[] txid, ulong block_num = 0)
+        {
+            Transaction transaction = null;
+            appliedTransactions.TryGetValue(txid, out transaction);
+
+            if (transaction != null)
+                return transaction.getBytes(true, true);
+
+            // No transaction found in memory, look into storage
+            return Node.storage.getTransactionBytes(txid, block_num);
         }
 
         // Attempts to retrieve a transaction from memory or from storage
@@ -1182,7 +1178,7 @@ namespace DLT
             {
                 foreach (byte[] txid in block.transactions)
                 {
-                    Transaction tx = getAppliedTransaction(txid, block.blockNum, true);
+                    Transaction tx = getAppliedTransaction(txid, block.blockNum);
                     if(tx == null)
                     {
                         Logging.error("Error occurred while fetching transaction {0} for block #{1} from storage.", Transaction.getTxIdString(txid), block.blockNum);
@@ -2899,7 +2895,7 @@ namespace DLT
             HashSet<byte[]> tx_ids = block.transactions;
             for (int i = 0; i < tx_ids.Count; i++)
             {
-                Transaction t = getAppliedTransaction(tx_ids.ElementAt(i), block.blockNum, true);
+                Transaction t = getAppliedTransaction(tx_ids.ElementAt(i), block.blockNum);
                 if (t == null)
                 {
                     Logging.error("nulltx: {0}", Transaction.getTxIdString(tx_ids.ElementAt(i)));
@@ -2917,7 +2913,7 @@ namespace DLT
             HashSet<byte[]> tx_ids = block.transactions;
             for (int i = 0; i < tx_ids.Count; i++)
             {
-                Transaction t = getAppliedTransaction(tx_ids.ElementAt(i), block.blockNum, true);
+                Transaction t = getAppliedTransaction(tx_ids.ElementAt(i), block.blockNum);
                 if (t == null)
                 {
                     Logging.error("nulltx: {0}", Transaction.getTxIdString(tx_ids.ElementAt(i)));
@@ -2937,7 +2933,7 @@ namespace DLT
             HashSet<byte[]> tx_ids = block.transactions;
             for (int i = 0; i < tx_ids.Count; i++)
             {
-                Transaction t = getAppliedTransaction(tx_ids.ElementAt(i), block.blockNum, true);
+                Transaction t = getAppliedTransaction(tx_ids.ElementAt(i), block.blockNum);
                 if (t == null)
                     Logging.error("nulltx: {0}", Transaction.getTxIdString(tx_ids.ElementAt(i)));
                 else

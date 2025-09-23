@@ -1,5 +1,5 @@
-// Copyright (C) 2017-2020 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -95,6 +95,11 @@ namespace DLT
                 public byte[] pubKey { get; set; }
                 public long applied { get; set; }
                 public int version { get; set; }
+            }
+
+            public SQLiteStorage(string dataFolderBlocks) : base(dataFolderBlocks)
+            {
+
             }
 
             // Creates the storage file if not found
@@ -864,7 +869,12 @@ namespace DLT
                 return getBlockFromStorageBlock(_storage_block[0]);
             }
 
-            public override (byte[] blockChecksum, string totalSignerDifficulty) getBlockTotalSignerDifficulty(ulong blocknum)
+            public override byte[] getBlockBytes(ulong blocknum, bool asBlockHeader)
+            {
+                return getBlock(blocknum)?.getBytes(true, true, true, asBlockHeader);
+            }
+
+            public override (byte[] blockChecksum, IxiNumber totalSignerDifficulty) getBlockTotalSignerDifficulty(ulong blocknum)
             {
                 if (blocknum < 1)
                 {
@@ -895,7 +905,14 @@ namespace DLT
                             return (null, null);
                         }
 
-                        return (result[0].blockChecksum, result[0].totalSignerDifficulty);
+                        if (result[0].totalSignerDifficulty != null && result[0].totalSignerDifficulty != "")
+                        {
+                            return (result[0].blockChecksum, new IxiNumber(result[0].totalSignerDifficulty));
+                        }
+                        else
+                        {
+                            return (result[0].blockChecksum, null);
+                        }
                     }
                     catch (Exception e)
                     {
@@ -903,136 +920,7 @@ namespace DLT
                         return (null, null);
                     }
                 }
-
-                return (null, null);
             }
-
-            public override Block getBlockByHash(byte[] hash)
-            {
-                var sw = new System.Diagnostics.Stopwatch();
-                sw.Start();
-
-                _storage_Block[] _storage_block = null;
-                if (hash == null)
-                {
-                    return null;
-                }
-
-                string sql = "select * from blocks where `blockChecksum` = ? LIMIT 1";
-
-                // Go through each database until the block is found
-                // TODO: optimize this for better performance
-                lock (storageLock)
-                {
-                    bool found = false;
-
-                    try
-                    {
-                        _storage_block = sqlConnection.Query<_storage_Block>(sql, hash).ToArray();
-                    }
-                    catch (Exception e)
-                    {
-                        Logging.error(String.Format("Exception has been thrown while executing SQL Query {0}. Exception message: {1}", sql, e.Message));
-                        found = false;
-                    }
-
-                    if (_storage_block != null)
-                    {
-                        if (_storage_block.Length > 0)
-                        {
-                            found = true;
-                        }
-                    }
-
-                    ulong db_blocknum = getHighestBlockInStorage();
-                    while (!found)
-                    {
-                        // Block not found yet, seek to another database
-                        seekDatabase(db_blocknum, true);
-                        try
-                        {
-                            _storage_block = sqlConnection.Query<_storage_Block>(sql, hash).ToArray();
-
-                        }
-                        catch (Exception)
-                        {
-                            if (db_blocknum > Config.maxBlocksPerDatabase)
-                            {
-                                db_blocknum -= Config.maxBlocksPerDatabase;
-                            }
-                            else
-                            {
-                                // Block not found
-                                return null;
-                            }
-                        }
-
-                        if (_storage_block == null || _storage_block.Length < 1)
-                        {
-                            if (db_blocknum > Config.maxBlocksPerDatabase)
-                            {
-                                db_blocknum -= Config.maxBlocksPerDatabase;
-                            }
-                            else
-                            {
-                                // Block not found in any database
-                                return null;
-                            }
-                            continue;
-                        }
-
-                        found = true;
-                    }
-                }
-
-                if (_storage_block == null)
-                {
-                    return null;
-                }
-
-                if (_storage_block.Length < 1)
-                {
-                    return null;
-                }
-
-                sw.Stop();
-                Logging.trace("|- Local block #{0} read from storage took: {1}ms", _storage_block[0].blockNum, sw.Elapsed.TotalMilliseconds);
-
-                return getBlockFromStorageBlock(_storage_block[0]);
-            }
-
-            public override Block getBlockByLastSBHash(byte[] checksum)
-            {
-                if (checksum == null)
-                {
-                    return null;
-                }
-
-                string sql = "select * from blocks where `lastSuperBlockChecksum` = ? LIMIT 1";
-                List<_storage_Block> _storage_block = null;
-
-                lock (superBlockStorageLock)
-                {
-                    try
-                    {
-                        _storage_block = superBlocksSqlConnection.Query<_storage_Block>(sql, checksum);
-                    }
-                    catch (Exception e)
-                    {
-                        Logging.error(String.Format("Exception has been thrown while executing SQL Query {0}. Exception message: {1}", sql, e.Message));
-                        return null;
-                    }
-                }
-
-                if (_storage_block == null)
-                    return null;
-
-                if (_storage_block.Count < 1)
-                    return null;
-
-                return getBlockFromStorageBlock(_storage_block[0]);
-            }
-
 
             private Transaction getTransactionFromStorageTransaction(_storage_Transaction tx)
             {
@@ -1260,6 +1148,11 @@ namespace DLT
                 _storage_Transaction tx = _storage_tx[0];
 
                 return getTransactionFromStorageTransaction(tx);
+            }
+
+            public override byte[] getTransactionBytes(byte[] txid, ulong block_num)
+            {
+                return getTransaction(txid, block_num)?.getBytes();
             }
 
             // Removes a block from the storage database
@@ -1556,27 +1449,7 @@ namespace DLT
                 throw new NotImplementedException();
             }
 
-            public override IEnumerable<Block> getBlocksByRange(ulong from, ulong to)
-            {
-                throw new NotImplementedException();
-            }
-
-            public override IEnumerable<Transaction> getTransactionsByType(Transaction.Type type, ulong block_from = 0, ulong block_to = 0)
-            {
-                throw new NotImplementedException();
-            }
-
-            public override IEnumerable<Transaction> getTransactionsFromAddress(byte[] from_addr, ulong block_from = 0, ulong block_to = 0)
-            {
-                throw new NotImplementedException();
-            }
-
-            public override IEnumerable<Transaction> getTransactionsToAddress(byte[] to_addr, ulong block_from = 0, ulong block_to = 0)
-            {
-                throw new NotImplementedException();
-            }
-
-            public override IEnumerable<Transaction> getTransactionsInBlock(ulong block_num, int tx_type = -1)
+            public override IEnumerable<Transaction> getTransactionsInBlock(ulong block_num, short tx_type = -1)
             {
                 List<Transaction> transactions = new List<Transaction>();
 
@@ -1648,7 +1521,7 @@ namespace DLT
                 return transactions;
             }
 
-            public override IEnumerable<Transaction> getTransactionsApplied(ulong block_from, ulong block_to)
+            public override IEnumerable<byte[]> getTransactionsBytesInBlock(ulong block_num, short tx_type = -1)
             {
                 throw new NotImplementedException();
             }

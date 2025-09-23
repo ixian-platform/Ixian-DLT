@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2020 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -16,9 +16,11 @@ using IXICore.Meta;
 using IXICore.Utils;
 using RocksDbSharp;
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace DLT
 {
@@ -26,44 +28,6 @@ namespace DLT
     {
         class RocksDBInternal
         {
-            public class _applied_tx_idx_entry
-            {
-                public ulong tx_original_bh;
-                public byte[] tx_id;
-
-                public _applied_tx_idx_entry(ulong orig_bh, byte[] txid)
-                {
-                    tx_original_bh = orig_bh;
-                    tx_id = txid;
-                }
-
-                public _applied_tx_idx_entry(byte[] from_bytes)
-                {
-                    using (MemoryStream ms = new MemoryStream(from_bytes))
-                    {
-                        using (BinaryReader br = new BinaryReader(ms))
-                        {
-                            tx_original_bh = br.ReadUInt64();
-                            int txid_len = br.ReadInt32();
-                            tx_id = br.ReadBytes(txid_len);
-                        }
-                    }
-                }
-
-                public byte[] asBytes()
-                {
-                    using (MemoryStream ms = new MemoryStream())
-                    {
-                        using (BinaryWriter bw = new BinaryWriter(ms))
-                        {
-                            bw.Write(tx_original_bh);
-                            bw.Write(tx_id);
-                        }
-                        return ms.ToArray();
-                    }
-                }
-            }
-
             class _storage_Index
             {
                 public ColumnFamilyHandle rocksIndexHandle;
@@ -74,53 +38,79 @@ namespace DLT
                     rocksIndexHandle = db.GetColumnFamily(cf_name);
                 }
 
-                public void addIndexEntry(byte[] key, byte[] e)
+                public static byte[] combineKeys(ReadOnlySpan<byte> key1, ReadOnlySpan<byte> key2 = default)
                 {
-                    byte[] keyWithSuffix = new byte[key.Length + e.Length];
-                    Array.Copy(key, keyWithSuffix, key.Length);
-                    Array.Copy(e, 0, keyWithSuffix, key.Length, e.Length);
+                    if (key1.Length > ushort.MaxValue)
+                        throw new ArgumentOutOfRangeException(nameof(key1), "Key1 length cannot exceed 65,535 bytes.");
 
-                    db.Put(keyWithSuffix, e, rocksIndexHandle);
+                    if (key2 == default)
+                        key2 = ReadOnlySpan<byte>.Empty;
+
+                    int size = 2 + key1.Length + key2.Length;
+
+                    var combined = GC.AllocateUninitializedArray<byte>(size);
+                    BinaryPrimitives.WriteUInt16BigEndian(combined, (ushort)key1.Length);
+                    key1.CopyTo(combined.AsSpan(2));
+                    key2.CopyTo(combined.AsSpan(2 + key1.Length));
+
+                    return combined;
                 }
 
-                public void delIndexEntry(byte[] key, byte[] e)
+                public void addIndexEntry(ReadOnlySpan<byte> key, ReadOnlySpan<byte> index, ReadOnlySpan<byte> data, WriteBatch writeBatch = null)
                 {
-                    byte[] keyWithSuffix = new byte[key.Length + e.Length];
-                    Array.Copy(key, keyWithSuffix, key.Length);
-                    Array.Copy(e, 0, keyWithSuffix, key.Length, e.Length);
-
-                    db.Remove(keyWithSuffix, rocksIndexHandle);
-                }
-
-                public IEnumerable<byte[]> getEntriesForKey(byte[] key)
-                {
-                    List<byte[]> entries = new();
-                    var iter = db.NewIterator(rocksIndexHandle);
-                    for (iter.Seek(key); iter.Valid() && iter.Key().Take(key.Length).SequenceEqual(key); iter.Next())
+                    byte[] keyWithSuffix = combineKeys(key, index);
+                    if (writeBatch != null)
                     {
-                        entries.Add(iter.Value());
+                        writeBatch.Put(keyWithSuffix, data, rocksIndexHandle);
                     }
-                    iter.Dispose();
-                    return entries;
+                    else
+                    {
+                        db.Put(keyWithSuffix, data, rocksIndexHandle);
+                    }
                 }
 
-                public IEnumerable<byte[]> getAllKeys()
+                public void delIndexEntry(ReadOnlySpan<byte> key, ReadOnlySpan<byte> index, WriteBatch writeBatch = null)
                 {
-                    List<byte[]> entries = new();
-                    var iter = db.NewIterator(rocksIndexHandle);
-                    iter.SeekToFirst();
-                    while (iter.Valid())
+                    byte[] keyWithSuffix = combineKeys(key, index);
+                    if (writeBatch != null)
                     {
-                        entries.Add(iter.Key());
-                        iter.Next();
+                        writeBatch.Delete(keyWithSuffix, rocksIndexHandle);
                     }
-                    iter.Dispose();
-                    return entries;
+                    else
+                    {
+                        db.Remove(keyWithSuffix, rocksIndexHandle);
+                    }
+                }
+
+                public IEnumerable<(ReadOnlyMemory<byte> index, ReadOnlyMemory<byte> value)> getEntriesForKey(ReadOnlyMemory<byte> key,
+                                                                                                              ReadOnlyMemory<byte> index = default)
+                {
+                    var keyWithLen = combineKeys(key.Span, index.Span);
+                    var iter = db.NewIterator(rocksIndexHandle);
+
+                    try
+                    {
+                        for (iter.Seek(keyWithLen); iter.Valid(); iter.Next())
+                        {
+                            var k = iter.Key();
+                            if (!k.AsSpan(0, keyWithLen.Length).SequenceEqual(keyWithLen))
+                                yield break;
+
+                            var v = iter.Value();
+                            var indexSpan = k.AsMemory().Slice(2 + key.Length);
+                            var valueMem = v.AsMemory();
+
+                            yield return (indexSpan, valueMem);
+                        }
+                    }
+                    finally
+                    {
+                        iter.Dispose();
+                    }
                 }
             }
 
             public string dbPath { get; private set; }
-            private DbOptions rocksOptions;
             private RocksDb database = null;
             // global column families
             private ColumnFamilyHandle rocksCFBlocks;
@@ -129,13 +119,18 @@ namespace DLT
             // index column families
             // block
             private _storage_Index idxBlocksChecksum;
-            private _storage_Index idxBlocksLastSBChecksum;
             // transaction
             private _storage_Index idxTXAppliedType;
-            private _storage_Index idxTXFrom;
-            private _storage_Index idxTXTo;
-            private _storage_Index idxTXApplied;
+            private _storage_Index idxAddressTXs;
             private readonly object rockLock = new object();
+
+            private readonly byte[] BLOCKS_KEY_HEADER = new byte[] { 0 };
+            private readonly byte[] BLOCKS_KEY_TXS = new byte[] { 1 };
+            private readonly byte[] BLOCKS_KEY_SIGNERS = new byte[] { 2 };
+            private readonly byte[] BLOCKS_KEY_SIGNERS_COMPACT = new byte[] { 3 };
+
+            private readonly byte[] TRANSACTIONS_KEY_TX = new byte[] { 0 };
+            //private readonly byte[] TRANSACTIONS_KEY_PROOF = new byte[] { 1 };
 
             public ulong minBlockNumber { get; private set; }
             public ulong maxBlockNumber { get; private set; }
@@ -148,21 +143,17 @@ namespace DLT
                 }
             }
             public DateTime lastUsedTime { get; private set; }
-            public DateTime lastMaintenance { get; private set; }
-            public readonly double maintenanceInterval = 120.0;
             // Caches (shared with other rocksDb
             private Cache blockCache = null;
-            private ulong writeBufferSize = 0;
 
-
-            public RocksDBInternal(string db_path, Cache block_cache = null, ulong write_buffer_size = 0)
+            public RocksDBInternal(string dbPath, Cache blockCache = null)
             {
-                dbPath = db_path;
                 minBlockNumber = 0;
                 maxBlockNumber = 0;
                 dbVersion = 0;
-                blockCache = block_cache;
-                writeBufferSize = write_buffer_size;
+
+                this.dbPath = dbPath;
+                this.blockCache = blockCache;
             }
 
             public void openDatabase()
@@ -173,89 +164,165 @@ namespace DLT
                 }
                 lock (rockLock)
                 {
-                    rocksOptions = new DbOptions();
-                    rocksOptions.SetCreateIfMissing(true);
-                    rocksOptions.SetCreateMissingColumnFamilies(true);
-                    rocksOptions.SetTargetFileSizeMultiplier(1);
-                    rocksOptions.SetLogFileTimeToRoll(604800000000); // about 7 days
-                    rocksOptions.SetRecycleLogFileNum(30);
-                    if (writeBufferSize > 0)
-                    {
-                        rocksOptions.SetDbWriteBufferSize(writeBufferSize);
-                    }
-                    BlockBasedTableOptions bbto = new BlockBasedTableOptions();
+                    var rocksOptions = new DbOptions()
+                        .SetCreateIfMissing(true)
+                        .SetCreateMissingColumnFamilies(true)
+                        .SetKeepLogFileNum(2)
+                        .SetMaxLogFileSize(1 * 1024 * 1024)
+                        .SetRecycleLogFileNum(10)
+                        .IncreaseParallelism(Environment.ProcessorCount)
+                        .SetMaxBackgroundCompactions(Environment.ProcessorCount)
+                        .SetMaxBackgroundFlushes(Math.Min(4, Environment.ProcessorCount / 2))
+                        .SetAllowMmapReads(false)
+                        .SetAllowMmapWrites(false)
+                        .SetTargetFileSizeBase(128 * 1024 * 1024)
+                        .SetCompression(Compression.Zstd)
+                        .SetLevelCompactionDynamicLevelBytes(true)
+                        .SetCompactionReadaheadSize(2 * 1024 * 1024);
+
+                    // blocks
+                    var blocksBbto = new BlockBasedTableOptions();
                     if (blockCache != null)
                     {
-                        bbto.SetBlockCache(blockCache.Handle);
+                        blocksBbto.SetBlockCache(blockCache.Handle);
                     }
-                    //bbto.SetFilterPolicy(BloomFilterPolicy.Create(256, false));
-                    //bbto.SetWholeKeyFiltering(true);
-                    ColumnFamilyOptions cfo = new ColumnFamilyOptions();
-                    cfo.SetBlockBasedTableFactory(bbto);
-                    cfo.SetCompression(Compression.Snappy);
-                    //cfo.SetPrefixExtractor(SliceTransform.CreateFixedPrefix(64));
-                    //cfo.SetMemtableHugePageSize(2 * 1024 * 1024);
-                    var columnFamilies = new ColumnFamilies(cfo);
-                    // default column families
-                    columnFamilies.Add("blocks", cfo);
-                    columnFamilies.Add("transactions", cfo);
-                    columnFamilies.Add("meta", cfo);
-                    // index column families
-                    columnFamilies.Add("index_block_checksum", cfo);
-                    columnFamilies.Add("index_block_last_sb_checksum", cfo);
-                    columnFamilies.Add("index_tx_applied_type", cfo);
-                    columnFamilies.Add("index_tx_from", cfo);
-                    columnFamilies.Add("index_tx_to", cfo);
-                    columnFamilies.Add("index_tx_applied", cfo);
-                    //
+                    blocksBbto.SetBlockSize(64 * 1024);
+                    blocksBbto.SetCacheIndexAndFilterBlocks(true);
+                    blocksBbto.SetPinL0FilterAndIndexBlocksInCache(true);
+                    blocksBbto.SetFilterPolicy(BloomFilterPolicy.Create(14, true));
+                    blocksBbto.SetWholeKeyFiltering(false);
+                    blocksBbto.SetFormatVersion(6);
+
+                    // transactions
+                    var txBbto = new BlockBasedTableOptions();
+                    if (blockCache != null)
+                    {
+                        txBbto.SetBlockCache(blockCache.Handle);
+                    }
+                    txBbto.SetBlockSize(64 * 1024);
+                    txBbto.SetCacheIndexAndFilterBlocks(true);
+                    txBbto.SetPinL0FilterAndIndexBlocksInCache(true);
+                    txBbto.SetFilterPolicy(BloomFilterPolicy.Create(14, true));
+                    txBbto.SetWholeKeyFiltering(false);
+                    txBbto.SetFormatVersion(6);
+
+                    // meta
+                    var metaBbto = new BlockBasedTableOptions();
+                    if (blockCache != null)
+                    {
+                        metaBbto.SetBlockCache(blockCache.Handle);
+                    }
+                    metaBbto.SetBlockSize(4 * 1024);
+                    metaBbto.SetCacheIndexAndFilterBlocks(true);
+                    metaBbto.SetPinL0FilterAndIndexBlocksInCache(true);
+                    metaBbto.SetFilterPolicy(BloomFilterPolicy.Create(14, true));
+                    metaBbto.SetWholeKeyFiltering(true);
+                    metaBbto.SetFormatVersion(6);
+
+                    // index CFs
+                    var indexBbto = new BlockBasedTableOptions();
+                    if (blockCache != null)
+                    {
+                        indexBbto.SetBlockCache(blockCache.Handle);
+                    }
+                    indexBbto.SetBlockSize(8 * 1024);
+                    indexBbto.SetCacheIndexAndFilterBlocks(true);
+                    indexBbto.SetPinL0FilterAndIndexBlocksInCache(true);
+                    indexBbto.SetFilterPolicy(BloomFilterPolicy.Create(14, true));
+                    indexBbto.SetWholeKeyFiltering(false);
+                    indexBbto.SetFormatVersion(6);
+
+                    var columnFamilies = new ColumnFamilies
+                    {
+                        { "blocks", new ColumnFamilyOptions()
+                            .SetBlockBasedTableFactory(blocksBbto)
+                            .SetWriteBufferSize(8UL << 20)
+                            .SetMaxWriteBufferNumber(1)
+                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(32))
+                        },
+                        { "transactions", new ColumnFamilyOptions()
+                            .SetBlockBasedTableFactory(txBbto)
+                            .SetWriteBufferSize(128UL << 20)
+                            .SetMaxWriteBufferNumber(6)
+                            .SetMinWriteBufferNumberToMerge(3)
+                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(32))
+                        },
+                        { "meta", new ColumnFamilyOptions()
+                            .SetBlockBasedTableFactory(metaBbto)
+                            .OptimizeForPointLookup(128)
+                            .SetWriteBufferSize(64UL << 10)
+                            .SetMaxWriteBufferNumber(1)
+                        },
+                        { "index_blocks_checksum_meta", new ColumnFamilyOptions()
+                            .SetBlockBasedTableFactory(indexBbto)
+                            .SetWriteBufferSize(1UL << 20)
+                            .SetMaxWriteBufferNumber(1)
+                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(10))
+                        },
+                        { "index_tx_applied_type", new ColumnFamilyOptions()
+                            .SetBlockBasedTableFactory(indexBbto)
+                            .SetWriteBufferSize(16UL << 20)
+                            .SetMaxWriteBufferNumber(4)
+                            .SetMinWriteBufferNumberToMerge(1)
+                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(10))
+                        },
+                        { "index_address_txs", new ColumnFamilyOptions()
+                            .SetBlockBasedTableFactory(indexBbto)
+                            .SetWriteBufferSize(64UL << 20)
+                            .SetMaxWriteBufferNumber(4)
+                            .SetMinWriteBufferNumberToMerge(2)
+                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(47))
+                        }
+                    };
+
                     database = RocksDb.Open(rocksOptions, dbPath, columnFamilies);
+
                     // initialize column family handles
                     rocksCFBlocks = database.GetColumnFamily("blocks");
                     rocksCFTransactions = database.GetColumnFamily("transactions");
                     rocksCFMeta = database.GetColumnFamily("meta");
-                    // initialize indexes - this also loads them in memory
-                    idxBlocksChecksum = new _storage_Index("index_block_checksum", database);
-                    idxBlocksLastSBChecksum = new _storage_Index("index_block_last_sb_checksum", database);
+
+                    // initialize indexes
+                    idxBlocksChecksum = new _storage_Index("index_blocks_checksum_meta", database);
                     idxTXAppliedType = new _storage_Index("index_tx_applied_type", database);
-                    idxTXFrom = new _storage_Index("index_tx_from", database);
-                    idxTXTo = new _storage_Index("index_tx_to", database);
-                    idxTXApplied = new _storage_Index("index_tx_applied", database);
+                    idxAddressTXs = new _storage_Index("index_address_txs", database);
 
                     // read initial meta values
-                    string version_str = database.Get("db_version", rocksCFMeta);
-                    if (version_str == null || version_str == "")
+                    string versionStr = database.Get("db_version", rocksCFMeta);
+                    if (versionStr == null || versionStr == "")
                     {
-                        dbVersion = 1;
                         database.Put("db_version", dbVersion.ToString(), rocksCFMeta);
                     }
                     else
                     {
-                        dbVersion = int.Parse(version_str);
+                        dbVersion = int.Parse(versionStr);
                     }
-                    string min_block_str = database.Get("min_block", rocksCFMeta);
-                    if (min_block_str == null || min_block_str == "")
+
+                    byte[] minBlockBytes = database.Get(Encoding.UTF8.GetBytes("min_block"), rocksCFMeta);
+                    if (minBlockBytes == null)
                     {
                         minBlockNumber = 0;
-                        database.Put("min_block", minBlockNumber.ToString(), rocksCFMeta);
+                        database.Put(Encoding.UTF8.GetBytes("min_block"), BitConverter.GetBytes(minBlockNumber), rocksCFMeta);
                     }
                     else
                     {
-                        minBlockNumber = ulong.Parse(min_block_str);
+                        minBlockNumber = BitConverter.ToUInt64(minBlockBytes);
                     }
-                    string max_block_str = database.Get("max_block", rocksCFMeta);
-                    if (max_block_str == null || max_block_str == "")
+
+                    byte[] maxBlockBytes = database.Get(Encoding.UTF8.GetBytes("max_block"), rocksCFMeta);
+                    if (maxBlockBytes == null)
                     {
                         maxBlockNumber = 0;
-                        database.Put("max_block", maxBlockNumber.ToString(), rocksCFMeta);
+                        database.Put(Encoding.UTF8.GetBytes("max_block"), BitConverter.GetBytes(maxBlockNumber), rocksCFMeta);
                     }
                     else
                     {
-                        maxBlockNumber = ulong.Parse(max_block_str);
+                        maxBlockNumber = BitConverter.ToUInt64(maxBlockBytes);
                     }
+
                     Logging.info("RocksDB: Opened Database {0}: Blocks {1} - {2}, version {3}", dbPath, minBlockNumber, maxBlockNumber, dbVersion);
-                    Logging.info("RocksDB: Stats: {0}", database.GetProperty("rocksdb.stats"));
+                    Logging.trace("RocksDB: Stats: {0}", database.GetProperty("rocksdb.stats"));
                     lastUsedTime = DateTime.Now;
-                    lastMaintenance = DateTime.Now;
                 }
             }
 
@@ -267,94 +334,9 @@ namespace DLT
                     {
                         Logging.info("RocksDB: Common Cache Bytes Used: {0}", blockCache.GetUsage());
                     }
+
                     Logging.info("RocksDB: Stats [rocksdb.block-cache-usage] '{0}': {1}", dbPath, database.GetProperty("rocksdb.block-cache-usage"));
                     Logging.info("RocksDB: Stats for '{0}': {1}", dbPath, database.GetProperty("rocksdb.dbstats"));
-
-                }
-            }
-
-            public void maintenance()
-            {
-                if (database != null)
-                {
-                    if ((DateTime.Now - lastMaintenance).TotalSeconds > maintenanceInterval)
-                    {
-                        Logging.info("RocksDB: Performing regular maintenance (compaction) on database '{0}'.", dbPath);
-                        try
-                        {
-                            lock (rockLock)
-                            {
-                                var i = database.NewIterator(rocksCFBlocks);
-                                i = i.SeekToFirst();
-                                var first_key = i.Key();
-                                i = i.SeekToLast();
-                                var last_key = i.Key();
-                                database.CompactRange(first_key, last_key, rocksCFBlocks);
-                                i.Dispose();
-                                //
-                                i = database.NewIterator(rocksCFTransactions);
-                                i = i.SeekToFirst();
-                                first_key = i.Key();
-                                i = i.SeekToLast();
-                                last_key = i.Key();
-                                database.CompactRange(first_key, last_key, rocksCFTransactions);
-                                i.Dispose();
-                                //
-                                i = database.NewIterator(idxBlocksChecksum.rocksIndexHandle);
-                                i = i.SeekToFirst();
-                                first_key = i.Key();
-                                i = i.SeekToLast();
-                                last_key = i.Key();
-                                database.CompactRange(first_key, last_key, idxBlocksChecksum.rocksIndexHandle);
-                                i.Dispose();
-                                //
-                                i = database.NewIterator(idxBlocksLastSBChecksum.rocksIndexHandle);
-                                i = i.SeekToFirst();
-                                first_key = i.Key();
-                                i = i.SeekToLast();
-                                last_key = i.Key();
-                                database.CompactRange(first_key, last_key, idxBlocksLastSBChecksum.rocksIndexHandle);
-                                i.Dispose();
-                                //
-                                i = database.NewIterator(idxTXAppliedType.rocksIndexHandle);
-                                i = i.SeekToFirst();
-                                first_key = i.Key();
-                                i = i.SeekToLast();
-                                last_key = i.Key();
-                                database.CompactRange(first_key, last_key, idxTXAppliedType.rocksIndexHandle);
-                                i.Dispose();
-                                //
-                                i = database.NewIterator(idxTXFrom.rocksIndexHandle);
-                                i = i.SeekToFirst();
-                                first_key = i.Key();
-                                i = i.SeekToLast();
-                                last_key = i.Key();
-                                database.CompactRange(first_key, last_key, idxTXFrom.rocksIndexHandle);
-                                i.Dispose();
-                                //
-                                i = database.NewIterator(idxTXTo.rocksIndexHandle);
-                                i = i.SeekToFirst();
-                                first_key = i.Key();
-                                i = i.SeekToLast();
-                                last_key = i.Key();
-                                database.CompactRange(first_key, last_key, idxTXTo.rocksIndexHandle);
-                                i.Dispose();
-                                //
-                                i = database.NewIterator(idxTXApplied.rocksIndexHandle);
-                                i = i.SeekToFirst();
-                                first_key = i.Key();
-                                i = i.SeekToLast();
-                                last_key = i.Key();
-                                database.CompactRange(first_key, last_key, idxTXApplied.rocksIndexHandle);
-                                i.Dispose();
-                            }
-                        }
-                        catch (Exception e)
-                        {
-                            Logging.warn("RocksDB: Error while performing regular maintenance on '{0}': {1}", dbPath, e.Message);
-                        }
-                        lastMaintenance = DateTime.Now;
-                    }
                 }
             }
 
@@ -366,77 +348,109 @@ namespace DLT
                     {
                         return;
                     }
+
                     // free all blocks column families
                     rocksCFBlocks = null;
                     rocksCFMeta = null;
                     rocksCFTransactions = null;
+
                     // free all indexes
                     idxBlocksChecksum = null;
-                    idxBlocksLastSBChecksum = null;
                     idxTXAppliedType = null;
-                    idxTXFrom = null;
-                    idxTXTo = null;
-                    idxTXApplied = null;
-                    //
-                    rocksOptions = null;
+                    idxAddressTXs = null;
+
                     database.Dispose();
                     database = null;
                 }
             }
 
-            private void updateBlockIndexes(Block sb)
+            private byte[] getBlockMetaBytes(int sigCount, IxiNumber totalSignerDifficulty, byte[] powField)
             {
-                byte[] block_num_bytes = BitConverter.GetBytes(sb.blockNum);
-                idxBlocksChecksum.addIndexEntry(sb.blockChecksum, block_num_bytes);
-                if (sb.lastSuperBlockChecksum != null)
-                {
-                    idxBlocksLastSBChecksum.addIndexEntry(sb.lastSuperBlockChecksum, block_num_bytes);
-                }
-                lastUsedTime = DateTime.Now;
+                byte[] sigCountBytes = sigCount.GetIxiVarIntBytes();
+                byte[] tsdBytes = totalSignerDifficulty.getBytes().GetIxiBytes();
+                byte[] powFieldBytes = powField.GetIxiBytes();
+                byte[] blockMetaBytes = new byte[sigCountBytes.Length + tsdBytes.Length + powFieldBytes.Length];
+                Buffer.BlockCopy(sigCountBytes, 0, blockMetaBytes, 0, sigCountBytes.Length);
+                Buffer.BlockCopy(tsdBytes, 0, blockMetaBytes, sigCountBytes.Length, tsdBytes.Length);
+                Buffer.BlockCopy(powFieldBytes, 0, blockMetaBytes, sigCountBytes.Length + tsdBytes.Length, powFieldBytes.Length);
+
+                return blockMetaBytes;
             }
 
-            private byte[] appliedAndTypeToBytes(ulong bh, int type)
+            private (int sigCount, IxiNumber totalSignerDifficulty, byte[] powField) parseBlockMetaBytes(byte[] bytes)
             {
-                byte[] bhBytes = BitConverter.GetBytes(bh);
-                byte[] typeBytes = BitConverter.GetBytes(type);
-                byte[] bhTypeBytes = new byte[bhBytes.Length + typeBytes.Length];
-                Array.Copy(bhBytes, bhTypeBytes, bhBytes.Length);
-                Array.Copy(typeBytes, 0, bhTypeBytes, bhBytes.Length, typeBytes.Length);
-                return bhTypeBytes;
+                int offset = 0;
+                var iwo = bytes.GetIxiVarUInt(offset);
+                int sigCount = (int)iwo.num;
+                offset += iwo.bytesRead;
+
+                var bwo = bytes.ReadIxiBytes(offset);
+                IxiNumber totalSignerDifficulty = new IxiNumber(bwo.bytes);
+                offset += bwo.bytesRead;
+
+                bwo = bytes.ReadIxiBytes(offset);
+                byte[] powField = bwo.bytes;
+                offset += bwo.bytesRead;
+
+                return (sigCount, totalSignerDifficulty, powField);
             }
 
-            private void updateTXIndexes(Transaction st)
+            private void updateBlockIndexes(WriteBatch writeBatch, Block sb)
+            {
+                writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_TXS), sb.getTransactionIDsBytes(), rocksCFBlocks);
+                writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS), sb.getSignaturesBytes(true, false), rocksCFBlocks);
+                writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), sb.getSignaturesBytes(true, true), rocksCFBlocks);
+
+                byte[] blockMetaBytes = getBlockMetaBytes(sb.getFrozenSignatureCount(), sb.getTotalSignerDifficulty(), sb.powField);
+                idxBlocksChecksum.addIndexEntry(sb.blockNum.GetBytesBE(), sb.blockChecksum, blockMetaBytes, writeBatch);
+            }
+
+            private static byte[] typeAndTxIDToBytes(short type, ReadOnlySpan<byte> txid)
+            {
+                byte[] buffer = GC.AllocateUninitializedArray<byte>(2 + txid.Length);
+                BinaryPrimitives.WriteInt16BigEndian(buffer.AsSpan(0, 2), type);
+                txid.CopyTo(buffer.AsSpan(2));
+
+                return buffer;
+            }
+
+            private static byte[] blockHeightAndTxIDToBytes(ulong blockHeight, ReadOnlySpan<byte> txid)
+            {
+                byte[] buffer = GC.AllocateUninitializedArray<byte>(8 + txid.Length);
+                BinaryPrimitives.WriteUInt64BigEndian(buffer.AsSpan(0, 8), blockHeight);
+                txid.CopyTo(buffer.AsSpan(8));
+
+                return buffer;
+            }
+
+            private void updateTXIndexes(WriteBatch writeBatch, Transaction st)
             {
                 byte[] tx_id_bytes = st.id;
 
                 foreach (var from in st.fromList)
                 {
-                    idxTXFrom.addIndexEntry(new Address(st.pubKey.addressNoChecksum, from.Key).addressNoChecksum, tx_id_bytes);
+                    idxAddressTXs.addIndexEntry(new Address(st.pubKey.addressNoChecksum, from.Key).addressNoChecksum, blockHeightAndTxIDToBytes(st.applied, tx_id_bytes), Array.Empty<byte>(), writeBatch);
                 }
 
                 foreach (var to in st.toList)
                 {
-                    idxTXTo.addIndexEntry(to.Key.addressNoChecksum, tx_id_bytes);
+                    idxAddressTXs.addIndexEntry(to.Key.addressNoChecksum, blockHeightAndTxIDToBytes(st.applied, tx_id_bytes), Array.Empty<byte>(), writeBatch);
                 }
 
-                idxTXApplied.addIndexEntry(BitConverter.GetBytes(st.applied), tx_id_bytes);
-
-                idxTXAppliedType.addIndexEntry(appliedAndTypeToBytes(st.applied, st.type), tx_id_bytes);
-
-                lastUsedTime = DateTime.Now;
+                idxTXAppliedType.addIndexEntry(st.applied.GetBytesBE(), typeAndTxIDToBytes((short)st.type, tx_id_bytes), Array.Empty<byte>(), writeBatch);
             }
 
-            private void updateMinMax(ulong blocknum)
+            private void updateMinMax(WriteBatch writeBatch, ulong blocknum)
             {
                 if (minBlockNumber == 0 || blocknum < minBlockNumber)
                 {
                     minBlockNumber = blocknum;
-                    database.Put("min_block", minBlockNumber.ToString(), rocksCFMeta);
+                    writeBatch.Put(Encoding.UTF8.GetBytes("min_block"), BitConverter.GetBytes(minBlockNumber), rocksCFMeta);
                 }
                 if (maxBlockNumber == 0 || blocknum > maxBlockNumber)
                 {
                     maxBlockNumber = blocknum;
-                    database.Put("max_block", maxBlockNumber.ToString(), rocksCFMeta);
+                    writeBatch.Put(Encoding.UTF8.GetBytes("max_block"), BitConverter.GetBytes(maxBlockNumber), rocksCFMeta);
                 }
 
                 lastUsedTime = DateTime.Now;
@@ -450,11 +464,15 @@ namespace DLT
                     {
                         return false;
                     }
-                    database.Put(BitConverter.GetBytes(block.blockNum), block.getBytes(true, true, true), rocksCFBlocks);
-                    updateBlockIndexes(block);
-                    updateMinMax(block.blockNum);
+                    lastUsedTime = DateTime.Now;
+                    using (WriteBatch writeBatch = new WriteBatch())
+                    {
+                        writeBatch.Put(_storage_Index.combineKeys(block.blockChecksum, BLOCKS_KEY_HEADER), block.getBytes(true, true, true, true, true), rocksCFBlocks);
+                        updateBlockIndexes(writeBatch, block);
+                        updateMinMax(writeBatch, block.blockNum);
+                        database.Write(writeBatch);
+                    }
                 }
-                lastUsedTime = DateTime.Now;
                 return true;
             }
 
@@ -466,24 +484,15 @@ namespace DLT
                     {
                         return false;
                     }
-                    database.Put(transaction.id, transaction.getBytes(true, true), rocksCFTransactions);
-                    updateTXIndexes(transaction);
+                    lastUsedTime = DateTime.Now;
+                    using (WriteBatch writeBatch = new WriteBatch())
+                    {
+                        writeBatch.Put(_storage_Index.combineKeys(transaction.id, TRANSACTIONS_KEY_TX), transaction.getBytes(true, true), rocksCFTransactions);
+                        updateTXIndexes(writeBatch, transaction);
+                        database.Write(writeBatch);
+                    }
                 }
-                lastUsedTime = DateTime.Now;
                 return true;
-            }
-
-            private Block getBlockInternal(byte[] block_num_bytes)
-            {
-                byte[] block_bytes = database.Get(block_num_bytes, rocksCFBlocks);
-                lastUsedTime = DateTime.Now;
-                if (block_bytes != null)
-                {
-                    Block b = new Block(block_bytes, true);
-                    b.fromLocalStorage = true;
-                    return b;
-                }
-                return null;
             }
 
             public Block getBlock(ulong blocknum)
@@ -498,11 +507,19 @@ namespace DLT
                     {
                         return null;
                     }
-                    return getBlockInternal(BitConverter.GetBytes(blocknum));
+
+                    lastUsedTime = DateTime.Now;
+
+                    var e = idxBlocksChecksum.getEntriesForKey(blocknum.GetBytesBE());
+                    if (!e.Any())
+                    {
+                        return null;
+                    }
+                    return getBlockByHash(e.First().index.Span, e.First().value.Span);
                 }
             }
 
-            public Block getBlockByHash(byte[] checksum)
+            public byte[] getBlockBytes(ulong blocknum, bool asBlockHeader)
             {
                 lock (rockLock)
                 {
@@ -510,70 +527,118 @@ namespace DLT
                     {
                         return null;
                     }
-                    lastUsedTime = DateTime.Now;
-                    var e = idxBlocksChecksum.getEntriesForKey(checksum);
-                    if (e.Any())
-                    {
-                        return getBlockInternal(e.First());
-                    }
-                    return null;
-                }
-            }
-
-            public Block getBlockByLastSBHash(byte[] checksum)
-            {
-                lock (rockLock)
-                {
-                    if (database == null)
+                    if (blocknum < minBlockNumber || blocknum > maxBlockNumber)
                     {
                         return null;
                     }
-                    lastUsedTime = DateTime.Now;
-                    var e = idxBlocksLastSBChecksum.getEntriesForKey(checksum);
-                    if (e.Any())
-                    {
-                        return getBlockInternal(e.First());
-                    }
-                    return null;
-                }
-            }
 
-            public IEnumerable<Block> getBlocksByRange(ulong from, ulong to)
-            {
-                lock (rockLock)
-                {
-                    var blocks = new List<Block>();
                     lastUsedTime = DateTime.Now;
-                    Iterator iter = database.NewIterator(rocksCFBlocks);
-                    iter.SeekToFirst();
-                    while (iter.Valid())
+
+                    var e = idxBlocksChecksum.getEntriesForKey(blocknum.GetBytesBE());
+                    if (!e.Any())
                     {
-                        ulong block_num = BitConverter.ToUInt64(iter.Key(), 0);
-                        if (block_num >= from && block_num <= to)
+                        return null;
+                    }
+
+                    var blockHash = e.First().index;
+                    byte[] blockBytes = database.Get(_storage_Index.combineKeys(blockHash.Span, BLOCKS_KEY_HEADER), rocksCFBlocks);
+                    if (blockBytes != null)
+                    {
+                        if (asBlockHeader)
                         {
-                            Block b = new Block(iter.Value(), true);
-                            b.fromLocalStorage = true;
-                            blocks.Add(b);
+                            byte[] sigBytes = database.Get(_storage_Index.combineKeys(blockHash.Span, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
+
+                            byte[] mergedBytes = new byte[blockBytes.Length + sigBytes.Length];
+                            Buffer.BlockCopy(blockBytes, 0, mergedBytes, 0, blockBytes.Length);
+                            Buffer.BlockCopy(sigBytes, 0, mergedBytes, blockBytes.Length, sigBytes.Length);
+                            return mergedBytes;
+                        }
+                        else
+                        {
+                            byte[] sigBytes = database.Get(_storage_Index.combineKeys(blockHash.Span, BLOCKS_KEY_SIGNERS), rocksCFBlocks);
+                            byte[] txIDBytes = database.Get(_storage_Index.combineKeys(blockHash.Span, BLOCKS_KEY_TXS), rocksCFBlocks);
+
+                            byte[] mergedBytes = new byte[blockBytes.Length + sigBytes.Length + txIDBytes.Length];
+                            Buffer.BlockCopy(blockBytes, 0, mergedBytes, 0, blockBytes.Length);
+                            Buffer.BlockCopy(sigBytes, 0, mergedBytes, blockBytes.Length, sigBytes.Length);
+                            Buffer.BlockCopy(txIDBytes, 0, mergedBytes, blockBytes.Length + sigBytes.Length, txIDBytes.Length);
+                            return mergedBytes;
                         }
                     }
-                    iter.Dispose();
-                    return blocks;
+                    return null;
                 }
             }
 
-            private Transaction getTransactionInternal(byte[] txid_bytes)
+            public Block getBlockByHash(ReadOnlySpan<byte> checksum)
+            {
+                if (database == null)
+                {
+                    return null;
+                }
+                return getBlockByHash(checksum, null);
+            }
+
+            private Block getBlockByHash(ReadOnlySpan<byte> checksum, ReadOnlySpan<byte> blockMetaBytes)
             {
                 lock (rockLock)
                 {
                     lastUsedTime = DateTime.Now;
-                    var tx_bytes = database.Get(txid_bytes, rocksCFTransactions);
+
+                    byte[] blockBytes = database.Get(_storage_Index.combineKeys(checksum, BLOCKS_KEY_HEADER), rocksCFBlocks);
+                    if (blockBytes != null)
+                    {
+                        lastUsedTime = DateTime.Now;
+                        byte[] txIDsBytes = database.Get(_storage_Index.combineKeys(checksum, BLOCKS_KEY_TXS), rocksCFBlocks);
+                        Block b = new Block(checksum.ToArray(), blockBytes, txIDsBytes);
+                        (int sigCount, IxiNumber totalSignerDifficulty, byte[] powField) blockMeta;
+                        if (blockMetaBytes != null)
+                        {
+                            blockMeta = parseBlockMetaBytes(blockMetaBytes.ToArray());
+                        }
+                        else
+                        {
+                            blockMeta = parseBlockMetaBytes(idxBlocksChecksum.getEntriesForKey(b.blockNum.GetBytesBE(), b.blockChecksum).First().value.ToArray());
+                        }
+
+                        b.totalSignerDifficulty = blockMeta.totalSignerDifficulty;
+                        b.powField = blockMeta.powField;
+                        b.signatureCount = blockMeta.sigCount;
+
+                        byte[] sigBytes = database.Get(_storage_Index.combineKeys(b.blockChecksum, BLOCKS_KEY_SIGNERS), rocksCFBlocks);
+                        if (sigBytes == null)
+                        {
+                            sigBytes = database.Get(_storage_Index.combineKeys(b.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
+                        }
+                        b.setSignaturesFromBytes(sigBytes);
+                        b.fromLocalStorage = true;
+                        return b;
+                    }
+                    return null;
+                }
+            }
+
+
+            private Transaction getTransactionInternal(ReadOnlySpan<byte> txid)
+            {
+                lock (rockLock)
+                {
+                    var tx_bytes = getTransactionBytesInternal(txid);
                     if (tx_bytes != null)
                     {
-                        Transaction t = new Transaction(tx_bytes, true, true);
+                        Transaction t = new Transaction(txid.ToArray(), tx_bytes);
                         t.fromLocalStorage = true;
                         return t;
                     }
                     return null;
+                }
+            }
+
+            private byte[] getTransactionBytesInternal(ReadOnlySpan<byte> txid)
+            {
+                lock (rockLock)
+                {
+                    lastUsedTime = DateTime.Now;
+                    return database.Get(_storage_Index.combineKeys(txid, TRANSACTIONS_KEY_TX), rocksCFTransactions);
                 }
             }
 
@@ -589,25 +654,19 @@ namespace DLT
                 }
             }
 
-            public IEnumerable<Transaction> getTransactionsFromAddress(byte[] from_addr)
+            public byte[] getTransactionBytes(byte[] txid)
             {
                 lock (rockLock)
                 {
-                    List<Transaction> txs = new List<Transaction>();
                     if (database == null)
                     {
                         return null;
                     }
-                    lastUsedTime = DateTime.Now;
-                    foreach (var i in idxTXFrom.getEntriesForKey(from_addr))
-                    {
-                        txs.Add(getTransactionInternal(i));
-                    }
-                    return txs;
+                    return getTransactionBytesInternal(txid);
                 }
             }
 
-            public IEnumerable<Transaction> getTransactionsToAddress(byte[] to_addr)
+            public IEnumerable<Transaction> getTransactionsByAddress(byte[] addr, ulong blockNum = 0)
             {
                 lock (rockLock)
                 {
@@ -617,63 +676,76 @@ namespace DLT
                         return null;
                     }
                     lastUsedTime = DateTime.Now;
-                    foreach (var i in idxTXFrom.getEntriesForKey(to_addr))
+                    IEnumerable<(ReadOnlyMemory<byte> index, ReadOnlyMemory<byte> value)> entries;
+                    if (blockNum == 0)
                     {
-                        txs.Add(getTransactionInternal(i));
-                    }
-                    return txs;
-                }
-            }
-
-            public IEnumerable<Transaction> getTransactionsInBlock(ulong block_num, int tx_type = -1)
-            {
-                lock (rockLock)
-                {
-                    List<Transaction> txs = new List<Transaction>();
-                    if (database == null)
-                    {
-                        return null;
-                    }
-                    lastUsedTime = DateTime.Now;
-                    IEnumerable<byte[]> entries;
-                    if (tx_type == -1)
-                    {
-                        entries = idxTXApplied.getEntriesForKey(BitConverter.GetBytes(block_num));
+                        entries = idxAddressTXs.getEntriesForKey(addr);
                     }
                     else
                     {
-                        entries = idxTXAppliedType.getEntriesForKey(appliedAndTypeToBytes(block_num, tx_type));
+                        entries = idxAddressTXs.getEntriesForKey(addr, blockNum.GetBytesBE());
+                    }
+                    foreach (var i in entries)
+                    {
+                        txs.Add(getTransactionInternal(i.index.Span.Slice(8)));
+                    }
+                    return txs;
+                }
+            }
+
+            public IEnumerable<Transaction> getTransactionsInBlock(ulong block_num, short tx_type = -1)
+            {
+                lock (rockLock)
+                {
+                    List<Transaction> txs = new List<Transaction>();
+                    if (database == null)
+                    {
+                        return null;
+                    }
+                    lastUsedTime = DateTime.Now;
+                    IEnumerable<(ReadOnlyMemory<byte> index, ReadOnlyMemory<byte> value)> entries;
+                    if (tx_type == -1)
+                    {
+                        entries = idxTXAppliedType.getEntriesForKey(block_num.GetBytesBE());
+                    }
+                    else
+                    {
+                        entries = idxTXAppliedType.getEntriesForKey(block_num.GetBytesBE(), tx_type.GetBytesBE());
                     }
 
                     foreach (var txid in entries)
                     {
-                        var tx = getTransactionInternal(txid);
+                        var tx = getTransactionInternal(txid.index.Span.Slice(2));
                         txs.Add(tx);
                     }
                     return txs;
                 }
             }
 
-            public IEnumerable<_applied_tx_idx_entry> getTransactionsApplied(ulong block_from, ulong block_to)
+            public IEnumerable<byte[]> getTransactionsBytesInBlock(ulong block_num, short tx_type = -1)
             {
                 lock (rockLock)
                 {
-                    List<_applied_tx_idx_entry> txs = new List<_applied_tx_idx_entry>();
+                    List<byte[]> txs = new List<byte[]>();
                     if (database == null)
                     {
                         return null;
                     }
                     lastUsedTime = DateTime.Now;
-                    foreach (var bh_bytes in idxTXApplied.getAllKeys())
+                    IEnumerable<(ReadOnlyMemory<byte> index, ReadOnlyMemory<byte> value)> entries;
+                    if (tx_type == -1)
                     {
-                        ulong blockheight = BitConverter.ToUInt64(bh_bytes, 0);
-                        if (blockheight >= block_from && blockheight <= block_to)
-                        {
-                            foreach (var i in idxTXApplied.getEntriesForKey(bh_bytes))
-                            {
-                                txs.Add(new _applied_tx_idx_entry(i));
-                            }
-                        }
+                        entries = idxTXAppliedType.getEntriesForKey(block_num.GetBytesBE());
+                    }
+                    else
+                    {
+                        entries = idxTXAppliedType.getEntriesForKey(block_num.GetBytesBE(), tx_type.GetBytesBE());
+                    }
+
+                    foreach (var txid in entries)
+                    {
+                        var tx = getTransactionBytesInternal(txid.index.Span.Slice(2));
+                        txs.Add(tx);
                     }
                     return txs;
                 }
@@ -686,18 +758,26 @@ namespace DLT
                     Block b = getBlock(blockNum);
                     if (b != null)
                     {
-                        var block_num_bytes = BitConverter.GetBytes(blockNum);
-                        database.Remove(block_num_bytes, rocksCFBlocks);
-                        // remove it from indexes
-                        idxBlocksChecksum.delIndexEntry(b.blockChecksum, block_num_bytes);
-                        idxBlocksLastSBChecksum.delIndexEntry(b.lastSuperBlockChecksum, block_num_bytes);
-                        //
+                        var block_num_bytes = blockNum.GetBytesBE();
+
                         if (removeTransactions)
                         {
-                            foreach (var tx_id_bytes in idxTXApplied.getEntriesForKey(block_num_bytes))
+                            foreach (var tx_id_bytes in idxTXAppliedType.getEntriesForKey(block_num_bytes))
                             {
-                                removeTransactionInternal(tx_id_bytes);
+                                removeTransactionInternal(tx_id_bytes.index.Span.Slice(2));
                             }
+                        }
+
+                        using (WriteBatch writeBatch = new WriteBatch())
+                        {
+                            writeBatch.Delete(_storage_Index.combineKeys(b.blockChecksum, BLOCKS_KEY_HEADER), rocksCFBlocks);
+                            writeBatch.Delete(_storage_Index.combineKeys(b.blockChecksum, BLOCKS_KEY_SIGNERS), rocksCFBlocks);
+                            writeBatch.Delete(_storage_Index.combineKeys(b.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
+                            writeBatch.Delete(_storage_Index.combineKeys(b.blockChecksum, BLOCKS_KEY_TXS), rocksCFBlocks);
+
+                            idxBlocksChecksum.delIndexEntry(block_num_bytes, b.blockChecksum, writeBatch);
+
+                            database.Write(writeBatch);
                         }
                         return true;
                     }
@@ -705,25 +785,31 @@ namespace DLT
                 }
             }
 
-            private bool removeTransactionInternal(byte[] tx_id_bytes)
+            private bool removeTransactionInternal(ReadOnlySpan<byte> tx_id_bytes)
             {
                 lock (rockLock)
                 {
+                    lastUsedTime = DateTime.Now;
                     Transaction tx = getTransactionInternal(tx_id_bytes);
                     if (tx != null)
                     {
-                        database.Remove(tx_id_bytes, rocksCFTransactions);
-                        // remove it from indexes
-                        idxTXApplied.delIndexEntry(BitConverter.GetBytes(tx.applied), tx_id_bytes);
-                        foreach (var f in tx.fromList.Keys)
+                        using (WriteBatch writeBatch = new WriteBatch())
                         {
-                            idxTXFrom.delIndexEntry(f, tx_id_bytes);
+                            writeBatch.Delete(_storage_Index.combineKeys(tx_id_bytes, TRANSACTIONS_KEY_TX), rocksCFTransactions);
+                            
+                            // remove it from indexes
+                            foreach (var f in tx.fromList.Keys)
+                            {
+                                idxAddressTXs.delIndexEntry(new Address(tx.pubKey.addressNoChecksum, f).addressNoChecksum, blockHeightAndTxIDToBytes(tx.applied, tx_id_bytes), writeBatch);
+                            }
+                            foreach (var t in tx.toList.Keys)
+                            {
+                                idxAddressTXs.delIndexEntry(t.addressNoChecksum, blockHeightAndTxIDToBytes(tx.applied, tx_id_bytes), writeBatch);
+                            }
+                            idxTXAppliedType.delIndexEntry(tx.applied.GetBytesBE(), typeAndTxIDToBytes((short)tx.type, tx_id_bytes), writeBatch);
+
+                            database.Write(writeBatch);
                         }
-                        foreach (var t in tx.toList.Keys)
-                        {
-                            idxTXTo.delIndexEntry(t.addressNoChecksum, tx_id_bytes);
-                        }
-                        idxTXAppliedType.delIndexEntry(appliedAndTypeToBytes(tx.applied, tx.type), tx_id_bytes);
                         return true;
                     }
                     return false;
@@ -738,19 +824,71 @@ namespace DLT
                     return removeTransactionInternal(tx_id_bytes);
                 }
             }
+
+            public (byte[] blockChecksum, IxiNumber totalSignerDifficulty) getBlockTotalSignerDifficulty(ulong blocknum)
+            {
+                lock (rockLock)
+                {
+                    if (database == null)
+                    {
+                        return (null, null);
+                    }
+                    lastUsedTime = DateTime.Now;
+
+                    var e = idxBlocksChecksum.getEntriesForKey(blocknum.GetBytesBE());
+                    if (!e.Any())
+                    {
+                        return (null, null);
+                    }
+                    byte[] checksum = e.First().index.ToArray();
+                    return (checksum, parseBlockMetaBytes(e.First().value.ToArray()).totalSignerDifficulty);
+                }
+            }
+
+            public void compact()
+            {
+                if (database != null)
+                {
+                    try
+                    {
+                        Logging.info("RocksDB: Performing compaction on database '{0}'.", dbPath);
+                        lock (rockLock)
+                        {
+                            database.CompactRange(null, null, rocksCFBlocks);
+                            database.CompactRange(null, null, rocksCFTransactions);
+                            database.CompactRange(null, null, rocksCFMeta);
+                            database.CompactRange(null, null, idxBlocksChecksum.rocksIndexHandle);
+                            database.CompactRange(null, null, idxAddressTXs.rocksIndexHandle);
+                            database.CompactRange(null, null, idxTXAppliedType.rocksIndexHandle);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Logging.error("RocksDB: Error while performing regular maintenance on '{0}': {1}", dbPath, e.Message);
+                    }
+                }
+            }
         }
 
         public class RocksDBStorage : IStorage
         {
             private readonly Dictionary<ulong, RocksDBInternal> openDatabases = new Dictionary<ulong, RocksDBInternal>();
             public uint closeAfterSeconds = 60;
-            public uint oldDBCleanupPeriod = 600;
 
             // Runtime stuff
-            private ulong writeBufferSize = 0;
             private Cache commonBlockCache = null;
             private Queue<RocksDBInternal> reopenCleanupList = new Queue<RocksDBInternal>();
             private DateTime lastReopenOptimize = DateTime.Now;
+
+
+            private ulong highestBlockNum = 0;
+            private ulong lowestBlockNum = 0;
+            private IMemoryInfoProvider memoryInfoProvider;
+
+            public RocksDBStorage(string dataFolderBlocks, IMemoryInfoProvider memoryInfoProvider) : base(dataFolderBlocks)
+            {
+                this.memoryInfoProvider = memoryInfoProvider;
+            }
 
             private RocksDBInternal getDatabase(ulong blockNum, bool onlyExisting = false)
             {
@@ -767,7 +905,7 @@ namespace DLT
                     }
                     else
                     {
-                        string db_path = Path.Combine(pathBase, "0000" , baseBlockNum.ToString());
+                        string db_path = Path.Combine(pathBase, "0000", baseBlockNum.ToString());
                         if (onlyExisting)
                         {
                             if (!Directory.Exists(db_path))
@@ -778,7 +916,7 @@ namespace DLT
                         }
 
                         Logging.info("RocksDB: Opening a database for blocks {0} - {1}.", baseBlockNum * Config.maxBlocksPerDatabase, (baseBlockNum * Config.maxBlocksPerDatabase) + Config.maxBlocksPerDatabase - 1);
-                        db = new RocksDBInternal(db_path, commonBlockCache, writeBufferSize);
+                        db = new RocksDBInternal(db_path, commonBlockCache);
                         openDatabases.Add(baseBlockNum, db);
                     }
                 }
@@ -790,30 +928,11 @@ namespace DLT
                 return db;
             }
 
-            private ulong estimateDBWriteBufferSize()
-            {
-                const long MB = 1024 * 1024;
-                const long GB = 1024 * MB;
-                long memMB = Platform.getAvailableRAM() / MB;
-                if (memMB < 4096) // 4GB or below or indeterminate
-                {
-                    return 128 * MB;
-                }
-                else if (memMB < 8192) // between 4GB and 8GB
-                {
-                    return 512 * MB;
-                }
-                else // above 8GB
-                {
-                    return 1 * GB;
-                }
-            }
-
             private ulong estimateDBBlockCacheSize()
             {
                 const long MB = 1024 * 1024;
                 const long GB = 1024 * MB;
-                long memMB = Platform.getAvailableRAM() / MB;
+                long memMB = memoryInfoProvider.GetTotalRAM() / MB;
                 if (memMB < 4096) // 4GB or below or indeterminate
                 {
                     return 512 * MB;
@@ -824,10 +943,9 @@ namespace DLT
                 }
                 else // above 8GB
                 {
-                    return 2 * GB;
+                    return (ulong)memMB * MB / 2;
                 }
             }
-
 
             protected override bool prepareStorageInternal()
             {
@@ -846,14 +964,13 @@ namespace DLT
                     }
                     catch (Exception e)
                     {
-                        Logging.error(String.Format("Unable to prepare block database path '{0}': {1}", pathBase, e.Message));
+                        Logging.error("Unable to prepare block database path '{0}': {1}", pathBase, e.Message);
                         return false;
                     }
                 }
                 // Prepare cache
-                writeBufferSize = estimateDBWriteBufferSize();
                 ulong blockCacheSize = estimateDBBlockCacheSize();
-                commonBlockCache = Cache.CreateLru(blockCacheSize / 2);
+                commonBlockCache = Cache.CreateLru(blockCacheSize / 3);
                 // DB optimization
                 if (Config.optimizeDBStorage)
                 {
@@ -884,20 +1001,19 @@ namespace DLT
                     Logging.info("RocksDB Registered database list:");
                     foreach (var db in openDatabases.Values)
                     {
-                        Logging.info("RocksDB: [{0}]: open: {1}, last used: {2}, last maintenance: {3}",
+                        Logging.info("RocksDB: [{0}]: open: {1}, last used: {2}",
                             db.dbPath,
                             db.isOpen,
-                            db.lastUsedTime,
-                            db.lastMaintenance
+                            db.lastUsedTime
                             );
                     }
                     List<ulong> toDrop = new List<ulong>();
                     foreach (var db in openDatabases)
                     {
-                        db.Value.maintenance();
                         if (db.Value.isOpen && (DateTime.Now - db.Value.lastUsedTime).TotalSeconds >= closeAfterSeconds)
                         {
                             Logging.info("RocksDB: Closing '{0}' due to inactivity.", db.Value.dbPath);
+                            db.Value.compact();
                             db.Value.closeDatabase();
                             toDrop.Add(db.Key);
                             reopenCleanupList.Enqueue(db.Value);
@@ -978,7 +1094,7 @@ namespace DLT
                 {
                     foreach (var db in openDatabases.Values)
                     {
-                        Logging.info(String.Format("RocksDB: Shutdown, closing '{0}'", db.dbPath));
+                        Logging.info("RocksDB: Shutdown, closing '{0}'", db.dbPath);
                         db.closeDatabase();
                     }
                 }
@@ -986,7 +1102,11 @@ namespace DLT
 
             public override ulong getHighestBlockInStorage()
             {
-                // TODO Cache
+                if (highestBlockNum > 0)
+                {
+                    return highestBlockNum;
+                }
+
                 // find our absolute highest block db
                 ulong latest_db = 0;
                 foreach (var d in Directory.EnumerateDirectories(Path.Combine(pathBase, "0000")))
@@ -1008,8 +1128,10 @@ namespace DLT
                         var db = getDatabase(i * Config.maxBlocksPerDatabase, true);
                         if (db != null && db.maxBlockNumber > 0)
                         {
-                            return db.maxBlockNumber;
-                        }else if(i == 0)
+                            highestBlockNum = db.maxBlockNumber;
+                            return highestBlockNum;
+                        }
+                        else if (i == 0)
                         {
                             return 0;
                         }
@@ -1020,28 +1142,34 @@ namespace DLT
 
             public override ulong getLowestBlockInStorage()
             {
-                // TODO Cache
-                // find our absolute highest block db
-                ulong oldest_db = 0;
+                if (lowestBlockNum > 0)
+                {
+                    return lowestBlockNum;
+                }
+
+                // find our absolute lowest block db
+                ulong oldest_db = ulong.MaxValue;
                 foreach (var d in Directory.EnumerateDirectories(Path.Combine(pathBase, "0000")))
                 {
-                    string final_dir = Path.GetDirectoryName(d);
+                    string[] dir_parts = d.Split(Path.DirectorySeparatorChar);
+                    string final_dir = dir_parts[dir_parts.Length - 1];
                     if (ulong.TryParse(final_dir, out ulong db_base))
                     {
-                        if (db_base > oldest_db)
+                        if (db_base < oldest_db)
                         {
                             oldest_db = db_base;
                         }
                     }
                 }
-                if (oldest_db == 0)
+                if (oldest_db == ulong.MaxValue)
                 {
                     return 0; // empty db
                 }
                 lock (openDatabases)
                 {
-                    var db = getDatabase(oldest_db);
-                    return db.minBlockNumber;
+                    var db = getDatabase(oldest_db, true);
+                    lowestBlockNum = db.minBlockNumber;
+                    return lowestBlockNum;
                 }
             }
 
@@ -1050,7 +1178,15 @@ namespace DLT
                 lock (openDatabases)
                 {
                     var db = getDatabase(block.blockNum);
-                    return db.insertBlock(block);
+                    if (db.insertBlock(block))
+                    {
+                        if (block.blockNum > highestBlockNum)
+                        {
+                            highestBlockNum = block.blockNum;
+                        }
+                        return true;
+                    }
+                    return false;
                 }
             }
 
@@ -1067,69 +1203,17 @@ namespace DLT
             {
                 lock (openDatabases)
                 {
-                    var db = getDatabase(blocknum);
-                    return db.getBlock(blocknum);
+                    var db = getDatabase(blocknum, true);
+                    return db?.getBlock(blocknum);
                 }
             }
 
-            public override Block getBlockByHash(byte[] checksum)
+            public override byte[] getBlockBytes(ulong blocknum, bool asBlockHeader)
             {
                 lock (openDatabases)
                 {
-                    foreach (var db in openDatabases.Values)
-                    {
-                        if (!db.isOpen)
-                        {
-                            db.openDatabase();
-                        }
-                        Block b = db.getBlockByHash(checksum);
-                        if (b != null)
-                        {
-                            return b;
-                        }
-                    }
-                    //
-                    return null;
-                }
-            }
-
-            public override Block getBlockByLastSBHash(byte[] checksum)
-            {
-                lock (openDatabases)
-                {
-                    foreach (var db in openDatabases.Values)
-                    {
-                        if (!db.isOpen)
-                        {
-                            db.openDatabase();
-                        }
-                        Block b = db.getBlockByLastSBHash(checksum);
-                        if (b != null)
-                        {
-                            return b;
-                        }
-                    }
-                    //
-                    return null;
-                }
-            }
-
-            public override IEnumerable<Block> getBlocksByRange(ulong from, ulong to)
-            {
-                IEnumerable<Block> combined = Enumerable.Empty<Block>();
-                if (to < from || (to + from == 0))
-                {
-                    return combined;
-                }
-                lock (openDatabases)
-                {
-                    for (ulong i = from; i <= to; i++)
-                    {
-                        var db = getDatabase(i);
-                        var matching_blocks = db.getBlocksByRange(from, to);
-                        combined = Enumerable.Concat(combined, matching_blocks);
-                    }
-                    return combined;
+                    var db = getDatabase(blocknum, true);
+                    return db.getBlockBytes(blocknum, asBlockHeader);
                 }
             }
 
@@ -1139,7 +1223,14 @@ namespace DLT
                 {
                     if (block_num != 0)
                     {
-                        var db = getDatabase(block_num);
+                        var db = getDatabase(block_num, true);
+
+                        if (db == null)
+                        {
+                            Logging.error("Cannot access database for block {0}", block_num);
+                            return null;
+                        }
+
                         return db.getTransaction(txid);
                     }
                     else
@@ -1160,14 +1251,15 @@ namespace DLT
                             return null;
                         }
 
-                        if (highest_blocknum > db_blocknum + ConsensusConfig.getRedactedWindowSize(Block.maxVersion))
+                        // TODO Improve getRedactedWindowSize(0) with block height helpers to determine block version and correct window size
+                        if (highest_blocknum > db_blocknum + ConsensusConfig.getRedactedWindowSize(0))
                         {
-                            highest_blocknum = db_blocknum + ConsensusConfig.getRedactedWindowSize(Block.maxVersion);
+                            highest_blocknum = db_blocknum + ConsensusConfig.getRedactedWindowSize(0);
                         }
 
                         while (!found)
                         {
-                            var db = getDatabase(db_blocknum);
+                            var db = getDatabase(db_blocknum, true);
                             if (db == null)
                             {
                                 Logging.error("Cannot access database for block {0}", db_blocknum);
@@ -1198,109 +1290,96 @@ namespace DLT
                 }
             }
 
-            public override IEnumerable<Transaction> getTransactionsByType(Transaction.Type type, ulong block_from = 0, ulong block_to = 0)
+            public override byte[] getTransactionBytes(byte[] txid, ulong block_num = 0)
             {
                 lock (openDatabases)
                 {
-                    IEnumerable<Transaction> combined = Enumerable.Empty<Transaction>();
-                    IEnumerable<RocksDBInternal> dbs_to_search = openDatabases.Values.Where(x => true); // all databases
-                    if (block_from + block_to > 0)
+                    if (block_num != 0)
                     {
-                        dbs_to_search = openDatabases.Where(kvp => kvp.Key >= block_from && kvp.Key <= block_to).Select(kvp => kvp.Value);
+                        var db = getDatabase(block_num, true);
+                        return db.getTransactionBytes(txid);
                     }
-                    foreach (var db in dbs_to_search)
+                    else
                     {
-                        if (!db.isOpen)
+                        bool found = false;
+                        ulong db_blocknum = IxiVarInt.GetIxiVarUInt(txid, 1).num;
+
+                        if (db_blocknum == 0)
                         {
-                            db.openDatabase();
+                            Logging.error("Invalid txid {0} - generated at block height 0.", Transaction.getTxIdString(txid));
+                            return null;
                         }
-                        for (ulong i = db.minBlockNumber; i < db.maxBlockNumber; i++)
+
+                        ulong highest_blocknum = getHighestBlockInStorage();
+                        if (db_blocknum > highest_blocknum)
                         {
-                            var matching_txs = db.getTransactionsInBlock(i, (int)type);
-                            combined = Enumerable.Concat(combined, matching_txs);
+                            Logging.error("Tried to get transaction generated on block {0} but the highest block in storage is {1}", db_blocknum, highest_blocknum);
+                            return null;
                         }
+
+                        // TODO Improve getRedactedWindowSize(0) with block height helpers to determine block version and correct window size
+                        if (highest_blocknum > db_blocknum + ConsensusConfig.getRedactedWindowSize(0))
+                        {
+                            highest_blocknum = db_blocknum + ConsensusConfig.getRedactedWindowSize(0);
+                        }
+
+                        while (!found)
+                        {
+                            var db = getDatabase(db_blocknum, true);
+                            if (db == null)
+                            {
+                                Logging.error("Cannot access database for block {0}", db_blocknum);
+                                return null;
+                            }
+
+                            byte[] tx = db.getTransactionBytes(txid);
+                            if (tx != null)
+                            {
+                                return tx;
+                            }
+                            else
+                            {
+                                if (db_blocknum + Config.maxBlocksPerDatabase <= highest_blocknum)
+                                {
+                                    db_blocknum += Config.maxBlocksPerDatabase;
+                                }
+                                else
+                                {
+                                    // Transaction not found in any database
+                                    return null;
+                                }
+                            }
+                        }
+
                     }
-                    return combined;
+                    return null;
                 }
             }
 
-            public override IEnumerable<Transaction> getTransactionsFromAddress(byte[] from_addr, ulong block_from = 0, ulong block_to = 0)
+            public IEnumerable<Transaction> getTransactionsByAddress(byte[] addr, ulong superBlockNum, ulong blockNum = 0)
             {
                 lock (openDatabases)
                 {
-                    IEnumerable<Transaction> combined = Enumerable.Empty<Transaction>();
-                    IEnumerable<RocksDBInternal> dbs_to_search = openDatabases.Values.Where(x => true); // all databases
-                    if (block_from + block_to > 0)
-                    {
-                        dbs_to_search = openDatabases.Where(kvp => kvp.Key >= block_from && kvp.Key <= block_to).Select(kvp => kvp.Value);
-                    }
-                    foreach (var db in dbs_to_search)
-                    {
-                        if (!db.isOpen)
-                        {
-                            db.openDatabase();
-                        }
-                        var matching_txs = db.getTransactionsFromAddress(from_addr);
-                        combined = Enumerable.Concat(combined, matching_txs);
-                    }
-                    return combined;
+                    var db = getDatabase(superBlockNum, true);
+                    return db.getTransactionsByAddress(addr, blockNum);
                 }
             }
 
-            public override IEnumerable<Transaction> getTransactionsToAddress(byte[] to_addr, ulong block_from = 0, ulong block_to = 0)
+            public override IEnumerable<Transaction> getTransactionsInBlock(ulong block_num, short tx_type = -1)
             {
                 lock (openDatabases)
                 {
-                    IEnumerable<Transaction> combined = Enumerable.Empty<Transaction>();
-                    IEnumerable<RocksDBInternal> dbs_to_search = openDatabases.Values.Where(x => true); // all databases
-                    if (block_from + block_to > 0)
-                    {
-                        dbs_to_search = openDatabases.Where(kvp => kvp.Key >= block_from && kvp.Key <= block_to).Select(kvp => kvp.Value);
-                    }
-                    foreach (var db in dbs_to_search)
-                    {
-                        if (!db.isOpen)
-                        {
-                            db.openDatabase();
-                        }
-                        var matching_txs = db.getTransactionsToAddress(to_addr);
-                        combined = Enumerable.Concat(combined, matching_txs);
-                    }
-                    return combined;
-                }
-            }
-
-            public override IEnumerable<Transaction> getTransactionsInBlock(ulong block_num, int tx_type = -1)
-            {
-                lock (openDatabases)
-                {
-                    var db = getDatabase(block_num);
+                    var db = getDatabase(block_num, true);
                     return db.getTransactionsInBlock(block_num, tx_type);
                 }
             }
 
-            public override IEnumerable<Transaction> getTransactionsApplied(ulong block_from, ulong block_to)
+            public override IEnumerable<byte[]> getTransactionsBytesInBlock(ulong block_num, short tx_type = -1)
             {
-                List<Transaction> combined = new List<Transaction>();
-                if (block_to < block_from || (block_from + block_to == 0))
-                {
-                    return combined;
-                }
                 lock (openDatabases)
                 {
-                    for (ulong i = block_from; i <= block_to; i++)
-                    {
-                        var db = getDatabase(i);
-                        foreach (var appidx in db.getTransactionsApplied(block_from, block_to))
-                        {
-                            var t = getTransaction(appidx.tx_id, appidx.tx_original_bh);
-                            if (t != null)
-                            {
-                                combined.Add(t);
-                            }
-                        }
-                    }
-                    return combined;
+                    var db = getDatabase(block_num, true);
+                    return db.getTransactionsBytesInBlock(block_num, tx_type);
                 }
             }
 
@@ -1308,41 +1387,31 @@ namespace DLT
             {
                 lock (openDatabases)
                 {
-                    var db = getDatabase(block_num);
+                    var db = getDatabase(block_num, true);
                     return db.removeBlock(block_num, remove_transactions);
                 }
             }
 
-            public override bool removeTransaction(byte[] txid, ulong block_num = 0)
+            public override bool removeTransaction(byte[] txid, ulong block_num)
             {
                 lock (openDatabases)
                 {
-                    if (block_num > 0)
-                    {
-                        var db = getDatabase(block_num);
-                        return db.removeTransaction(txid);
-                    }
-                    else
-                    {
-                        foreach (var db in openDatabases.Values)
-                        {
-                            if (!db.isOpen)
-                            {
-                                db.openDatabase();
-                            }
-                            if (db.removeTransaction(txid))
-                            {
-                                return true;
-                            }
-                        }
-                        return false;
-                    }
+                    var db = getDatabase(block_num, true);
+                    return db.removeTransaction(txid);
                 }
             }
 
-            public override (byte[] blockChecksum, string totalSignerDifficulty) getBlockTotalSignerDifficulty(ulong blocknum)
+            public override (byte[] blockChecksum, IxiNumber totalSignerDifficulty) getBlockTotalSignerDifficulty(ulong blocknum)
             {
-                throw new NotImplementedException();
+                lock (openDatabases)
+                {
+                    var db = getDatabase(blocknum, true);
+                    if (db == null)
+                    {
+                        return (null, null);
+                    }
+                    return db.getBlockTotalSignerDifficulty(blocknum);
+                }
             }
         }
     }

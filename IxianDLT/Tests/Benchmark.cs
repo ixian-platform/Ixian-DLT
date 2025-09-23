@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2022 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -19,12 +19,7 @@ using IXICore.Utils;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace DLTNode
 {
@@ -340,7 +335,7 @@ namespace DLTNode
             // Initialize storage
             if (storage is null)
             {
-                storage = IStorage.create(Config.blockStorageProvider);
+                storage = IStorage.create(Config.blockStorageProvider, Config.dataFolderBlocks, new MemoryInfoProvider());
             }
             if (!storage.prepareStorage())
             {

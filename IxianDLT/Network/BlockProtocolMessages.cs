@@ -29,47 +29,6 @@ namespace DLT
     {
         class BlockProtocolMessages
         {
-            public static void handleGetNextSuperBlock(byte[] data, RemoteEndpoint endpoint)
-            {
-                using (MemoryStream m = new MemoryStream(data))
-                {
-                    using (BinaryReader reader = new BinaryReader(m))
-                    {
-                        ulong include_segments = reader.ReadIxiVarUInt();
-
-                        bool full_header = reader.ReadBoolean();
-
-                        Block block = null;
-
-                        int checksum_len = (int)reader.ReadIxiVarUInt();
-                        byte[] checksum = reader.ReadBytes(checksum_len);
-
-                        block = Node.storage.getBlockByLastSBHash(checksum);
-
-                        if (block != null)
-                        {
-                            endpoint.sendData(ProtocolMessageCode.blockData2, block.getBytes(full_header, true, true), BitConverter.GetBytes(block.blockNum));
-
-                            if (include_segments > 0)
-                            {
-                                foreach (var entry in block.superBlockSegments.OrderBy(x => x.Key))
-                                {
-                                    SuperBlockSegment segment = entry.Value;
-                                    if (segment.blockNum < include_segments)
-                                    {
-                                        continue;
-                                    }
-
-                                    Block segment_block = Node.blockChain.getBlock(segment.blockNum, true);
-
-                                    endpoint.sendData(ProtocolMessageCode.blockData2, segment_block.getBytes(true, true, true), BitConverter.GetBytes(segment.blockNum));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
             public static void handleGetBlockHeaders3(byte[] data, RemoteEndpoint endpoint)
             {
                 using (MemoryStream m = new MemoryStream(data))
@@ -323,7 +282,7 @@ namespace DLT
 
                 foreach (var txid in b.transactions)
                 {
-                    Transaction t = TransactionPool.getAppliedTransaction(txid, b.blockNum, true);
+                    Transaction t = TransactionPool.getAppliedTransaction(txid, b.blockNum);
 
                     if (t == null)
                     {
@@ -359,7 +318,7 @@ namespace DLT
 
                 foreach (var txid in b.transactions)
                 {
-                    Transaction t = TransactionPool.getAppliedTransaction(txid, b.blockNum, true);
+                    Transaction t = TransactionPool.getAppliedTransaction(txid, b.blockNum);
 
                     if (t == null)
                     {
@@ -381,35 +340,6 @@ namespace DLT
                                 break;
                             }
                         }
-                    }
-                }
-            }
-
-
-            // Requests block with specified block height from the network, include_segments_from_block value can be 0 for no segments, and a positive value for segments bigger than the specified value
-            public static bool broadcastGetNextSuperBlock(ulong block_num, byte[] block_checksum, ulong include_segments = 0, bool full_header = false, RemoteEndpoint skipEndpoint = null, RemoteEndpoint endpoint = null)
-            {
-                using (MemoryStream mw = new MemoryStream())
-                {
-                    using (BinaryWriter writerw = new BinaryWriter(mw))
-                    {
-                        writerw.WriteIxiVarInt(include_segments);
-                        writerw.Write(full_header);
-                        writerw.WriteIxiVarInt(block_checksum.Length);
-                        writerw.Write(block_checksum);
-#if TRACE_MEMSTREAM_SIZES
-                        Logging.info(String.Format("NetworkProtocol::broadcastGetNextSuperBlock: {0}", mw.Length));
-#endif
-
-                        if (endpoint != null)
-                        {
-                            if (endpoint.isConnected())
-                            {
-                                endpoint.sendData(ProtocolMessageCode.getNextSuperBlock, mw.ToArray());
-                                return true;
-                            }
-                        }
-                        return CoreProtocolMessage.broadcastProtocolMessageToSingleRandomNode(new char[] { 'M', 'H' }, ProtocolMessageCode.getNextSuperBlock, mw.ToArray(), block_num, skipEndpoint);
                     }
                 }
             }

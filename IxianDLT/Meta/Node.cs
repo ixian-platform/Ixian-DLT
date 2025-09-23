@@ -130,7 +130,7 @@ namespace DLT.Meta
             // Initialize storage
             if (storage is null)
             {
-                storage = IStorage.create(Config.blockStorageProvider);
+                storage = IStorage.create(Config.blockStorageProvider, Config.dataFolderBlocks, new MemoryInfoProvider());
             }
             if (!storage.prepareStorage())
             {
@@ -795,7 +795,7 @@ namespace DLT.Meta
             // we have to instantiate whatever implementation we are using and remove its data files
             if (storage is null)
             {
-                storage = IStorage.create(Config.blockStorageProvider);
+                storage = IStorage.create(Config.blockStorageProvider, Config.dataFolderBlocks, new MemoryInfoProvider());
             }
             storage.deleteData();
 

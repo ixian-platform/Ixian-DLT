@@ -355,7 +355,7 @@ namespace DLTNode
             Transaction t = TransactionPool.getUnappliedTransaction(txid);
             if(t == null)
             {
-                t = TransactionPool.getAppliedTransaction(txid, 0, Config.storeFullHistory);
+                t = TransactionPool.getAppliedTransaction(txid, 0);
             }
             if (t == null)
             {

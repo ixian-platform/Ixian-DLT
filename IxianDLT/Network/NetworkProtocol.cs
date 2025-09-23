@@ -117,10 +117,6 @@ namespace DLT
                             NetworkEvents.handleDetachEventMessage(data, endpoint);
                             break;
 
-                        case ProtocolMessageCode.getNextSuperBlock:
-                            BlockProtocolMessages.handleGetNextSuperBlock(data, endpoint);
-                            break;
-
                         case ProtocolMessageCode.inventory2:
                             handleInventory2(data, endpoint);
                             break;

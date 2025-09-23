@@ -1,5 +1,5 @@
-// Copyright (C) 2017-2022 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -101,7 +101,7 @@ namespace DLT
             public static ulong forceSyncToBlock = 0;
 
             // Read-only values
-            public static readonly string version = "xdc-0.9.6a"; // DLT Node version
+            public static readonly string version = "xdc-0.9.7-dev"; // DLT Node version
 
             public static readonly string checkVersionUrl = "https://resources.ixian.io/update.txt";
             public static readonly int checkVersionSeconds = 6 * 60 * 60; // 6 hours

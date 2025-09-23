@@ -110,28 +110,26 @@ namespace DLT
                                         continue;
                                     }
                                 }
-                                Transaction tx;
+                                byte[] txBytes = null;
                                 if (applied_block)
                                 {
-                                    tx = TransactionPool.getAppliedTransaction(txIdArr[i], blockNum, true);
+                                    txBytes = TransactionPool.getAppliedTransactionBytes(txIdArr[i], blockNum);
                                 }
                                 else
                                 {
-                                    tx = TransactionPool.getUnappliedTransaction(txIdArr[i]);
-                                    if (tx == null)
+                                    txBytes = TransactionPool.getUnappliedTransaction(txIdArr[i])?.getBytes(true, true);
+                                    if (txBytes == null)
                                     {
-                                        tx = TransactionPool.getAppliedTransaction(txIdArr[i], blockNum, true);
-                                        if (tx != null)
+                                        txBytes = TransactionPool.getAppliedTransactionBytes(txIdArr[i], blockNum);
+                                        if (txBytes != null)
                                         {
                                             applied_block = true;
                                         }
                                     }
                                 }
                                 i++;
-                                if (tx != null)
+                                if (txBytes != null)
                                 {
-                                    byte[] txBytes = tx.getBytes(true, true);
-
                                     long rollback_len = mOut.Length;
                                     writer.WriteIxiVarInt(txBytes.Length);
                                     writer.Write(txBytes);
@@ -167,13 +165,21 @@ namespace DLT
                 {
                     using (BinaryReader reader = new BinaryReader(m))
                     {
-                        int msg_id = (int)reader.ReadIxiVarInt();
+                        long block_num_long = reader.ReadIxiVarInt();
+                        ulong block_num = block_num_long.ToUlongAbs();
                         int tx_count = (int)reader.ReadIxiVarUInt();
 
                         int max_tx_per_chunk = CoreConfig.maximumTransactionsPerChunk;
                         if (tx_count > max_tx_per_chunk)
                         {
                             tx_count = max_tx_per_chunk;
+                        }
+
+                        bool block_applied = false;
+                        if (block_num != 0
+                            && block_num <= Node.blockChain.getLastBlockNum())
+                        {
+                            block_applied = true;
                         }
 
                         for (int i = 0; i < tx_count;)
@@ -191,7 +197,7 @@ namespace DLT
                                     {
                                         next_tx_count = tx_count - i;
                                     }
-                                    writer.WriteIxiVarInt(msg_id);
+                                    writer.WriteIxiVarInt(block_num_long);
                                     writer.WriteIxiVarInt(next_tx_count);
 
                                     for (int j = 0; j < next_tx_count && i < tx_count;  j++)
@@ -209,18 +215,24 @@ namespace DLT
                                         int txid_len = (int)reader.ReadIxiVarUInt();
                                         byte[] txid = reader.ReadBytes(txid_len);
 
-                                        Transaction tx = TransactionPool.getUnappliedTransaction(txid);
-                                        if (tx == null)
+                                        byte[] tx_bytes = null;
+                                        if (block_num == 0 || !block_applied)
                                         {
-                                            tx = TransactionPool.getAppliedTransaction(txid);
-                                            if (tx == null)
-                                            {
-                                                Logging.warn("I do not have txid '{0}.", Transaction.getTxIdString(txid)); // convert to string
-                                                continue;
-                                            }
+                                            tx_bytes = TransactionPool.getUnappliedTransaction(txid)?.getBytes(true, true);
                                         }
 
-                                        byte[] tx_bytes = tx.getBytes(true, true);
+                                        if (tx_bytes == null
+                                            && (block_num == 0 || block_applied))
+                                        {
+                                            tx_bytes = TransactionPool.getAppliedTransactionBytes(txid, block_num);
+                                        }
+
+                                        if (tx_bytes == null)
+                                        {
+                                            Logging.warn("I do not have txid '{0}.", Transaction.getTxIdString(txid)); // convert to string
+                                            continue;
+                                        }
+
                                         byte[] tx_len = IxiVarInt.GetIxiVarIntBytes(tx_bytes.Length);
                                         writer.Write(tx_len);
                                         writer.Write(tx_bytes);
@@ -368,26 +380,35 @@ namespace DLT
                         byte[] txid = reader.ReadBytes(txid_len);
                         ulong block_num = reader.ReadIxiVarUInt();
 
-                        Transaction transaction = null;
+                        byte[] tx_bytes = null;
+
+                        bool block_applied = false;
+                        if (block_num != 0
+                            && block_num <= Node.blockChain.getLastBlockNum())
+                        {
+                            block_applied = true;
+                        }
 
                         // Check for a transaction corresponding to this id
-                        if (block_num == 0 || block_num == Node.blockChain.getLastBlockNum() + 1)
+                        if (block_num == 0 || !block_applied)
                         {
-                            transaction = TransactionPool.getUnappliedTransaction(txid);
+                            tx_bytes = TransactionPool.getUnappliedTransaction(txid)?.getBytes(true, true);
                         }
-                        if (transaction == null)
+                        
+                        if (tx_bytes == null
+                            && (block_num == 0 || block_applied))
                         {
-                            transaction = TransactionPool.getAppliedTransaction(txid, block_num, true);
+                            tx_bytes = TransactionPool.getAppliedTransactionBytes(txid, block_num);
                         }
 
-                        if (transaction == null)
+                        if (tx_bytes == null)
                         {
                             Logging.warn("I do not have txid '{0}.", Transaction.getTxIdString(txid));
                             return;
                         }
 
-                        Logging.info("Sending transaction {0} - {1} - {2}.", transaction.getTxIdString(), Crypto.hashToString(transaction.checksum), transaction.amount);
-                        endpoint.sendData(ProtocolMessageCode.transactionData2, transaction.getBytes(true, true));
+                        Logging.info("Sending transaction {0} - {1}.", Transaction.getTxIdString(txid), Transaction.getTxIdString(txid));
+                        endpoint.sendData(ProtocolMessageCode.transactionData2, tx_bytes);
                     }
                 }
             }

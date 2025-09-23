@@ -338,12 +338,7 @@ namespace DLT
                     var hashAndTotalSignerDiff = Node.storage.getBlockTotalSignerDifficulty(blockNum);
                     if (hashAndTotalSignerDiff.blockChecksum != null)
                     {
-                        IxiNumber totalSignerDifficulty = null;
-                        if (hashAndTotalSignerDiff.totalSignerDifficulty != null && hashAndTotalSignerDiff.totalSignerDifficulty != "")
-                        {
-                            totalSignerDifficulty = new IxiNumber(hashAndTotalSignerDiff.totalSignerDifficulty);
-                        }
-                        cacheBlockSignerDifficulty(blockNum, hashAndTotalSignerDiff.blockChecksum, totalSignerDifficulty);
+                        cacheBlockSignerDifficulty(blockNum, hashAndTotalSignerDiff.blockChecksum, hashAndTotalSignerDiff.totalSignerDifficulty);
                         return hashAndTotalSignerDiff.blockChecksum;
                     }
                 }
@@ -449,48 +444,6 @@ namespace DLT
                 }
                 return blockList.Take(count).ToList();
             }
-        }
-
-        // Attempts to retrieve a block from memory or from storage
-        // Returns null if no block is found
-        public Block getBlockByHash(byte[] hash, bool search_in_storage = false, bool return_full_block = true)
-        {
-            Block block = null;
-
-            bool compacted_block = false;
-
-            byte[] pow_field = null;
-
-            // Search memory
-            lock (blocks)
-            {
-                block = blocks.Find(x => x.blockChecksum.SequenceEqual(hash));
-
-                if (block != null)
-                {
-                    pow_field = block.powField;
-                    if (block.compacted && return_full_block)
-                    {
-                        compacted_block = true;
-                        block = null;
-                    }
-                }
-            }
-
-            if (block != null)
-                return block;
-
-            // Search storage
-            if (search_in_storage || compacted_block)
-            {
-                block = Node.storage.getBlockByHash(hash);
-                if (block != null && compacted_block)
-                {
-                    block.powField = pow_field;
-                }
-            }
-
-            return block;
         }
 
         public ulong getLastBlockNum()
@@ -1172,11 +1125,6 @@ namespace DLT
             return getBlock(block_num, true);
         }
 
-        public Block getSuperBlock(byte[] block_checksum)
-        {
-            return getBlockByHash(block_checksum, true);
-        }
-
         // Clears all the transactions in the pool
         public void clear()
         {
@@ -1432,7 +1380,7 @@ namespace DLT
         {
             foreach(var tx_id in block.transactions)
             {
-                Transaction tx = TransactionPool.getAppliedTransaction(tx_id, block.blockNum, true);
+                Transaction tx = TransactionPool.getAppliedTransaction(tx_id, block.blockNum);
                 if(tx == null)
                 {
                     Logging.error("Cannot revert transaction " + Transaction.getTxIdString(tx_id) + ", transaction doesn't exist.");

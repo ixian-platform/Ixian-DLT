@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2020 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -13,6 +13,7 @@
 using DLT.Meta;
 using IXICore;
 using IXICore.Meta;
+using IXICore.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -48,9 +49,9 @@ namespace DLT
             // Maintain a queue of sql statements
             protected readonly List<QueueStorageMessage> queueStatements = new List<QueueStorageMessage>();
 
-            protected IStorage()
+            protected IStorage(string dataFolderBlocks)
             {
-                pathBase = Config.dataFolderBlocks;
+                pathBase = dataFolderBlocks;
             }
 
 
@@ -281,26 +282,7 @@ namespace DLT
             /// <param name="blocknum">Block height of the block you wish to retrieve.</param>
             /// <returns>Null if the Block does not exist in storage.</returns>
             public abstract Block getBlock(ulong blocknum);
-            /// <summary>
-            /// Retrieves a Block by its blockChecksum from the underlying storage (database).
-            /// </summary>
-            /// <param name="checksum">Block Checksum of the Block you wish to retrieve.</param>
-            /// <returns>Null if the Block with the specified hash does not exist in storage.</returns>
-            public abstract Block getBlockByHash(byte[] checksum);
-            /// <summary>
-            /// Retrieves a SuperBlock which has the specified lastSuperblockChecksum from the underlying storage (database).
-            /// </summary>
-            /// <param name="checksum">Block checksum of the previous Superblock.</param>
-            /// <returns>Null if the bloud could not be found in storage.</returns>
-            public abstract Block getBlockByLastSBHash(byte[] checksum);
-            /// <summary>
-            /// Retrieves all Blocks between two block heights, inclusive on both ends.
-            /// Note: If `from` is larger than `to`, or both parameters are 0, an empty collection is returned.
-            /// </summary>
-            /// <param name="from">Minimum block height.</param>
-            /// <param name="to">Maximum block height</param>
-            /// <returns>IEnumerable with the resulting Blocks.</returns>
-            public abstract IEnumerable<Block> getBlocksByRange(ulong from, ulong to);
+            public abstract byte[] getBlockBytes(ulong blocknum, bool asBlockHeader);
             // Get - Transaction
             /// <summary>
             /// Retrieves a Transaction by its txid.
@@ -309,56 +291,20 @@ namespace DLT
             /// <param name="block_num">Block height of the Block where the Transaction can be found.</param>
             /// <returns>Null if this transaction can't be found in storage.</returns>
             public abstract Transaction getTransaction(byte[] txid, ulong block_num);
-            /// <summary>
-            /// Retrieves all Transactions with the specified type from the given block range.
-            /// Note: If `block_to` is 0, only Block `block_from` will be searched. If both parameters are 0, all Blocks will be searched.
-            /// If both parameters are specified, the search is performed on the blocks [`block_from` - `block_to`] (inclusive).
-            /// </summary>
-            /// <param name="type">Transaction type to retrieve.</param>
-            /// <param name="block_from">Starting block for the transaction search.</param>
-            /// <param name="block_to">Ending block to search.</param>
-            /// <returns>Collection of matching transactions.</returns>
-            public abstract IEnumerable<Transaction> getTransactionsByType(Transaction.Type type, ulong block_from = 0, ulong block_to = 0);
-            /// <summary>
-            /// Retrieves all transactions which have the specified address in their `from` field.
-            /// Note: If `block_to` is 0, only Block `block_from` will be searched. If both parameters are 0, all Blocks will be searched.
-            /// If both parameters are specified, the search is performed on the blocks [`block_from` - `block_to`] (inclusive).
-            /// </summary>
-            /// <param name="from_addr">The wallet address you are searching.</param>
-            /// <param name="block_from">Starting block for the transaction search.</param>
-            /// <param name="block_to">Ending block to search.</param>
-            /// <returns>Collection of matching Transactions.</returns>
-            public abstract IEnumerable<Transaction> getTransactionsFromAddress(byte[] from_addr, ulong block_from = 0, ulong block_to = 0);
-            /// <summary>
-            /// Retrieves all transactions which have the specified address in their `to` field.
-            /// Note: If `block_to` is 0, only Block `block_from` will be searched. If both parameters are 0, all Blocks will be searched.
-            /// If both parameters are specified, the search is performed on the blocks [`block_from` - `block_to`] (inclusive).
-            /// </summary>
-            /// <param name="to_addr">The wallet address you are searching.</param>
-            /// <param name="block_from">Starting block for the transaction search.</param>
-            /// <param name="block_to">Ending block to search.</param>
-            /// <returns>Collection of matching Transactions.</returns>
-            public abstract IEnumerable<Transaction> getTransactionsToAddress(byte[] to_addr, ulong block_from = 0, ulong block_to = 0);
+            public abstract byte[] getTransactionBytes(byte[] txid, ulong block_num);
             /// <summary>
             /// Retrieves all Transactions from the specified block.
             /// </summary>
             /// <param name="block_num">Block from which to read Transactions.</param>
             /// <returns>Collection with matching Transactions.</returns>
-            public abstract IEnumerable<Transaction> getTransactionsInBlock(ulong block_num, int tx_type = -1);
-            /// <summary>
-            /// Retrieve all Transactions which were applied in the specified block range (inclusive).
-            /// Note: if `block_from` is larger than `block_to`, or both parameters are 0, an empty collection will be returned.
-            /// </summary>
-            /// <param name="block_from">Starting block from which applied transactions will be returned.</param>
-            /// <param name="block_to">Ending block until which applied transactions will be returned.</param>
-            /// <returns>Collection of Transactions which match the criteria.</returns>
-            public abstract IEnumerable<Transaction> getTransactionsApplied(ulong block_from, ulong block_to);
+            public abstract IEnumerable<Transaction> getTransactionsInBlock(ulong block_num, short tx_type = -1);
+            public abstract IEnumerable<byte[]> getTransactionsBytesInBlock(ulong block_num, short tx_type = -1);
             //
             // Remove
             public abstract bool removeBlock(ulong block_num, bool remove_transactions = true);
-            public abstract bool removeTransaction(byte[] txid, ulong block_num = 0);
+            public abstract bool removeTransaction(byte[] txid, ulong block_num);
 
-            public abstract (byte[] blockChecksum, string totalSignerDifficulty) getBlockTotalSignerDifficulty(ulong blocknum);
+            public abstract (byte[] blockChecksum, IxiNumber totalSignerDifficulty) getBlockTotalSignerDifficulty(ulong blocknum);
             //
             // Prepare and cleanup
             protected abstract bool prepareStorageInternal();
@@ -368,13 +314,13 @@ namespace DLT
 
 
             // instantiation for the proper implementation class
-            public static IStorage create(string name)
+            public static IStorage create(string name, string dataFolderBlocks, IMemoryInfoProvider memoryInfoProvider)
             {
                 Logging.info("Block storage provider: {0}", name);
                 switch(name)
                 {
-                    case "SQLite": return new SQLiteStorage();
-                    case "RocksDB": return new RocksDBStorage();
+                    case "SQLite": return new SQLiteStorage(dataFolderBlocks);
+                    case "RocksDB": return new RocksDBStorage(dataFolderBlocks, memoryInfoProvider);
                     default: throw new Exception(String.Format("Unknown blocks storage provider: {0}", name));
                 }
             }
