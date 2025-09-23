@@ -2020,11 +2020,11 @@ namespace DLT
                         Logging.warn("Error freezing signatures of target block #{0} {1}, cannot freeze enough signatures to pass consensus, difficulty: {2} < {3} count: {4} < {5}.", target_block.blockNum, Crypto.hashToString(target_block.blockChecksum), frozen_block_sigs_difficulty, required_difficulty, frozen_block_sigs.Count, required_consensus_count_adjusted);
                         return false;
                     }
-                }
 
-                if (target_block.blockNum != 1 && target_block.version >= BlockVer.v10 && IxianHandler.getBlockHeader(target_block.blockNum - 1).version >= BlockVer.v10)
-                {
-                    frozen_block_sigs = frozen_block_sigs.OrderBy(x => x.powSolution.difficulty, Comparer<IxiNumber>.Default).ThenBy(x => x.recipientPubKeyOrAddress.addressNoChecksum, new ByteArrayComparer()).ToList();
+                    if (target_block.blockNum != 1)
+                    {
+                        frozen_block_sigs = frozen_block_sigs.OrderBy(x => x.powSolution.difficulty, Comparer<IxiNumber>.Default).ThenBy(x => x.recipientPubKeyOrAddress.addressNoChecksum, new ByteArrayComparer()).ToList();
+                    }
                 }
 
                 Node.blockChain.setFrozenSignatures(target_block, frozen_block_sigs);

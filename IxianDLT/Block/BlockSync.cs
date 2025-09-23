@@ -27,7 +27,7 @@ namespace DLT
     {
         public bool synchronizing { get; private set; }
         List<Block> pendingBlocks = new List<Block>();
-        List<ulong> missingBlocks = null;
+        SortedSet<ulong> missingBlocks = null;
         ulong lastMissingBlock = 0;
 
         SortedDictionary<ulong, List<Transaction>> pendingTransactions = new();
@@ -115,7 +115,7 @@ namespace DLT
                         rollForward();
                         if (lastBh == IxianHandler.getLastBlockHeight())
                         {
-                            Thread.Sleep(100);
+                            Thread.Sleep(50);
                         }
                     }
                     catch (Exception e)
@@ -163,8 +163,10 @@ namespace DLT
                         continue;
                     }
 
-                    requestMissingBlocks();
-                    Thread.Sleep(100);
+                    if (!requestMissingBlocks())
+                    {
+                        Thread.Sleep(50);
+                    }
                     continue;
                 }
                 // Check if we can perform the walletstate synchronization
@@ -244,8 +246,7 @@ namespace DLT
                 if (missingBlocks == null)
                 {
                     lastMissingBlock = lastBlock;
-                    missingBlocks = new List<ulong>(Enumerable.Range(0, (int)(lastBlock - firstBlock + 1)).Select(x => (ulong)x + firstBlock));
-                    missingBlocks.Sort();
+                    missingBlocks = new(Enumerable.Range(0, (int)(lastBlock - firstBlock + 1)).Select(x => (ulong)x + firstBlock));
                 }
 
 
@@ -1492,7 +1493,6 @@ namespace DLT
                                 missingBlocks.Add(lastMissingBlock + i);
                             }
                             lastMissingBlock = block_height;
-                            missingBlocks.Sort();
                         }
                         determineSyncTargetBlockNum();
                     }
