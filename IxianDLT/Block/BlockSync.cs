@@ -13,7 +13,6 @@
 using DLT.Meta;
 using DLT.Network;
 using IXICore;
-using IXICore.ExternalWallets;
 using IXICore.Meta;
 using IXICore.Network;
 using System;
@@ -261,7 +260,7 @@ namespace DLT
                     return false;
                 }
 
-                tmpMissingBlocks = new List<ulong>(missingBlocks.Take(maxBlockRequests * 2));
+                tmpMissingBlocks = missingBlocks.Take(maxBlockRequests * 2).ToList();
             }
 
             foreach (ulong blockNum in tmpMissingBlocks)
