@@ -1152,7 +1152,7 @@ namespace DLT
 
             public override byte[] getTransactionBytes(byte[] txid, ulong block_num)
             {
-                return getTransaction(txid, block_num)?.getBytes();
+                return getTransaction(txid, block_num)?.getBytes(true, true);
             }
 
             // Removes a block from the storage database

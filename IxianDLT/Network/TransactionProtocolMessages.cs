@@ -77,7 +77,7 @@ namespace DLT
                     return;
                 }
 
-                txIdArr = new List<byte[]>(b.transactions);
+                txIdArr = b.transactions.ToList();
 
                 if (txIdArr == null)
                     return;
