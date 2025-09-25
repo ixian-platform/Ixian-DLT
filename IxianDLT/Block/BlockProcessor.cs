@@ -1811,7 +1811,17 @@ namespace DLT
                 if (block.blockNum > 13 && required_consensus_count > 1)
                 {
                     // verify if over 50% signatures are from the previous block
-                    if (required_sigs.Count < (required_consensus_count > 2 ? ((required_consensus_count / 2) + 1) : 1)
+                    int required_consensus_count_adj;
+                    if (block.version > BlockVer.v12)
+                    {
+                        required_consensus_count_adj = (required_consensus_count / 2) + 1;
+                    }
+                    else
+                    {
+                        required_consensus_count_adj = required_consensus_count > 2 ? ((required_consensus_count / 2) + 1) : 1;
+                    }
+
+                    if (required_sigs.Count < required_consensus_count_adj
                         && !handleBlockchainRecoveryMode(block, required_sigs.Count, frozen_sig_count, frozen_sig_difficulty, required_signer_difficulty))
                     {
                         Logging.warn("Block {0} has less than 50% + 1 required signers from previous block {1} < {2}.", block.blockNum, required_sigs.Count(), (required_consensus_count / 2) + 1);

@@ -98,7 +98,7 @@ namespace DLT.Meta
             }
             CoreConfig.maximumServerClients = Config.maxIncomingClientNodes;
 
-            IxianHandler.init(Config.version, this, Config.networkType, !Config.disableSetTitle, Config.checksumLock);
+            IxianHandler.init(Config.version + (Config.blockStorageProvider == "RocksDB" ? "-r" : "-s"), this, Config.networkType, !Config.disableSetTitle, Config.checksumLock);
             init();
         }
 

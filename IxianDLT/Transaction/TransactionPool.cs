@@ -1142,14 +1142,11 @@ namespace DLT
         // Returns null if no transaction is found
         public static Transaction getUnappliedTransaction(byte[] txid)
         {
-            lock(stateLock)
+            lock (stateLock)
             {
-                if(unappliedTransactions.ContainsKey(txid))
-                {
-                    return unappliedTransactions[txid];
-                }
+                unappliedTransactions.TryGetValue(txid, out var tx);
+                return tx;
             }
-            return null;
         }
 
         // Removes all transactions from TransactionPool linked to a block.

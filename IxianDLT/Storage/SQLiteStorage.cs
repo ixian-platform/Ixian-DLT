@@ -102,6 +102,15 @@ namespace DLT
 
             }
 
+            public static bool hasSQLiteData(string pathBase)
+            {
+                if (File.Exists(Path.Combine(pathBase, "0000", "0.dat")))
+                {
+                    return true;
+                }
+                return false;
+            }
+
             // Creates the storage file if not found
             protected override bool prepareStorageInternal()
             {

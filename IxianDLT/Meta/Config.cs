@@ -56,7 +56,7 @@ namespace DLT
             public static uint cpuThreads = (uint)Environment.ProcessorCount;
 
             public static string dataFolderPath = "data";
-            public static string blockStorageProvider = "SQLite";
+            public static string blockStorageProvider = "Auto";
             public static string dataFolderBlocks
             {
                 get
