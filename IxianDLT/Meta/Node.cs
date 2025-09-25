@@ -98,7 +98,7 @@ namespace DLT.Meta
             }
             CoreConfig.maximumServerClients = Config.maxIncomingClientNodes;
 
-            IxianHandler.init(Config.version + (Config.blockStorageProvider == "RocksDB" ? "-r" : "-s"), this, Config.networkType, !Config.disableSetTitle, Config.checksumLock);
+            IxianHandler.init(Config.version, this, Config.networkType, !Config.disableSetTitle, Config.checksumLock);
             init();
         }
 
@@ -132,6 +132,16 @@ namespace DLT.Meta
             {
                 storage = IStorage.create(Config.blockStorageProvider, Config.dataFolderBlocks, new MemoryInfoProvider());
             }
+
+            if (storage is RocksDBStorage)
+            {
+                CoreConfig.productVersion = Config.version + "-r";
+            }
+            else
+            {
+                CoreConfig.productVersion = Config.version + "-s";
+            }
+
             if (!storage.prepareStorage())
             {
                 Logging.error("Error while preparing block storage! Aborting.");
