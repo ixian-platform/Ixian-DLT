@@ -1000,7 +1000,13 @@ namespace DLT
 
             private bool hasSufficientDiskSpace()
             {
-                return Platform.getAvailableDiskSpace() > minDiskSpace;
+                var availSpace = Platform.getAvailableDiskSpace(pathBase);
+                if (availSpace == -1)
+                {
+                    Logging.warn("Could not read available disk space.");
+                    return true;
+                }
+                return availSpace > minDiskSpace;
             }
 
             protected override void cleanupCache()
