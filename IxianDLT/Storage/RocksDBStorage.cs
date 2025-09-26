@@ -175,28 +175,29 @@ namespace DLT
                         .SetMaxBackgroundFlushes(Math.Min(4, Environment.ProcessorCount / 2))
                         .SetAllowMmapReads(false)
                         .SetAllowMmapWrites(false)
-                        .SetTargetFileSizeBase(128 * 1024 * 1024)
+                        .SetTargetFileSizeBase(256 * 1024 * 1024)
+                        .SetTargetFileSizeMultiplier(2)
                         .SetCompression(Compression.Zstd)
                         .SetLevelCompactionDynamicLevelBytes(true)
-                        .SetCompactionReadaheadSize(2 * 1024 * 1024);
+                        .SetCompactionReadaheadSize(4 * 1024 * 1024);
 
                     // blocks
                     var blocksBbto = new BlockBasedTableOptions();
                     blocksBbto.SetBlockCache(blockCache.Handle);
-                    blocksBbto.SetBlockSize(64 * 1024);
+                    blocksBbto.SetBlockSize(128 * 1024);
                     blocksBbto.SetCacheIndexAndFilterBlocks(true);
                     blocksBbto.SetPinL0FilterAndIndexBlocksInCache(true);
-                    blocksBbto.SetFilterPolicy(BloomFilterPolicy.Create(14, true));
+                    blocksBbto.SetFilterPolicy(BloomFilterPolicy.Create(16, true));
                     blocksBbto.SetWholeKeyFiltering(true);
                     blocksBbto.SetFormatVersion(6);
 
                     // transactions
                     var txBbto = new BlockBasedTableOptions();
                     txBbto.SetBlockCache(blockCache.Handle);
-                    txBbto.SetBlockSize(32 * 1024);
+                    txBbto.SetBlockSize(64 * 1024);
                     txBbto.SetCacheIndexAndFilterBlocks(true);
                     txBbto.SetPinL0FilterAndIndexBlocksInCache(true);
-                    txBbto.SetFilterPolicy(BloomFilterPolicy.Create(14, true));
+                    txBbto.SetFilterPolicy(BloomFilterPolicy.Create(16, true));
                     txBbto.SetWholeKeyFiltering(true);
                     txBbto.SetFormatVersion(6);
 
@@ -211,28 +212,38 @@ namespace DLT
                     metaBbto.SetFormatVersion(6);
 
                     // index CFs
-                    var indexBbto = new BlockBasedTableOptions();
-                    indexBbto.SetBlockCache(blockCache.Handle);
-                    indexBbto.SetBlockSize(16 * 1024);
-                    indexBbto.SetCacheIndexAndFilterBlocks(true);
-                    indexBbto.SetPinL0FilterAndIndexBlocksInCache(true);
-                    indexBbto.SetFilterPolicy(BloomFilterPolicy.Create(14, true));
-                    indexBbto.SetWholeKeyFiltering(false);
-                    indexBbto.SetFormatVersion(6);
+                    var blocksIndexBbto = new BlockBasedTableOptions();
+                    blocksIndexBbto.SetBlockCache(blockCache.Handle);
+                    blocksIndexBbto.SetBlockSize(16 * 1024);
+                    blocksIndexBbto.SetCacheIndexAndFilterBlocks(true);
+                    blocksIndexBbto.SetPinL0FilterAndIndexBlocksInCache(true);
+                    blocksIndexBbto.SetFilterPolicy(BloomFilterPolicy.Create(14, true));
+                    blocksIndexBbto.SetWholeKeyFiltering(false);
+                    blocksIndexBbto.SetFormatVersion(6);
+
+                    var txIndexBbto = new BlockBasedTableOptions();
+                    txIndexBbto.SetBlockCache(blockCache.Handle);
+                    txIndexBbto.SetBlockSize(32 * 1024);
+                    txIndexBbto.SetCacheIndexAndFilterBlocks(true);
+                    txIndexBbto.SetPinL0FilterAndIndexBlocksInCache(true);
+                    txIndexBbto.SetFilterPolicy(BloomFilterPolicy.Create(14, true));
+                    txIndexBbto.SetWholeKeyFiltering(false);
+                    txIndexBbto.SetFormatVersion(6);
 
                     var columnFamilies = new ColumnFamilies
                     {
                         { "blocks", new ColumnFamilyOptions()
                             .SetBlockBasedTableFactory(blocksBbto)
-                            .SetWriteBufferSize(8UL << 20)
-                            .SetMaxWriteBufferNumber(1)
+                            .SetWriteBufferSize(32UL << 20)
+                            .SetMaxWriteBufferNumber(2)
+                            .SetMinWriteBufferNumberToMerge(1)
                             .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(34))
                         },
                         { "transactions", new ColumnFamilyOptions()
                             .SetBlockBasedTableFactory(txBbto)
                             .SetWriteBufferSize(128UL << 20)
-                            .SetMaxWriteBufferNumber(6)
-                            .SetMinWriteBufferNumberToMerge(3)
+                            .SetMaxWriteBufferNumber(4)
+                            .SetMinWriteBufferNumberToMerge(2)
                             .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(36))
                         },
                         { "meta", new ColumnFamilyOptions()
@@ -242,23 +253,24 @@ namespace DLT
                             .SetMaxWriteBufferNumber(1)
                         },
                         { "index_blocks_checksum_meta", new ColumnFamilyOptions()
-                            .SetBlockBasedTableFactory(indexBbto)
-                            .SetWriteBufferSize(1UL << 20)
-                            .SetMaxWriteBufferNumber(1)
-                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(10))
-                        },
-                        { "index_tx_applied_type", new ColumnFamilyOptions()
-                            .SetBlockBasedTableFactory(indexBbto)
-                            .SetWriteBufferSize(16UL << 20)
-                            .SetMaxWriteBufferNumber(4)
+                            .SetBlockBasedTableFactory(blocksIndexBbto)
+                            .SetWriteBufferSize(2UL << 20)
+                            .SetMaxWriteBufferNumber(2)
                             .SetMinWriteBufferNumberToMerge(1)
                             .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(10))
                         },
-                        { "index_address_txs", new ColumnFamilyOptions()
-                            .SetBlockBasedTableFactory(indexBbto)
-                            .SetWriteBufferSize(64UL << 20)
+                        { "index_tx_applied_type", new ColumnFamilyOptions()
+                            .SetBlockBasedTableFactory(txIndexBbto)
+                            .SetWriteBufferSize(8UL << 20)
                             .SetMaxWriteBufferNumber(4)
                             .SetMinWriteBufferNumberToMerge(2)
+                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(10))
+                        },
+                        { "index_address_txs", new ColumnFamilyOptions()
+                            .SetBlockBasedTableFactory(txIndexBbto)
+                            .SetWriteBufferSize(32UL << 20)
+                            .SetMaxWriteBufferNumber(6)
+                            .SetMinWriteBufferNumberToMerge(3)
                             .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(35))
                         }
                     };
