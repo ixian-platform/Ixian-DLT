@@ -183,15 +183,6 @@ namespace DLTNode
 
             IXICore.Utils.ConsoleHelpers.prepareWindowsConsole();
 
-            // Start logging
-            if(!Logging.start(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), Config.logVerbosity))
-            {
-                IxianHandler.forceShutdown = true;
-                Logging.info("Press ENTER to exit.");
-                Console.ReadLine();
-                return;
-            }
-
             Console.CancelKeyPress += delegate (object sender, ConsoleCancelEventArgs e) {
                 ConsoleHelpers.verboseConsoleOutput = true;
                 Logging.consoleOutput = ConsoleHelpers.verboseConsoleOutput;
@@ -239,6 +230,18 @@ namespace DLTNode
 
             // Read configuration from command line
             Config.init(args);
+
+            // First create the data folder if it does not already exist
+            Node.checkDataFolder();
+
+            // Start logging
+            if (!Logging.start(Config.dataFolderPath, Config.logVerbosity))
+            {
+                IxianHandler.forceShutdown = true;
+                Logging.info("Press ENTER to exit.");
+                Console.ReadLine();
+                return;
+            }
 
             // Set the logging options
             Logging.setOptions(Config.maxLogSize, Config.maxLogCount);

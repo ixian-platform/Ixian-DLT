@@ -1057,8 +1057,8 @@ namespace DLT
 
                     if ((DateTime.Now - lastReopenOptimize).TotalSeconds > 60.0)
                     {
-                        int num = 0;
-                        while (num < 2 && reopenCleanupList.Count > 0)
+                        int reopenListCount = reopenCleanupList.Count;
+                        for (int i = 0; i < reopenListCount; i++)
                         {
                             var db = reopenCleanupList.Dequeue();
                             if (openDatabases.Values.Any(x => x.dbPath == db.dbPath))
@@ -1084,8 +1084,6 @@ namespace DLT
                                 db.closeDatabase();
                                 Logging.info("RocksDB: Compacting succeeded");
                             }
- 
-                            num += 1;
                         }
                         lastReopenOptimize = DateTime.Now;
                     }

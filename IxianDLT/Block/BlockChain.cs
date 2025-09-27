@@ -18,6 +18,7 @@ using IXICore.Meta;
 using IXICore.Network;
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
 
 namespace DLT
@@ -26,8 +27,8 @@ namespace DLT
     {
         List<Block> blocks = new List<Block>((int)ConsensusConfig.getRedactedWindowSize());
 
-        Dictionary<ulong, Block> blocksDictionary = new Dictionary<ulong, Block>(); // A secondary storage for quick lookups
-        List<(ulong blockNum, byte[] hash, IxiNumber totalSignerDifficulty)?> blockHashCache = new(); // Cache for quick lookups of block hashes and total signer difficulty outside of redacted window
+        SortedDictionary<ulong, Block> blocksDictionary = new SortedDictionary<ulong, Block>(); // A secondary storage for quick lookups
+        OrderedDictionary blockHashCache = new(); // Cache for quick lookups of block hashes and total signer difficulty outside of redacted window
 
         long lastBlockReceivedTime = Clock.getTimestamp();
 
@@ -273,18 +274,21 @@ namespace DLT
         {
             lock (blocks)
             {
-                var bhIndex = blockHashCache.FindIndex(x => x.Value.blockNum == blockNum);
-                if (bhIndex == -1)
+                if (blockHashCache.Contains(blockNum))
                 {
-                    blockHashCache.Add((blockNum, blockHash, totalSignerDifficulty));
-                    if (blockHashCache.Count > Config.maxCachedBlockHashes)
+                    if (totalSignerDifficulty == null)
                     {
-                        blockHashCache.RemoveAt(0);
+                        return;
                     }
+
+                    // Remove and re-add
+                    blockHashCache.Remove(blockNum);
                 }
-                else if (totalSignerDifficulty != null)
+
+                blockHashCache.Add(blockNum, (blockHash, totalSignerDifficulty));
+                if (blockHashCache.Count > Config.maxCachedBlockHashes)
                 {
-                    blockHashCache[bhIndex] = (blockNum, blockHash, totalSignerDifficulty);
+                    blockHashCache.RemoveAt(0);
                 }
             }
         }
@@ -296,7 +300,7 @@ namespace DLT
             {
                 lock (blocks)
                 {
-                    var bh = blockHashCache.Find(x => x.Value.blockNum == blockNum);
+                    (byte[] hash, IxiNumber totalSignerDifficulty)? bh = ((byte[] hash, IxiNumber totalSignerDifficulty)?)blockHashCache[blockNum];
                     if (bh != null && bh.HasValue && bh.Value.totalSignerDifficulty != null)
                     {
                         return bh.Value.totalSignerDifficulty;
@@ -330,7 +334,7 @@ namespace DLT
             {
                 lock (blocks)
                 {
-                    var bh = blockHashCache.Find(x => x.Value.blockNum == blockNum);
+                    (byte[] hash, IxiNumber totalSignerDifficulty)? bh = ((byte[] hash, IxiNumber totalSignerDifficulty)?)blockHashCache[blockNum];
                     if (bh != null && bh.HasValue)
                     {
                         return bh.Value.hash;
@@ -1141,9 +1145,9 @@ namespace DLT
                 lastSuperBlockNum = 0;
                 lastBlockReceivedTime = 0;
                 blocks.Clear();
+                clearCachedRequiredSignerDifficulty();
+                blockCount = blocks.Count;
             }
-            clearCachedRequiredSignerDifficulty();
-            blockCount = blocks.Count;
         }
 
         // this function prunes un-needed sigs from blocks
@@ -1366,11 +1370,7 @@ namespace DLT
                 }
                 clearCachedRequiredSignerDifficulty();
 
-                var itemsToRemove = blockHashCache.FindAll(x => x.Value.blockNum == block_num_to_revert);
-                foreach (var item in itemsToRemove)
-                {
-                    blockHashCache.Remove(item);
-                }
+                blockHashCache.Remove(block_num_to_revert);
             }
 
             return true;

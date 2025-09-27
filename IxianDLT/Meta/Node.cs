@@ -107,9 +107,6 @@ namespace DLT.Meta
         {
             running = true;
 
-            // First create the data folder if it does not already exist
-            checkDataFolder();
-
             PeerStorage.init("");
 
             regNamesMemoryStorage = new RegNamesMemoryStorage(Path.Combine(Config.dataFolderPath, "names"), Config.saveWalletStateEveryBlock);

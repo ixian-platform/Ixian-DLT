@@ -24,8 +24,6 @@ namespace DLT.Meta
 
         public static void saveWalletState(ulong blockNum)
         {
-            Node.checkDataFolder();
-
             string db_path = path + Path.DirectorySeparatorChar + "0000" + Path.DirectorySeparatorChar + blockNum + ".dat";
 
             FileStream fs = File.Open(db_path, FileMode.Create, FileAccess.Write, FileShare.None);
