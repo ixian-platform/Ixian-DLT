@@ -15,6 +15,7 @@ using DLT.Network;
 using IXICore;
 using IXICore.Meta;
 using IXICore.Network;
+using IXICore.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,7 +30,7 @@ namespace DLT
         SortedSet<ulong> missingBlocks = null;
         ulong lastMissingBlock = 0;
 
-        SortedDictionary<ulong, List<Transaction>> pendingTransactions = new();
+        SortedDictionary<ulong, Dictionary<byte[], Transaction>> pendingTransactions = new();
 
         public ulong pendingWsBlockNum { get; private set; }
         readonly List<WsChunk> pendingWsChunks = new List<WsChunk>();
@@ -1288,29 +1289,24 @@ namespace DLT
             {
                 lock (pendingTransactions)
                 {
-                    int idx = -1;
                     ulong txBlockHeight = tx.blockHeight;
                     if (tx.type == (int)Transaction.Type.StakingReward)
                     {
                         txBlockHeight += 1;
                     }
 
-                    if (pendingTransactions.ContainsKey(txBlockHeight))
+                    if (!pendingTransactions.ContainsKey(txBlockHeight))
                     {
-                        idx = pendingTransactions[txBlockHeight].FindIndex(x => x.id.SequenceEqual(tx.id));
-                    }
-                    else
-                    {
-                        pendingTransactions.Add(txBlockHeight, new());
+                        pendingTransactions.Add(txBlockHeight, new(new ByteArrayComparer()));
                     }
 
-                    if (idx > -1)
+                    if (pendingTransactions[txBlockHeight].ContainsKey(tx.id))
                     {
-                        // pendingTransactions[idx] = tx;
+                        //pendingTransactions[txBlockHeight][tx.id] = tx;
                     }
                     else
                     {
-                        pendingTransactions[txBlockHeight].Add(tx);
+                        pendingTransactions[txBlockHeight].Add(tx.id, tx);
                     }
                 }
             } else
@@ -1326,8 +1322,8 @@ namespace DLT
         {
             lock (pendingTransactions)
             {
-                List<ulong> txSectionsToRemove = new();
-                foreach (var txs in pendingTransactions)
+                SortedDictionary<ulong, Dictionary<byte[], Transaction>> tmpPendingTransactions = new(pendingTransactions);
+                foreach (var txs in tmpPendingTransactions)
                 {
                     ulong lastBlockNum = Node.storage.getHighestBlockInStorage();
                     //ulong lastBlockNum = Node.blockChain.getLastBlockNum();
@@ -1336,8 +1332,9 @@ namespace DLT
                         break;
                     }
 
-                    foreach (var tx in txs.Value)
+                    foreach (var txKV in txs.Value)
                     {
+                        var tx = txKV.Value;
                         try
                         {
                             if (!TransactionPool.addTransaction(tx, true, null))
@@ -1346,10 +1343,12 @@ namespace DLT
                                 // Retry but only once
                                 if (tx.blockHeight == txs.Key)
                                 {
-                                    if (pendingTransactions.ContainsKey(txs.Key + 1))
+                                    if (!pendingTransactions.ContainsKey(txs.Key + 1))
                                     {
-                                        pendingTransactions[txs.Key + 1].Add(tx);
+                                        pendingTransactions.Add(txs.Key + 1, new(new ByteArrayComparer()));
                                     }
+
+                                    pendingTransactions[txs.Key + 1].Add(tx.id, tx);
                                 }
                             }
                         }
@@ -1358,11 +1357,7 @@ namespace DLT
                             Logging.error("Error occurred in processPendingTransactions: " + e);
                         }
                     }
-                    txSectionsToRemove.Add(txs.Key);
-                }
-                foreach(var txs in txSectionsToRemove)
-                {
-                    pendingTransactions.Remove(txs);
+                    pendingTransactions.Remove(txs.Key);
                 }
             }
         }
