@@ -17,8 +17,8 @@ using IXICore.Inventory;
 using IXICore.Meta;
 using IXICore.Network;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.Specialized;
 using System.Linq;
 
 namespace DLT
@@ -28,7 +28,10 @@ namespace DLT
         List<Block> blocks = new List<Block>((int)ConsensusConfig.getRedactedWindowSize());
 
         SortedDictionary<ulong, Block> blocksDictionary = new SortedDictionary<ulong, Block>(); // A secondary storage for quick lookups
-        OrderedDictionary blockHashCache = new(); // Cache for quick lookups of block hashes and total signer difficulty outside of redacted window
+
+        // Cache for quick lookups of block hashes and total signer difficulty outside of redacted window
+        private readonly ConcurrentDictionary<ulong, (byte[] hash, IxiNumber totalSignerDifficulty)> blockHashCache = new ConcurrentDictionary<ulong, (byte[], IxiNumber)>();
+        private readonly ConcurrentQueue<ulong> blockHashCacheOrderQueue = new ConcurrentQueue<ulong>();
 
         long lastBlockReceivedTime = Clock.getTimestamp();
 
@@ -272,24 +275,16 @@ namespace DLT
 
         public void cacheBlockSignerDifficulty(ulong blockNum, byte[] blockHash, IxiNumber totalSignerDifficulty)
         {
-            lock (blocks)
+            if (totalSignerDifficulty == null)
+                return;
+
+            blockHashCache[blockNum] = (blockHash, totalSignerDifficulty);
+
+            blockHashCacheOrderQueue.Enqueue(blockNum);
+
+            while (blockHashCacheOrderQueue.Count > Config.maxCachedBlockHashes && blockHashCacheOrderQueue.TryDequeue(out var oldest))
             {
-                if (blockHashCache.Contains(blockNum))
-                {
-                    if (totalSignerDifficulty == null)
-                    {
-                        return;
-                    }
-
-                    // Remove and re-add
-                    blockHashCache.Remove(blockNum);
-                }
-
-                blockHashCache.Add(blockNum, (blockHash, totalSignerDifficulty));
-                if (blockHashCache.Count > Config.maxCachedBlockHashes)
-                {
-                    blockHashCache.RemoveAt(0);
-                }
+                blockHashCache.TryRemove(oldest, out _);
             }
         }
 
@@ -298,21 +293,18 @@ namespace DLT
             bool outsideRedactedWindow = isOutsideRedactedWindow(blockNum);
             if (outsideRedactedWindow)
             {
-                lock (blocks)
+                if (blockHashCache.TryGetValue(blockNum, out var bh) && bh.totalSignerDifficulty != null)
                 {
-                    (byte[] hash, IxiNumber totalSignerDifficulty)? bh = ((byte[] hash, IxiNumber totalSignerDifficulty)?)blockHashCache[blockNum];
-                    if (bh != null && bh.HasValue && bh.Value.totalSignerDifficulty != null)
-                    {
-                        return bh.Value.totalSignerDifficulty;
-                    }
-                    var hashAndSignerDiffs = Node.storage.getBlockTotalSignerDifficulty(blockNum);
-                    if (hashAndSignerDiffs.blockChecksum != null && hashAndSignerDiffs.totalSignerDifficulty != null)
-                    {
-                        cacheBlockSignerDifficulty(blockNum, hashAndSignerDiffs.blockChecksum, new IxiNumber(hashAndSignerDiffs.totalSignerDifficulty));
-                        return hashAndSignerDiffs.totalSignerDifficulty;
-                    }
+                    return bh.totalSignerDifficulty;
+                }
+                var hashAndSignerDiffs = Node.storage.getBlockTotalSignerDifficulty(blockNum);
+                if (hashAndSignerDiffs.blockChecksum != null && hashAndSignerDiffs.totalSignerDifficulty != null)
+                {
+                    cacheBlockSignerDifficulty(blockNum, hashAndSignerDiffs.blockChecksum, new IxiNumber(hashAndSignerDiffs.totalSignerDifficulty));
+                    return hashAndSignerDiffs.totalSignerDifficulty;
                 }
             }
+
             var block = getBlock(blockNum, true, false);
             if (block == null)
             {
@@ -332,36 +324,34 @@ namespace DLT
             bool outsideRedactedWindow = isOutsideRedactedWindow(blockNum);
             if (outsideRedactedWindow)
             {
-                lock (blocks)
+                if (blockHashCache.TryGetValue(blockNum, out var bh))
                 {
-                    (byte[] hash, IxiNumber totalSignerDifficulty)? bh = ((byte[] hash, IxiNumber totalSignerDifficulty)?)blockHashCache[blockNum];
-                    if (bh != null && bh.HasValue)
-                    {
-                        return bh.Value.hash;
-                    }
-                    var hashAndTotalSignerDiff = Node.storage.getBlockTotalSignerDifficulty(blockNum);
-                    if (hashAndTotalSignerDiff.blockChecksum != null)
-                    {
-                        cacheBlockSignerDifficulty(blockNum, hashAndTotalSignerDiff.blockChecksum, hashAndTotalSignerDiff.totalSignerDifficulty);
-                        return hashAndTotalSignerDiff.blockChecksum;
-                    }
+                    return bh.hash;
+                }
+                var hashAndTotalSignerDiff = Node.storage.getBlockTotalSignerDifficulty(blockNum);
+                if (hashAndTotalSignerDiff.blockChecksum != null)
+                {
+                    cacheBlockSignerDifficulty(blockNum, hashAndTotalSignerDiff.blockChecksum, hashAndTotalSignerDiff.totalSignerDifficulty);
+                    return hashAndTotalSignerDiff.blockChecksum;
                 }
             }
+
             var block = getBlock(blockNum, true, false);
-            if (block != null)
+            if (block == null)
             {
-                if (outsideRedactedWindow)
-                {
-                    IxiNumber totalSignerDifficulty = null;
-                    if (block.compacted)
-                    {
-                        totalSignerDifficulty = block.getTotalSignerDifficulty();
-                    }
-                    cacheBlockSignerDifficulty(blockNum, block.blockChecksum, totalSignerDifficulty);
-                }
-                return block.blockChecksum;
+                return null;
             }
-            return null;
+
+            if (outsideRedactedWindow)
+            {
+                IxiNumber totalSignerDifficulty = null;
+                if (block.compacted)
+                {
+                    totalSignerDifficulty = block.getTotalSignerDifficulty();
+                }
+                cacheBlockSignerDifficulty(blockNum, block.blockChecksum, totalSignerDifficulty);
+            }
+            return block.blockChecksum;
         }
 
         // Attempts to retrieve a block from memory or from storage
@@ -1135,6 +1125,7 @@ namespace DLT
             {
                 blocksDictionary.Clear();
                 blockHashCache.Clear();
+                blockHashCacheOrderQueue.Clear();
                 pendingSuperBlocks.Clear();
                 lastSuperBlock = null;
                 lastSuperBlockChecksum = null;
@@ -1366,7 +1357,7 @@ namespace DLT
                 }
                 clearCachedRequiredSignerDifficulty();
 
-                blockHashCache.Remove(block_num_to_revert);
+                blockHashCache.TryRemove(block_num_to_revert, out _);
             }
 
             return true;

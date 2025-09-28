@@ -56,6 +56,7 @@ namespace DLT
             public static uint cpuThreads = (uint)Environment.ProcessorCount;
 
             public static string dataFolderPath = "data";
+            public static string logFolderPath = Environment.CurrentDirectory;
             public static string blockStorageProvider = "Auto";
             public static string dataFolderBlocks
             {
@@ -530,6 +531,8 @@ namespace DLT
                 cmd_parser.Setup<bool>("disableWebStart").Callback(value => disableWebStart = true).Required();
 
                 cmd_parser.Setup<string>("dataFolderPath").Callback(value => dataFolderPath = value).Required();
+
+                cmd_parser.Setup<string>("logFolderPath").Callback(value => logFolderPath = value).Required();
 
                 cmd_parser.Setup<bool>("optimizeDBStorage").Callback(value => optimizeDBStorage = value).Required();
 

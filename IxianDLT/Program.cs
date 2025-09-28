@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2022 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2025 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -20,7 +20,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using System.Threading;
 
@@ -43,18 +42,14 @@ namespace DLTNode
                 "BouncyCastle.Cryptography.dll",
                 "FluentCommandLineParser.dll",
                 "Newtonsoft.Json.dll",
-                "Open.Nat.dll",
-                "SQLite-net.dll",
-                "SQLitePCLRaw.batteries_v2.dll",
-                "SQLitePCLRaw.core.dll",
-                "SQLitePCLRaw.provider.e_sqlite3.dll",
+                "Open.Nat.dll"
             };
 
             foreach(string critical_dll in critical_dlls)
             {
                 if(!File.Exists(critical_dll))
                 {
-                    Logging.error(String.Format("Missing '{0}' in the program folder. Possibly the IXIAN archive was corrupted or incorrectly installed. Please re-download the archive from https://www.ixian.io!", critical_dll));
+                    Logging.error("Missing '{0}' in the program folder. Possibly the IXIAN archive was corrupted or incorrectly installed. Please re-download the archive from https://www.ixian.io!", critical_dll);
                     Logging.info("Press ENTER to exit.");
                     Console.ReadLine();
                     Environment.Exit(-1);
@@ -64,21 +59,11 @@ namespace DLTNode
             // Special case for argon
             if (!File.Exists("libargon2.dll") && !File.Exists("libargon2.so") && !File.Exists("libargon2.dylib"))
             {
-                Logging.error(String.Format("Missing '{0}' in the program folder. Possibly the IXIAN archive was corrupted or incorrectly installed. Please re-download the archive from https://www.ixian.io!", "libargon2"));
+                Logging.error("Missing '{0}' in the program folder. Possibly the IXIAN archive was corrupted or incorrectly installed. Please re-download the archive from https://www.ixian.io!", "libargon2");
                 Logging.info("Press ENTER to exit.");
                 Console.ReadLine();
                 Environment.Exit(-1);
             }
-
-            // Special case for sqlite3
-            /*if (!File.Exists("x64" + Path.DirectorySeparatorChar + "e_sqlite3.dll") && !File.Exists("libe_sqlite3.so") && !File.Exists("libe_sqlite3.dylib"))
-            {
-                Logging.error(String.Format("Missing '{0}' in the program folder. Possibly the IXIAN archive was corrupted or incorrectly installed. Please re-download the archive from https://www.ixian.io!", "sqlite3"));
-                Logging.info("Press ENTER to exit.");
-                Console.ReadLine();
-                Environment.Exit(-1);
-            }*/
-
         }
         static void checkVCRedist()
         {
@@ -140,8 +125,8 @@ namespace DLTNode
                                 {
                                     Logging.warn("Terminating installer process...");
                                     p.Kill();
-                                    Logging.warn(String.Format("Process output: {0}", p.StandardOutput.ReadToEnd()));
-                                    Logging.warn(String.Format("Process error output: {0}", p.StandardError.ReadToEnd()));
+                                    Logging.warn("Process output: {0}", p.StandardOutput.ReadToEnd());
+                                    Logging.warn("Process error output: {0}", p.StandardError.ReadToEnd());
                                 }
                             }
                         }
@@ -155,9 +140,9 @@ namespace DLTNode
                         else
                         {
                             Logging.info("Visual C++ 2017 has failed to install. Please review the error text (if any) and install manually:");
-                            Logging.warn(String.Format("Process exit code: {0}.", p.ExitCode));
-                            Logging.warn(String.Format("Process output: {0}", p.StandardOutput.ReadToEnd()));
-                            Logging.warn(String.Format("Process error output: {0}", p.StandardError.ReadToEnd()));
+                            Logging.warn("Process exit code: {0}.", p.ExitCode);
+                            Logging.warn("Process output: {0}", p.StandardOutput.ReadToEnd());
+                            Logging.warn("Process error output: {0}", p.StandardError.ReadToEnd());
                         }
                     }
                 }
@@ -231,11 +216,16 @@ namespace DLTNode
             // Read configuration from command line
             Config.init(args);
 
+            if (noStart)
+            {
+                return;
+            }
+
             // First create the data folder if it does not already exist
             Node.checkDataFolder();
 
             // Start logging
-            if (!Logging.start(Config.dataFolderPath, Config.logVerbosity))
+            if (!Logging.start(Config.logFolderPath, Config.logVerbosity))
             {
                 IxianHandler.forceShutdown = true;
                 Logging.info("Press ENTER to exit.");
