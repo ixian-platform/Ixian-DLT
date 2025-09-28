@@ -1959,42 +1959,22 @@ namespace DLT
 
             lock (target_block.signatures)
             {
-                if(target_block.version < BlockVer.v10)
+                foreach(BlockSignature sig in target_block.signatures)
                 {
-                    PresenceOrderedEnumerator poe = PresenceList.getElectedSignerList(target_block.blockChecksum, ConsensusConfig.maximumBlockSigners * 2);
-                    foreach (byte[] address in poe)
+                    var address = sig.recipientPubKeyOrAddress;
+                    if (frozen_block_sigs.Find(x => x.recipientPubKeyOrAddress.addressNoChecksum.SequenceEqual(address.addressNoChecksum)) == null)
                     {
-                        BlockSignature signature = target_block.signatures.Find(x => x.recipientPubKeyOrAddress.addressNoChecksum.SequenceEqual(address));
-                        if (signature != null && frozen_block_sigs.Find(x => x.recipientPubKeyOrAddress.addressNoChecksum.SequenceEqual(address)) == null)
+                        if(Node.blockChain.getTimeSinceLastBlock() < CoreConfig.blockSignaturePlCheckTimeout
+                            && PresenceList.getPresenceByAddress(address) == null)
                         {
-                            frozen_block_sigs.Add(signature);
-                            sig_count++;
+                            continue;
                         }
-                        if (sig_count == ConsensusConfig.maximumBlockSigners)
-                        {
-                            break;
-                        }
+                        frozen_block_sigs.Add(sig);
+                        sig_count++;
                     }
-                }
-                else
-                {
-                    foreach(BlockSignature sig in target_block.signatures)
+                    if (sig_count == ConsensusConfig.maximumBlockSigners)
                     {
-                        var address = sig.recipientPubKeyOrAddress;
-                        if (frozen_block_sigs.Find(x => x.recipientPubKeyOrAddress.addressNoChecksum.SequenceEqual(address.addressNoChecksum)) == null)
-                        {
-                            if(Node.blockChain.getTimeSinceLastBlock() < CoreConfig.blockSignaturePlCheckTimeout
-                               && PresenceList.getPresenceByAddress(address) == null)
-                            {
-                                continue;
-                            }
-                            frozen_block_sigs.Add(sig);
-                            sig_count++;
-                        }
-                        if (sig_count == ConsensusConfig.maximumBlockSigners)
-                        {
-                            break;
-                        }
+                        break;
                     }
                 }
 

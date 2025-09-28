@@ -602,22 +602,18 @@ namespace DLT
         {
             if (blockNum > lastBlockNum && blockNum % ConsensusConfig.superblockInterval == 0)
             {
-                if (curBlockVersion == 0 || curBlockTimestamp == 0)
+                if (curBlockVersion != 0 && curBlockTimestamp != 0)
                 {
-                    throw new Exception("Error calculating required signer difficulty, curBlockVersion or curBlockTimestamp is 0.");
+                    return calculateRequiredSignerDifficulty(adjustToRatio, curBlockVersion, curBlockTimestamp);
                 }
+            }
 
-                return calculateRequiredSignerDifficulty(adjustToRatio, curBlockVersion, curBlockTimestamp);
-            }
-            else
+            IxiNumber difficulty = SignerPowSolution.bitsToDifficulty(getRequiredSignerBits(blockNum));
+            if (adjustToRatio)
             {
-                IxiNumber difficulty = SignerPowSolution.bitsToDifficulty(getRequiredSignerBits(blockNum));
-                if (adjustToRatio)
-                {
-                    difficulty = adjustSignerDifficultyToRatio(blockNum, difficulty);
-                }
-                return difficulty;
+                difficulty = adjustSignerDifficultyToRatio(blockNum, difficulty);
             }
+            return difficulty;
         }
 
         public IxiNumber getRequiredSignerDifficulty(Block block, bool adjustToRatio)
@@ -1436,7 +1432,7 @@ namespace DLT
             }
         }
 
-        public IxiNumber getMinSignerPowDifficulty(ulong blockNum, int curBlockVersion, long curBlockTimestamp)
+        public IxiNumber getMinSignerPowDifficulty(ulong blockNum, int curBlockVersion = 0, long curBlockTimestamp = 0)
         {
             if (Count < 8)
             {

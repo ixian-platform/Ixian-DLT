@@ -136,7 +136,7 @@ namespace DLT
                     {
                         char type = reader.ReadChar();
 
-                        List<Presence> presences = PresenceList.getPresencesByType(type);
+                        List<Presence> presences = PresenceList.getPresencesByType(type, 20);
                         int presence_count = presences.Count();
                         if (presence_count > 10)
                         {
@@ -159,7 +159,7 @@ namespace DLT
             public static void handleUpdatePresence(byte[] data, RemoteEndpoint endpoint)
             {
                 // Parse the data and update entries in the presence list
-                Presence updated_presence = PresenceList.updateFromBytes(data, Node.blockChain.getMinSignerPowDifficulty(IxianHandler.getLastBlockHeight() + 1, IxianHandler.getLastBlockVersion(), Clock.getNetworkTimestamp()));
+                Presence updated_presence = PresenceList.updateFromBytes(data, Node.blockChain.getMinSignerPowDifficulty(IxianHandler.getLastBlockHeight() + 1, IxianHandler.getLastBlockVersion(), 0));
 
                 // If a presence entry was updated, broadcast this message again
                 if (updated_presence != null)
