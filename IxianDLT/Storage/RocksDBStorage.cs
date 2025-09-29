@@ -397,12 +397,19 @@ namespace DLT
 
             private void updateBlockIndexes(WriteBatch writeBatch, Block sb)
             {
+                // Remove all block height indexes
+                var blockNumBytes = sb.blockNum.GetBytesBE();
+                foreach (var idxBlockChecksum in idxBlocksChecksum.getEntriesForKey(blockNumBytes))
+                {
+                    idxBlocksChecksum.delIndexEntry(blockNumBytes, idxBlockChecksum.index.Span, writeBatch);
+                }
+
                 writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_TXS), sb.getTransactionIDsBytes(), rocksCFBlocks);
                 writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS), sb.getSignaturesBytes(true, false), rocksCFBlocks);
                 writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), sb.getSignaturesBytes(true, true), rocksCFBlocks);
 
                 byte[] blockMetaBytes = getBlockMetaBytes(sb.getFrozenSignatureCount(), sb.getTotalSignerDifficulty(), sb.powField);
-                idxBlocksChecksum.addIndexEntry(sb.blockNum.GetBytesBE(), sb.blockChecksum, blockMetaBytes, writeBatch);
+                idxBlocksChecksum.addIndexEntry(blockNumBytes, sb.blockChecksum, blockMetaBytes, writeBatch);
             }
 
             private static byte[] typeAndTxIDToBytes(short type, ReadOnlySpan<byte> txid)
@@ -749,13 +756,14 @@ namespace DLT
             {
                 lock (rockLock)
                 {
-                    Block b = getBlock(blockNum);
-                    if (b != null)
+                    byte[] blockChecksum = getBlockTotalSignerDifficulty(blockNum).blockChecksum;
+                    if (blockChecksum != null)
                     {
                         var block_num_bytes = blockNum.GetBytesBE();
 
                         if (removeTransactions)
                         {
+                            // Delete all transactions applied on this block height
                             foreach (var tx_id_bytes in idxTXAppliedType.getEntriesForKey(block_num_bytes))
                             {
                                 removeTransactionInternal(tx_id_bytes.index.Span.Slice(2));
@@ -764,12 +772,12 @@ namespace DLT
 
                         using (WriteBatch writeBatch = new WriteBatch())
                         {
-                            writeBatch.Delete(_storage_Index.combineKeys(b.blockChecksum, BLOCKS_KEY_HEADER), rocksCFBlocks);
-                            writeBatch.Delete(_storage_Index.combineKeys(b.blockChecksum, BLOCKS_KEY_SIGNERS), rocksCFBlocks);
-                            writeBatch.Delete(_storage_Index.combineKeys(b.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
-                            writeBatch.Delete(_storage_Index.combineKeys(b.blockChecksum, BLOCKS_KEY_TXS), rocksCFBlocks);
+                            writeBatch.Delete(_storage_Index.combineKeys(blockChecksum, BLOCKS_KEY_HEADER), rocksCFBlocks);
+                            writeBatch.Delete(_storage_Index.combineKeys(blockChecksum, BLOCKS_KEY_SIGNERS), rocksCFBlocks);
+                            writeBatch.Delete(_storage_Index.combineKeys(blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
+                            writeBatch.Delete(_storage_Index.combineKeys(blockChecksum, BLOCKS_KEY_TXS), rocksCFBlocks);
 
-                            idxBlocksChecksum.delIndexEntry(block_num_bytes, b.blockChecksum, writeBatch);
+                            idxBlocksChecksum.delIndexEntry(block_num_bytes, blockChecksum, writeBatch);
 
                             database.Write(writeBatch);
                         }
