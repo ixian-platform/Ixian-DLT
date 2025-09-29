@@ -82,6 +82,12 @@ namespace DLT
                     }
                 }
 
+                public byte[] getEntry(ReadOnlySpan<byte> key, ReadOnlySpan<byte> index)
+                {
+                    var keyWithSuffix = combineKeys(key, index);
+                    return db.Get(keyWithSuffix, rocksIndexHandle);
+                }
+
                 public IEnumerable<(ReadOnlyMemory<byte> index, ReadOnlyMemory<byte> value)> getEntriesForKey(ReadOnlyMemory<byte> key,
                                                                                                               ReadOnlyMemory<byte> index = default)
                 {
@@ -220,7 +226,7 @@ namespace DLT
                     blocksIndexBbto.SetCacheIndexAndFilterBlocks(true);
                     blocksIndexBbto.SetPinL0FilterAndIndexBlocksInCache(true);
                     blocksIndexBbto.SetFilterPolicy(BloomFilterPolicy.Create(14, true));
-                    blocksIndexBbto.SetWholeKeyFiltering(false);
+                    blocksIndexBbto.SetWholeKeyFiltering(true);
                     blocksIndexBbto.SetFormatVersion(6);
 
                     var txIndexBbto = new BlockBasedTableOptions();
@@ -516,19 +522,13 @@ namespace DLT
 
                     var blockNumBytes = blockNum.GetBytesBE();
 
-                    var e = idxBlocksChecksum.getEntriesForKey(blockNumBytes, BLOCKS_KEY_PRIMARY_INDEX);
-                    if (!e.Any())
+                    var blockChecksum = idxBlocksChecksum.getEntry(blockNumBytes, BLOCKS_KEY_PRIMARY_INDEX);
+                    if (blockChecksum == null)
                     {
                         return null;
                     }
 
-                    e = idxBlocksChecksum.getEntriesForKey(blockNumBytes, e.First().value);
-                    if (!e.Any())
-                    {
-                        return null;
-                    }
-
-                    return getBlockByHash(e.First().index.Span, e.First().value.Span);
+                    return getBlockByHash(blockChecksum, null);
                 }
             }
 
@@ -547,19 +547,18 @@ namespace DLT
 
                     lastUsedTime = DateTime.Now;
 
-                    var e = idxBlocksChecksum.getEntriesForKey(blocknum.GetBytesBE(), BLOCKS_KEY_PRIMARY_INDEX);
-                    if (!e.Any())
+                    var blockHash = idxBlocksChecksum.getEntry(blocknum.GetBytesBE(), BLOCKS_KEY_PRIMARY_INDEX);
+                    if (blockHash == null)
                     {
                         return null;
                     }
 
-                    var blockHash = e.First().value;
-                    byte[] blockBytes = database.Get(_storage_Index.combineKeys(blockHash.Span, BLOCKS_KEY_HEADER), rocksCFBlocks);
+                    byte[] blockBytes = database.Get(_storage_Index.combineKeys(blockHash, BLOCKS_KEY_HEADER), rocksCFBlocks);
                     if (blockBytes != null)
                     {
                         if (asBlockHeader)
                         {
-                            byte[] sigBytes = database.Get(_storage_Index.combineKeys(blockHash.Span, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
+                            byte[] sigBytes = database.Get(_storage_Index.combineKeys(blockHash, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
 
                             byte[] mergedBytes = new byte[blockBytes.Length + sigBytes.Length];
                             Buffer.BlockCopy(blockBytes, 0, mergedBytes, 0, blockBytes.Length);
@@ -568,8 +567,8 @@ namespace DLT
                         }
                         else
                         {
-                            byte[] sigBytes = database.Get(_storage_Index.combineKeys(blockHash.Span, BLOCKS_KEY_SIGNERS), rocksCFBlocks);
-                            byte[] txIDBytes = database.Get(_storage_Index.combineKeys(blockHash.Span, BLOCKS_KEY_TXS), rocksCFBlocks);
+                            byte[] sigBytes = database.Get(_storage_Index.combineKeys(blockHash, BLOCKS_KEY_SIGNERS), rocksCFBlocks);
+                            byte[] txIDBytes = database.Get(_storage_Index.combineKeys(blockHash, BLOCKS_KEY_TXS), rocksCFBlocks);
 
                             byte[] mergedBytes = new byte[blockBytes.Length + sigBytes.Length + txIDBytes.Length];
                             Buffer.BlockCopy(blockBytes, 0, mergedBytes, 0, blockBytes.Length);
@@ -609,7 +608,7 @@ namespace DLT
                         }
                         else
                         {
-                            blockMeta = parseBlockMetaBytes(idxBlocksChecksum.getEntriesForKey(b.blockNum.GetBytesBE(), b.blockChecksum).First().value.ToArray());
+                            blockMeta = parseBlockMetaBytes(idxBlocksChecksum.getEntry(b.blockNum.GetBytesBE(), b.blockChecksum));
                         }
 
                         b.totalSignerDifficulty = blockMeta.totalSignerDifficulty;
@@ -841,18 +840,17 @@ namespace DLT
 
                     var blockNumBytes = blockNum.GetBytesBE();
 
-                    var e = idxBlocksChecksum.getEntriesForKey(blockNumBytes, BLOCKS_KEY_PRIMARY_INDEX);
-                    if (!e.Any())
+                    var blockChecksum = idxBlocksChecksum.getEntry(blockNumBytes, BLOCKS_KEY_PRIMARY_INDEX);
+                    if (blockChecksum == null)
                     {
                         return (null, null);
                     }
-                    e = idxBlocksChecksum.getEntriesForKey(blockNumBytes, e.First().value);
-                    if (!e.Any())
+                    var blockMeta = idxBlocksChecksum.getEntry(blockNumBytes, blockChecksum);
+                    if (blockMeta == null)
                     {
                         return (null, null);
                     }
-                    byte[] checksum = e.First().index.ToArray();
-                    return (checksum, parseBlockMetaBytes(e.First().value.ToArray()).totalSignerDifficulty);
+                    return (blockChecksum, parseBlockMetaBytes(blockMeta).totalSignerDifficulty);
                 }
             }
 
