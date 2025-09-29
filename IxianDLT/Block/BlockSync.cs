@@ -424,9 +424,7 @@ namespace DLT
                 {
                     if (!missingBlocks.Contains(blockNum))
                     {
-                        Logging.info(String.Format("Requesting missing block #{0} again.", blockNum));
-                        //missingBlocks.Add(blockNum);
-                        //missingBlocks.Sort();
+                        Logging.info("Requesting missing block #{0} again.", blockNum);
 
                         lock (requestedBlockTimes)
                         {
@@ -1156,6 +1154,8 @@ namespace DLT
 
                 IxianHandler.getWalletStorage().scanForLostAddresses();
             }
+
+            stop();
         }
 
         // Request missing walletstate chunks from network
@@ -1273,13 +1273,13 @@ namespace DLT
             }
         }
 
-        public void onTransactionReceived(Transaction tx, RemoteEndpoint endpoint)
+        public bool onTransactionReceived(Transaction tx, RemoteEndpoint endpoint)
         {
-            if (synchronizing == false) return;
+            if (synchronizing == false) return false;
 
             if (tx.blockHeight > Node.blockChain.getLastBlockNum() + (ulong)maxBlockRequests + 5)
             {
-                return;
+                return false;
             }
 
             ulong lastBlockNum = Node.storage.getHighestBlockInStorage();
@@ -1295,27 +1295,22 @@ namespace DLT
                         txBlockHeight += 1;
                     }
 
-                    if (!pendingTransactions.ContainsKey(txBlockHeight))
-                    {
-                        pendingTransactions.Add(txBlockHeight, new(new ByteArrayComparer()));
-                    }
+                    pendingTransactions.TryAdd(txBlockHeight, new(new ByteArrayComparer()));
 
-                    if (pendingTransactions[txBlockHeight].ContainsKey(tx.id))
+                    if (pendingTransactions[txBlockHeight].TryAdd(tx.id, tx))
                     {
-                        //pendingTransactions[txBlockHeight][tx.id] = tx;
-                    }
-                    else
-                    {
-                        pendingTransactions[txBlockHeight].Add(tx.id, tx);
+                        return true;
                     }
                 }
             } else
             {
-                if (!TransactionPool.addTransaction(tx, true, endpoint))
+                if (TransactionPool.addTransaction(tx, true, endpoint))
                 {
-                    Logging.error("Couldn't add transaction " + tx.getTxIdString());
+                    return true;
                 }
             }
+            Logging.error("Couldn't add transaction " + tx.getTxIdString());
+            return false;
         }
 
         private void processPendingTransactions()

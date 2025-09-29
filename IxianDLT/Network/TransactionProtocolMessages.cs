@@ -302,8 +302,10 @@ namespace DLT
 
                             if (Node.blockSync.synchronizing)
                             {
-                                Node.blockSync.onTransactionReceived(tx, endpoint);
-                                processedTxCount++;
+                                if (Node.blockSync.onTransactionReceived(tx, endpoint))
+                                {
+                                    processedTxCount++;
+                                }
                             }
                             else if (TransactionPool.addTransaction(tx, false, endpoint))
                             {
@@ -312,7 +314,7 @@ namespace DLT
                         }
                         sw.Stop();
                         TimeSpan elapsed = sw.Elapsed;
-                        Logging.info("Processed {0}/{1} txs in {2}ms", processedTxCount, totalTxCount, elapsed.TotalMilliseconds);
+                        Logging.info("Processed {0}/{1} txs for #{2} in {3}ms", processedTxCount, totalTxCount, msg_id, elapsed.TotalMilliseconds);
                     }
                 }
             }

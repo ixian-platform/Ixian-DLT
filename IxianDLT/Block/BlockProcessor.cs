@@ -3703,7 +3703,7 @@ namespace DLT
                 {
                     return transactions;
                 }
-                if (Node.blockChain.getBlock(targetBlockNum - 1).version < BlockVer.v10)
+                if (Node.blockChain.getBlock(targetBlockNum - 1, false, false).version < BlockVer.v10)
                 {
                     return transactions;
                 }

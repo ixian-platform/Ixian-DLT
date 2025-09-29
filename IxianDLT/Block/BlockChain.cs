@@ -25,9 +25,7 @@ namespace DLT
 {
     public class BlockChain
     {
-        List<Block> blocks = new List<Block>((int)ConsensusConfig.getRedactedWindowSize());
-
-        SortedDictionary<ulong, Block> blocksDictionary = new SortedDictionary<ulong, Block>(); // A secondary storage for quick lookups
+        SortedDictionary<ulong, Block> blocks = new();
 
         // Cache for quick lookups of block hashes and total signer difficulty outside of redacted window
         private readonly ConcurrentDictionary<ulong, (byte[] hash, IxiNumber totalSignerDifficulty)> blockHashCache = new ConcurrentDictionary<ulong, (byte[], IxiNumber)>();
@@ -77,7 +75,7 @@ namespace DLT
                 int begin_size = blocks.Count();
                 while ((ulong)blocks.Count() > ConsensusConfig.redactedWindowSize)
                 {
-                    Block block = getBlock(blocks[0].blockNum);
+                    Block block = getBlock(blocks.First().Value.blockNum);
 
                     if (block == null)
                     {
@@ -99,8 +97,7 @@ namespace DLT
 
                     cacheBlockSignerDifficulty(block.blockNum, block.blockChecksum, block.getTotalSignerDifficulty());
 
-                    blocksDictionary.Remove(block.blockNum);
-                    blocks.RemoveAt(0); // Remove from memory
+                    blocks.Remove(block.blockNum);
                 }
                 blockCount = blocks.Count;
                 int redacted_block_count = begin_size - blockCount;
@@ -139,7 +136,7 @@ namespace DLT
 
                     Block b = getBlock(block_num_to_unredact, true, true);
 
-                    if (blocksDictionary.ContainsKey(block_num_to_unredact))
+                    if (blocks.ContainsKey(block_num_to_unredact))
                     {
                         Logging.warn("Won't unredact chain, block #{0} is already in memory.", block_num_to_unredact);
                         return false;
@@ -151,8 +148,7 @@ namespace DLT
                         return false;
                     }
 
-                    blocks.Insert(0, b);
-                    blocksDictionary.Add(block_num_to_unredact, b);
+                    blocks.Add(block_num_to_unredact, b);
                     blockCount = blocks.Count;
 
                     if (b.powField != null)
@@ -173,23 +169,23 @@ namespace DLT
             {
                 if(blocks.Count > 0)
                 {
-                    Block prev_block = blocks[blocks.Count - 1];
+                    Block prev_block = getLastBlock();
                     // check for invalid block appending
                     if (b.blockNum != prev_block.blockNum + 1)
                     {
-                        Logging.warn(String.Format("Attempting to add non-sequential block #{0} after block #{1}.",
+                        Logging.warn("Attempting to add non-sequential block #{0} after block #{1}.",
                             b.blockNum,
-                            prev_block.blockNum));
+                            prev_block.blockNum);
                         return false;
                     }
                     if (!b.lastBlockChecksum.SequenceEqual(prev_block.blockChecksum))
                     {
-                        Logging.error(String.Format("Attempting to add a block #{0} with invalid lastBlockChecksum!", b.blockNum));
+                        Logging.error("Attempting to add a block #{0} with invalid lastBlockChecksum!", b.blockNum);
                         return false;
                     }
-                    if (b.signatureFreezeChecksum != null && blocks.Count > 5 && !blocks[blocks.Count - 5].calculateSignatureChecksum().SequenceEqual(b.signatureFreezeChecksum))
+                    if (b.signatureFreezeChecksum != null && blocks.Count > 5 && !blocks[b.blockNum - 5].calculateSignatureChecksum().SequenceEqual(b.signatureFreezeChecksum))
                     {
-                        Logging.error(String.Format("Attempting to add a block #{0} with invalid sigFreezeChecksum!", b.blockNum));
+                        Logging.error("Attempting to add a block #{0} with invalid sigFreezeChecksum!", b.blockNum);
                         return false;
                     }
                 }
@@ -212,8 +208,7 @@ namespace DLT
                 // special case when we are starting up and have an empty chain
                 if (blocks.Count == 0)
                 {
-                    blocks.Add(b);
-                    blocksDictionary.Add(b.blockNum, b);
+                    blocks.Add(b.blockNum, b);
                     blockCount = blocks.Count;
                     if (add_to_storage)
                     {
@@ -222,8 +217,7 @@ namespace DLT
                     return true;
                 }
 
-                blocks.Add(b);
-                blocksDictionary.Add(b.blockNum, b);
+                blocks.Add(b.blockNum, b);
                 blockCount = blocks.Count;
 
                 if (reorgBlockStart <= b.blockNum)
@@ -371,10 +365,7 @@ namespace DLT
             // Search memory
             lock (blocks)
             {
-                if (blocksDictionary.ContainsKey(blocknum))
-                {
-                    block = blocksDictionary[blocknum];
-                }
+                blocks.TryGetValue(blocknum, out block);
             }
             if (block != null
                 && block.compacted
@@ -414,13 +405,10 @@ namespace DLT
         {
             lock (blocks)
             {
-                if (blocksDictionary.Remove(blockNum))
+                if (blocks.Remove(blockNum))
                 {
-                    if (blocks.RemoveAll(x => x.blockNum == blockNum) > 0)
-                    {
-                        blockCount = blocks.Count;
-                        return true;
-                    }
+                    blockCount = blocks.Count;
+                    return true;
                 }
                 blockCount = blocks.Count;
                 return false;
@@ -431,7 +419,7 @@ namespace DLT
         {
             lock (blocks)
             {
-                List<Block> blockList = blocks.Skip(fromIndex).ToList();
+                List<Block> blockList = blocks.Values.Skip(fromIndex).ToList();
                 if (count == 0)
                 {
                     return blockList;
@@ -489,10 +477,7 @@ namespace DLT
                 {
                     ulong consensus_block_num = block_num - (ulong)i - (ulong)block_offset;
                     Block b = null;
-                    if (blocksDictionary.ContainsKey(consensus_block_num))
-                    {
-                        b = blocksDictionary[consensus_block_num];
-                    }
+                    blocks.TryGetValue(consensus_block_num, out b);
                     if (b == null)
                     {
                         break;
@@ -947,19 +932,19 @@ namespace DLT
 
             lock (blocks)
             {
-                int idx = blocks.FindIndex(x => x.blockNum == b.blockNum && x.blockChecksum.SequenceEqual(b.blockChecksum));
-                if (idx > 0)
+                if (blocks.TryGetValue(b.blockNum, out Block block)
+                    && block.blockChecksum.SequenceEqual(b.blockChecksum))
                 {
-                    if(blocks[idx].compacted)
+                    if(block.compacted)
                     {
-                        Logging.error("Trying to refresh signatures on compacted block {0}", blocks[idx].blockNum);
+                        Logging.error("Trying to refresh signatures on compacted block {0}", block.blockNum);
                         return false;
                     }
 
-                    byte[] beforeSigsChecksum = blocks[idx].calculateSignatureChecksum();
-                    beforeSigs = blocks[idx].getFrozenSignatureCount();
+                    byte[] beforeSigsChecksum = block.calculateSignatureChecksum();
+                    beforeSigs = block.getFrozenSignatureCount();
 
-                    var added_sigs = blocks[idx].addSignaturesFrom(b, false);
+                    var added_sigs = block.addSignaturesFrom(b, false);
 
                     if (added_sigs != null && Node.isMasterNode())
                     {
@@ -978,18 +963,18 @@ namespace DLT
                             Logging.error("Error verifying block proposer while force refreshing signatures on block {0} ({1})", b.blockNum, Crypto.hashToString(b.blockChecksum));
                             return false;
                         }
-                        setFrozenSignatures(blocks[idx], b.signatures);
+                        setFrozenSignatures(block, b.signatures);
                         afterSigs = b.signatures.Count;
                     }
                     else
                     {
-                        afterSigs = blocks[idx].signatures.Count;
+                        afterSigs = block.signatures.Count;
                     }
 
-                    byte[] afterSigsChecksum = blocks[idx].calculateSignatureChecksum();
+                    byte[] afterSigsChecksum = block.calculateSignatureChecksum();
                     if (!beforeSigsChecksum.SequenceEqual(afterSigsChecksum))
                     {
-                        updatestorage_block = blocks[idx];
+                        updatestorage_block = block;
                     }
                 }
             }
@@ -1068,7 +1053,7 @@ namespace DLT
                         firstBlockNum = getLastBlockNum() - redacted_window_size;
                     }
 
-                    foreach (Block b in blocks)
+                    foreach (Block b in blocks.Values)
                     {
                         if (b.blockNum < firstBlockNum)
                         {
@@ -1123,7 +1108,6 @@ namespace DLT
             lastBlockVersion = -1;
             lock (blocks)
             {
-                blocksDictionary.Clear();
                 blockHashCache.Clear();
                 blockHashCacheOrderQueue.Clear();
                 pendingSuperBlocks.Clear();
@@ -1194,9 +1178,8 @@ namespace DLT
 
             lock (blocks)
             {
-                if (blocksDictionary.ContainsKey(block.blockNum))
+                if (blocks.TryGetValue(block.blockNum, out Block old_block))
                 {
-                    Block old_block = blocksDictionary[block.blockNum];
                     if (old_block.compacted)
                     {
                         compacted = true;
@@ -1227,11 +1210,9 @@ namespace DLT
 
             lock (blocks)
             {
-                int block_idx = blocks.FindIndex(x => x.blockNum == new_block.blockNum);
-                if (block_idx >= 0)
+                if (blocks.ContainsKey(new_block.blockNum))
                 {
-                    blocks[block_idx] = new_block;
-                    blocksDictionary[new_block.blockNum] = new_block;
+                    blocks[new_block.blockNum] = new_block;
                 }
                 else
                 {
