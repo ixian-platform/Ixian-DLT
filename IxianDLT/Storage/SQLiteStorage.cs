@@ -1165,7 +1165,7 @@ namespace DLT
             }
 
             // Removes a block from the storage database
-            public override bool removeBlock(ulong blockNum, bool remove_transactions)
+            public override bool removeBlock(ulong blockNum)
             {
                 // Only remove on non-history nodes
                 if (Config.storeFullHistory == true)

@@ -129,6 +129,8 @@ namespace DLT
             private readonly byte[] BLOCKS_KEY_SIGNERS = new byte[] { 2 };
             private readonly byte[] BLOCKS_KEY_SIGNERS_COMPACT = new byte[] { 3 };
 
+            private readonly byte[] BLOCKS_KEY_PRIMARY_INDEX = new byte[] { 0 };
+
             private readonly byte[] TRANSACTIONS_KEY_TX = new byte[] { 0 };
             //private readonly byte[] TRANSACTIONS_KEY_PROOF = new byte[] { 1 };
 
@@ -397,19 +399,16 @@ namespace DLT
 
             private void updateBlockIndexes(WriteBatch writeBatch, Block sb)
             {
-                // Remove all block height indexes
-                var blockNumBytes = sb.blockNum.GetBytesBE();
-                foreach (var idxBlockChecksum in idxBlocksChecksum.getEntriesForKey(blockNumBytes))
-                {
-                    idxBlocksChecksum.delIndexEntry(blockNumBytes, idxBlockChecksum.index.Span, writeBatch);
-                }
-
                 writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_TXS), sb.getTransactionIDsBytes(), rocksCFBlocks);
                 writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS), sb.getSignaturesBytes(true, false), rocksCFBlocks);
                 writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), sb.getSignaturesBytes(true, true), rocksCFBlocks);
 
+                var blockNumBytes = sb.blockNum.GetBytesBE();
+
                 byte[] blockMetaBytes = getBlockMetaBytes(sb.getFrozenSignatureCount(), sb.getTotalSignerDifficulty(), sb.powField);
                 idxBlocksChecksum.addIndexEntry(blockNumBytes, sb.blockChecksum, blockMetaBytes, writeBatch);
+
+                idxBlocksChecksum.addIndexEntry(blockNumBytes, BLOCKS_KEY_PRIMARY_INDEX, sb.blockChecksum, writeBatch);
             }
 
             private static byte[] typeAndTxIDToBytes(short type, ReadOnlySpan<byte> txid)
@@ -447,20 +446,18 @@ namespace DLT
                 idxTXAppliedType.addIndexEntry(st.applied.GetBytesBE(), typeAndTxIDToBytes((short)st.type, tx_id_bytes), Array.Empty<byte>(), writeBatch);
             }
 
-            private void updateMinMax(WriteBatch writeBatch, ulong blocknum)
+            private void updateMinMax(WriteBatch writeBatch, ulong blockNum)
             {
-                if (minBlockNumber == 0 || blocknum < minBlockNumber)
+                if (minBlockNumber == 0 || blockNum < minBlockNumber)
                 {
-                    minBlockNumber = blocknum;
+                    minBlockNumber = blockNum;
                     writeBatch.Put(Encoding.UTF8.GetBytes("min_block"), BitConverter.GetBytes(minBlockNumber), rocksCFMeta);
                 }
-                if (maxBlockNumber == 0 || blocknum > maxBlockNumber)
+                if (maxBlockNumber == 0 || blockNum > maxBlockNumber)
                 {
-                    maxBlockNumber = blocknum;
+                    maxBlockNumber = blockNum;
                     writeBatch.Put(Encoding.UTF8.GetBytes("max_block"), BitConverter.GetBytes(maxBlockNumber), rocksCFMeta);
                 }
-
-                lastUsedTime = DateTime.Now;
             }
 
             public bool insertBlock(Block block)
@@ -502,7 +499,7 @@ namespace DLT
                 return true;
             }
 
-            public Block getBlock(ulong blocknum)
+            public Block getBlock(ulong blockNum)
             {
                 lock (rockLock)
                 {
@@ -510,18 +507,27 @@ namespace DLT
                     {
                         return null;
                     }
-                    if (blocknum < minBlockNumber || blocknum > maxBlockNumber)
+                    if (blockNum < minBlockNumber || blockNum > maxBlockNumber)
                     {
                         return null;
                     }
 
                     lastUsedTime = DateTime.Now;
 
-                    var e = idxBlocksChecksum.getEntriesForKey(blocknum.GetBytesBE());
+                    var blockNumBytes = blockNum.GetBytesBE();
+
+                    var e = idxBlocksChecksum.getEntriesForKey(blockNumBytes, BLOCKS_KEY_PRIMARY_INDEX);
                     if (!e.Any())
                     {
                         return null;
                     }
+
+                    e = idxBlocksChecksum.getEntriesForKey(blockNumBytes, e.First().value);
+                    if (!e.Any())
+                    {
+                        return null;
+                    }
+
                     return getBlockByHash(e.First().index.Span, e.First().value.Span);
                 }
             }
@@ -541,13 +547,13 @@ namespace DLT
 
                     lastUsedTime = DateTime.Now;
 
-                    var e = idxBlocksChecksum.getEntriesForKey(blocknum.GetBytesBE());
+                    var e = idxBlocksChecksum.getEntriesForKey(blocknum.GetBytesBE(), BLOCKS_KEY_PRIMARY_INDEX);
                     if (!e.Any())
                     {
                         return null;
                     }
 
-                    var blockHash = e.First().index;
+                    var blockHash = e.First().value;
                     byte[] blockBytes = database.Get(_storage_Index.combineKeys(blockHash.Span, BLOCKS_KEY_HEADER), rocksCFBlocks);
                     if (blockBytes != null)
                     {
@@ -582,6 +588,8 @@ namespace DLT
                 {
                     return null;
                 }
+
+                lastUsedTime = DateTime.Now;
                 return getBlockByHash(checksum, null);
             }
 
@@ -589,12 +597,9 @@ namespace DLT
             {
                 lock (rockLock)
                 {
-                    lastUsedTime = DateTime.Now;
-
                     byte[] blockBytes = database.Get(_storage_Index.combineKeys(checksum, BLOCKS_KEY_HEADER), rocksCFBlocks);
                     if (blockBytes != null)
                     {
-                        lastUsedTime = DateTime.Now;
                         byte[] txIDsBytes = database.Get(_storage_Index.combineKeys(checksum, BLOCKS_KEY_TXS), rocksCFBlocks);
                         Block b = new Block(checksum.ToArray(), blockBytes, txIDsBytes);
                         (int sigCount, IxiNumber totalSignerDifficulty, byte[] powField) blockMeta;
@@ -694,7 +699,7 @@ namespace DLT
                 }
             }
 
-            public IEnumerable<Transaction> getTransactionsInBlock(ulong block_num, short tx_type = -1)
+            public IEnumerable<Transaction> getTransactionsInBlock(ulong blockNum, short txType = -1)
             {
                 lock (rockLock)
                 {
@@ -705,13 +710,13 @@ namespace DLT
                     }
                     lastUsedTime = DateTime.Now;
                     IEnumerable<(ReadOnlyMemory<byte> index, ReadOnlyMemory<byte> value)> entries;
-                    if (tx_type == -1)
+                    if (txType == -1)
                     {
-                        entries = idxTXAppliedType.getEntriesForKey(block_num.GetBytesBE());
+                        entries = idxTXAppliedType.getEntriesForKey(blockNum.GetBytesBE());
                     }
                     else
                     {
-                        entries = idxTXAppliedType.getEntriesForKey(block_num.GetBytesBE(), tx_type.GetBytesBE());
+                        entries = idxTXAppliedType.getEntriesForKey(blockNum.GetBytesBE(), txType.GetBytesBE());
                     }
 
                     foreach (var txid in entries)
@@ -723,7 +728,7 @@ namespace DLT
                 }
             }
 
-            public IEnumerable<byte[]> getTransactionsBytesInBlock(ulong block_num, short tx_type = -1)
+            public IEnumerable<byte[]> getTransactionsBytesInBlock(ulong blockNum, short txType = -1)
             {
                 lock (rockLock)
                 {
@@ -734,13 +739,13 @@ namespace DLT
                     }
                     lastUsedTime = DateTime.Now;
                     IEnumerable<(ReadOnlyMemory<byte> index, ReadOnlyMemory<byte> value)> entries;
-                    if (tx_type == -1)
+                    if (txType == -1)
                     {
-                        entries = idxTXAppliedType.getEntriesForKey(block_num.GetBytesBE());
+                        entries = idxTXAppliedType.getEntriesForKey(blockNum.GetBytesBE());
                     }
                     else
                     {
-                        entries = idxTXAppliedType.getEntriesForKey(block_num.GetBytesBE(), tx_type.GetBytesBE());
+                        entries = idxTXAppliedType.getEntriesForKey(blockNum.GetBytesBE(), txType.GetBytesBE());
                     }
 
                     foreach (var txid in entries)
@@ -752,22 +757,20 @@ namespace DLT
                 }
             }
 
-            public bool removeBlock(ulong blockNum, bool removeTransactions)
+            public bool removeBlock(ulong blockNum)
             {
                 lock (rockLock)
                 {
                     byte[] blockChecksum = getBlockTotalSignerDifficulty(blockNum).blockChecksum;
                     if (blockChecksum != null)
                     {
-                        var block_num_bytes = blockNum.GetBytesBE();
+                        lastUsedTime = DateTime.Now;
+                        var blockNumBytes = blockNum.GetBytesBE();
 
-                        if (removeTransactions)
+                        // Delete all transactions applied on this block height
+                        foreach (var tx_id_bytes in idxTXAppliedType.getEntriesForKey(blockNumBytes))
                         {
-                            // Delete all transactions applied on this block height
-                            foreach (var tx_id_bytes in idxTXAppliedType.getEntriesForKey(block_num_bytes))
-                            {
-                                removeTransactionInternal(tx_id_bytes.index.Span.Slice(2));
-                            }
+                            removeTransactionInternal(tx_id_bytes.index.Span.Slice(2));
                         }
 
                         using (WriteBatch writeBatch = new WriteBatch())
@@ -777,7 +780,9 @@ namespace DLT
                             writeBatch.Delete(_storage_Index.combineKeys(blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
                             writeBatch.Delete(_storage_Index.combineKeys(blockChecksum, BLOCKS_KEY_TXS), rocksCFBlocks);
 
-                            idxBlocksChecksum.delIndexEntry(block_num_bytes, blockChecksum, writeBatch);
+                            idxBlocksChecksum.delIndexEntry(blockNumBytes, blockChecksum, writeBatch);
+
+                            idxBlocksChecksum.delIndexEntry(blockNumBytes, BLOCKS_KEY_PRIMARY_INDEX, writeBatch);
 
                             database.Write(writeBatch);
                         }
@@ -789,14 +794,13 @@ namespace DLT
 
             private bool removeTransactionInternal(ReadOnlySpan<byte> tx_id_bytes)
             {
-                lastUsedTime = DateTime.Now;
                 Transaction tx = getTransactionInternal(tx_id_bytes);
                 if (tx != null)
                 {
                     using (WriteBatch writeBatch = new WriteBatch())
                     {
                         writeBatch.Delete(_storage_Index.combineKeys(tx_id_bytes, TRANSACTIONS_KEY_TX), rocksCFTransactions);
-                            
+
                         // remove it from indexes
                         foreach (var f in tx.fromList.Keys)
                         {
@@ -819,12 +823,13 @@ namespace DLT
             {
                 lock (rockLock)
                 {
+                    lastUsedTime = DateTime.Now;
                     var tx_id_bytes = txid;
                     return removeTransactionInternal(tx_id_bytes);
                 }
             }
 
-            public (byte[] blockChecksum, IxiNumber totalSignerDifficulty) getBlockTotalSignerDifficulty(ulong blocknum)
+            public (byte[] blockChecksum, IxiNumber totalSignerDifficulty) getBlockTotalSignerDifficulty(ulong blockNum)
             {
                 lock (rockLock)
                 {
@@ -834,7 +839,14 @@ namespace DLT
                     }
                     lastUsedTime = DateTime.Now;
 
-                    var e = idxBlocksChecksum.getEntriesForKey(blocknum.GetBytesBE());
+                    var blockNumBytes = blockNum.GetBytesBE();
+
+                    var e = idxBlocksChecksum.getEntriesForKey(blockNumBytes, BLOCKS_KEY_PRIMARY_INDEX);
+                    if (!e.Any())
+                    {
+                        return (null, null);
+                    }
+                    e = idxBlocksChecksum.getEntriesForKey(blockNumBytes, e.First().value);
                     if (!e.Any())
                     {
                         return (null, null);
@@ -1460,7 +1472,7 @@ namespace DLT
                 }
             }
 
-            public override bool removeBlock(ulong blockNum, bool removeTransactions)
+            public override bool removeBlock(ulong blockNum)
             {
                 lock (openDatabases)
                 {
@@ -1471,7 +1483,7 @@ namespace DLT
                         return false;
                     }
                     var db = getDatabase(blockNum, true);
-                    return db.removeBlock(blockNum, removeTransactions);
+                    return db.removeBlock(blockNum);
                 }
             }
 

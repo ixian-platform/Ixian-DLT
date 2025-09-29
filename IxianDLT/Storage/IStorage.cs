@@ -205,7 +205,7 @@ namespace DLT
                 ulong lowestBlock = getLowestBlockInStorage();
                 for (ulong b = lowestBlock; b < removeBlocksBelow; b++)
                 {
-                    removeBlock(b, true);
+                    removeBlock(b);
                 }
                 return true;
             }
@@ -301,7 +301,7 @@ namespace DLT
             public abstract IEnumerable<byte[]> getTransactionsBytesInBlock(ulong block_num, short tx_type = -1);
             //
             // Remove
-            public abstract bool removeBlock(ulong block_num, bool remove_transactions = true);
+            public abstract bool removeBlock(ulong block_num);
             public abstract bool removeTransaction(byte[] txid, ulong block_num);
 
             public abstract (byte[] blockChecksum, IxiNumber totalSignerDifficulty) getBlockTotalSignerDifficulty(ulong blocknum);

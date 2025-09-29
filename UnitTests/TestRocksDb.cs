@@ -450,7 +450,7 @@ namespace UnitTests
             txsByAddress = db.getTransactionsByAddress(tx.toList.First().Key.addressNoChecksum, 1).ToArray();
             Assert.AreEqual(1, txsByAddress.Length);
 
-            db.removeBlock(1, true);
+            db.removeBlock(1);
 
             var deletedBlock = db.getBlock(1);
             Assert.IsNull(deletedBlock);
@@ -479,7 +479,7 @@ namespace UnitTests
             var deletedTx = db.getTransaction(tx.id, 1);
             Assert.IsNull(deletedTx);
             
-            db.removeBlock(1, true);
+            db.removeBlock(1);
 
             var deletedBlock = db.getBlock(1);
             Assert.IsNull(deletedBlock);

@@ -87,7 +87,7 @@ namespace DLT
                     // Check if this is a full history node
                     if (Config.storeFullHistory == false)
                     {
-                        Node.storage.removeBlock(block.blockNum); // Remove from storage
+                        //Node.storage.removeBlock(block.blockNum); // Remove from storage
                     }
 
                     if (block.powField != null)
@@ -1296,6 +1296,7 @@ namespace DLT
             Node.regNameState.revertTransaction(block_num_to_revert);
 
             revertBlockTransactions(block_to_revert);
+            Node.storage.removeBlock(block_num_to_revert);
 
             Node.blockProcessor.resetSuperBlockCache();
 
