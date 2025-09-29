@@ -943,7 +943,7 @@ namespace DLT
             // Verify sigfreeze
             if (b.blockNum <= lastBlockNum)
             {
-                if (!verifySignatureFreezeChecksum(b, endpoint))
+                if (!verifySignatureFreezeChecksum(b, endpoint, false))
                 {
                     return BlockVerifyStatus.PotentiallyForkedBlock;
                 }
@@ -2120,7 +2120,7 @@ namespace DLT
                 if (localNewBlock.blockNum > 11)
                 {
                     target_block = Node.blockChain.getBlock(localNewBlock.blockNum - 5);
-                    if (target_block.frozenSignatures == null || !verifySignatureFreezeChecksum(localNewBlock, null))
+                    if (target_block.frozenSignatures == null || !verifySignatureFreezeChecksum(localNewBlock, null, false))
                     {
                         freezeSignatures(target_block);
                     }

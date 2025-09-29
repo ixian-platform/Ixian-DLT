@@ -448,6 +448,7 @@ namespace DLT.Meta
                         blockSync.onHelloDataReceived(blockNum, b.blockChecksum, b.version, b.walletStateChecksum, b.regNameStateChecksum, b.getFrozenSignatureCount(), lastLocalBlockNum);
                     }else
                     {
+                        Logging.consoleOutput = true;
                         Logging.error("Missing block #{0} in storage, cannot recover from wallet state.", blockNum);
                         Program.noStart = true;
                         return;

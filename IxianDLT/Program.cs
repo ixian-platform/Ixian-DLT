@@ -313,7 +313,14 @@ namespace DLTNode
             // Start the actual DLT node
             node.start(Config.verboseOutput);
 
-            if(mainLoopThread != null)
+            if (noStart)
+            {
+                Node.stop();
+                Thread.Sleep(1000);
+                return;
+            }
+
+            if (mainLoopThread != null)
             {
                 mainLoopThread.Interrupt();
                 mainLoopThread.Join();

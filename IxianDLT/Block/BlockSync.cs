@@ -503,9 +503,7 @@ namespace DLT
                 }
             }
 
-            Node.blockChain.appendBlock(b, false);
-
-            return true;
+            return Node.blockChain.appendBlock(b, false);
         }
 
         private void rollForward()
@@ -1301,6 +1299,8 @@ namespace DLT
                     {
                         return true;
                     }
+
+                    Logging.warn("Duplicate transaction {0}: already exists in pending transactions.", tx.getTxIdString());
                 }
             } else
             {
@@ -1309,7 +1309,6 @@ namespace DLT
                     return true;
                 }
             }
-            Logging.error("Couldn't add transaction " + tx.getTxIdString());
             return false;
         }
 
