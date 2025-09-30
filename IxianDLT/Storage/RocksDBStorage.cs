@@ -1127,7 +1127,7 @@ namespace DLT
 
             public override void deleteData()
             {
-                Directory.Delete(Config.dataFolderPath + Path.DirectorySeparatorChar + "blocks", true);
+                Directory.Delete(pathBase, true);
             }
 
             private void closeDatabases()

@@ -1442,16 +1442,16 @@ namespace DLT
             }
             public override void deleteData()
             {
-                string[] fileNames = Directory.GetFiles(Config.dataFolderPath + Path.DirectorySeparatorChar + "blocks" + Path.DirectorySeparatorChar + "0000");
+                string[] fileNames = Directory.GetFiles(pathBase + Path.DirectorySeparatorChar + "0000");
                 foreach(string fileName in fileNames)
                 {
                     File.Delete(fileName);
                     File.Delete(fileName + "-shm");
                     File.Delete(fileName + "-wal");
                 }
-                File.Delete(Config.dataFolderPath + Path.DirectorySeparatorChar + "blocks" + Path.DirectorySeparatorChar + "superblocks.dat");
-                File.Delete(Config.dataFolderPath + Path.DirectorySeparatorChar + "blocks" + Path.DirectorySeparatorChar + "superblocks.dat-shm");
-                File.Delete(Config.dataFolderPath + Path.DirectorySeparatorChar + "blocks" + Path.DirectorySeparatorChar + "superblocks.dat-wal");
+                File.Delete(pathBase + Path.DirectorySeparatorChar + "superblocks.dat");
+                File.Delete(pathBase + Path.DirectorySeparatorChar + "superblocks.dat-shm");
+                File.Delete(pathBase + Path.DirectorySeparatorChar + "superblocks.dat-wal");
             }
             public override ulong getLowestBlockInStorage()
             {

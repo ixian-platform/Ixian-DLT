@@ -335,7 +335,7 @@ namespace DLTNode
             // Initialize storage
             if (storage is null)
             {
-                storage = IStorage.create(Config.blockStorageProvider, Config.dataFolderBlocks, new MemoryInfoProvider());
+                storage = IStorage.create(Config.blockStorageProvider, "benchmark", new MemoryInfoProvider());
             }
             if (!storage.prepareStorage())
             {

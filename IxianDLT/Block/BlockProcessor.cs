@@ -2819,18 +2819,7 @@ namespace DLT
             ulong total_transactions = 1;
             IxiNumber total_amount = 0;
 
-            List<Transaction> unapplied_transactions = TransactionPool.getUnappliedTransactions().ToList<Transaction>();
-            unapplied_transactions = unapplied_transactions.OrderBy(x => x.id, new ByteArrayComparer()).ToList(); // TODO add fee/weight
-
-            // TODO TODO optimize this
-            List<Transaction> pool_transactions = new List<Transaction>();
-            if (block_num < ConsensusConfig.miningExpirationBlockHeight)
-            {
-                pool_transactions.AddRange(unapplied_transactions.Where(x => x.type == (int)Transaction.Type.PoWSolution).ToList<Transaction>()); // add PoW first
-            }
-            pool_transactions.AddRange(unapplied_transactions.Where(x => x.type == (int)Transaction.Type.ChangeMultisigWallet)); // then add MS wallet changes
-            pool_transactions.AddRange(unapplied_transactions.Where(x => x.type == (int)Transaction.Type.MultisigTX)); // then add MS TXs
-            pool_transactions.AddRange(unapplied_transactions.Where(x => x.type != (int)Transaction.Type.PoWSolution && x.type != (int)Transaction.Type.ChangeMultisigWallet && x.type != (int)Transaction.Type.MultisigTX && x.type != (int)Transaction.Type.MultisigAddTxSignature)); // finally add all other TXs
+            List<Transaction> pool_transactions = TransactionPool.getUnappliedTransactions().ToList();
 
             ulong normal_transactions = 0; // Keep a counter of normal transactions for the limiter
 
@@ -2858,11 +2847,6 @@ namespace DLT
                     }
                     continue;
                 }
-
-                // Verify that the transaction is actually valid at this point
-                // no need as the tx is already in the pool and was verified when received
-                //if (TransactionPool.verifyTransaction(transaction) == false)
-                //    continue;
 
                 // Skip adding staking rewards
                 if (transaction.type == (int)Transaction.Type.StakingReward)

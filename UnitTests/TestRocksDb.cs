@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Collections.Generic;
 using System;
-using DLT.Meta;
 using IXICore.Utils;
 
 namespace UnitTests
@@ -18,7 +17,7 @@ namespace UnitTests
         [TestInitialize]
         public void Init()
         {
-            db = new RocksDBStorage(Config.dataFolderBlocks, new MemoryInfoProvider());
+            db = new RocksDBStorage("test", new MemoryInfoProvider());
             db.prepareStorage();
         }
 

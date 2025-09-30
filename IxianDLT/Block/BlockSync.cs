@@ -340,7 +340,7 @@ namespace DLT
                         {
                             if (!requestedBlockTimes.ContainsKey(blockNum))
                             {
-                                requestedBlockTimes.Add(blockNum, currentTime);
+                                requestedBlockTimes.TryAdd(blockNum, currentTime);
                             }
                         }
                     }
@@ -430,7 +430,7 @@ namespace DLT
                         {
                             if (!requestedBlockTimes.ContainsKey(blockNum))
                             {
-                                requestedBlockTimes.Add(blockNum, Clock.getTimestamp() - 10);
+                                requestedBlockTimes.TryAdd(blockNum, Clock.getTimestamp() - 10);
                             }
                         }
                         return true;
@@ -1293,7 +1293,10 @@ namespace DLT
                         txBlockHeight += 1;
                     }
 
-                    pendingTransactions.TryAdd(txBlockHeight, new(new ByteArrayComparer()));
+                    if (!pendingTransactions.ContainsKey(txBlockHeight))
+                    {
+                        pendingTransactions.TryAdd(txBlockHeight, new(new ByteArrayComparer()));
+                    }
 
                     if (pendingTransactions[txBlockHeight].TryAdd(tx.id, tx))
                     {
@@ -1339,10 +1342,10 @@ namespace DLT
                                 {
                                     if (!pendingTransactions.ContainsKey(txs.Key + 1))
                                     {
-                                        pendingTransactions.Add(txs.Key + 1, new(new ByteArrayComparer()));
+                                        pendingTransactions.TryAdd(txs.Key + 1, new(new ByteArrayComparer()));
                                     }
 
-                                    pendingTransactions[txs.Key + 1].Add(tx.id, tx);
+                                    pendingTransactions[txs.Key + 1].TryAdd(tx.id, tx);
                                 }
                             }
                         }
