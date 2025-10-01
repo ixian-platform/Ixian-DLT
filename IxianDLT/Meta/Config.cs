@@ -102,14 +102,14 @@ namespace DLT
             public static ulong forceSyncToBlock = 0;
 
             // Read-only values
-            public static readonly string version = "xdc-0.9.7-dev"; // DLT Node version
+            public static readonly string version = "xdc-0.9.7-rc0"; // DLT Node version
 
             public static readonly string checkVersionUrl = "https://resources.ixian.io/update.txt";
             public static readonly int checkVersionSeconds = 6 * 60 * 60; // 6 hours
 
             public static readonly ulong maxBlocksPerDatabase = 1000; // number of blocks to store in a single database file
             
-            public static readonly ulong nodeDeprecationBlock = 5600000 + (ulong)(new Random()).Next(50); // block height on which this version of Ixian DLT stops working on
+            public static readonly ulong nodeDeprecationBlock = 6000000 + (ulong)(new Random()).Next(50); // block height on which this version of Ixian DLT stops working on
 
             public static readonly ulong saveWalletStateEveryBlock = ConsensusConfig.superblockInterval; // Saves wallet state every 1000 blocks
 
@@ -209,6 +209,8 @@ namespace DLT
                 Console.WriteLine("    --minActivityBlockHeight\t Prune activity older than specified block height (30000 is default, 0 disables it).");
                 Console.WriteLine("    --forceSyncToBlock\t\t Force sync to specified block height.");
                 Console.WriteLine("    --networkType\t\t mainnet, testnet or regtest.");
+                Console.WriteLine("    --dataFolderPath\t\t location where to store block and transaction data.");
+                Console.WriteLine("    --logFolderPath\t\t location where to store log files.");
                 Console.WriteLine("");
                 Console.WriteLine("----------- Developer CLI flags -----------");
                 Console.WriteLine("    --genesis\t\t\t Start node in genesis mode (to be used only when setting up your own private network)");
@@ -249,6 +251,8 @@ namespace DLT
                 Console.WriteLine("    blockStorage\t\t Specify storage provider for block and transaction (same as --blockStorage CLI)");
                 Console.WriteLine("    walletNotify\t\t Execute command when a wallet transaction changes");
                 Console.WriteLine("    blockNotify\t\t\t Execute command when the block changes");
+                Console.WriteLine("    dataFolderPath\t\t location where to store block and transaction data.");
+                Console.WriteLine("    logFolderPath\t\t location where to store log files.");
 
                 return "";
             }
@@ -371,6 +375,12 @@ namespace DLT
                             break;
                         case "networkType":
                             networkType = parseNetworkTypeValue(value);
+                            break;
+                        case "dataFolderPath":
+                            dataFolderPath = value;
+                            break;
+                        case "logFolderPath":
+                            logFolderPath = value;
                             break;
                         default:
                             // unknown key

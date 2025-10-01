@@ -929,7 +929,7 @@ namespace DLT
                 {
                     if (!Node.blockSync.synchronizing)
                     {
-                        BlockProtocolMessages.broadcastGetBlock(lastBlockNum + 1, null, null);
+                        BlockProtocolMessages.broadcastGetBlock(lastBlockNum + 1, null, endpoint);
                     }
                     Logging.info("Received an indeterminate future block {0} ({1})", b.blockNum, Crypto.hashToString(b.blockChecksum));
                     return BlockVerifyStatus.IndeterminateFutureBlock;
@@ -1591,12 +1591,12 @@ namespace DLT
         }
 
         // Returns true if block is blacklisted
-        // When expiration_time is set to 0, it will use the default blockGenerationInterval * 10;
+        // When expiration_time is set to 0, it will use the default blockGenerationInterval * 5;
         public bool isBlockBlacklisted(Block b, int expiration_time = 0)
         {
             if(expiration_time == 0)
             {
-                expiration_time = blockGenerationInterval * 10;
+                expiration_time = blockGenerationInterval * 5;
             }
             lock (blockBlacklist)
             {
@@ -3014,7 +3014,6 @@ namespace DLT
                         if (target_block == null)
                         {
                             Logging.error("Unable to find target block {0} while creating superblock {1}.", i - 5, super_block.blockNum);
-                            BlockProtocolMessages.broadcastGetBlock(i - 5, endpoint);
                             return false;
                         }
                         else if (!target_block.calculateSignatureChecksum().SequenceEqual(b.signatureFreezeChecksum))
