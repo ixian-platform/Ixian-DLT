@@ -16,6 +16,7 @@ using IXICore;
 using IXICore.Inventory;
 using IXICore.Meta;
 using IXICore.Network;
+using IXICore.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -923,9 +924,22 @@ namespace DLT
                 ulong sigLockHeight = lastBlockNum > 5 ? lastBlockNum - 4 : 1;
                 if (b.blockNum <= sigLockHeight)
                 {
+                    Logging.error("Trying to refresh signatures on older block {0} <= {1}", b.blockNum, sigLockHeight);
                     return false;
                 }
             }
+            else
+            {
+                // we refuse to force change sig numbers older than 5 blocks
+                ulong lastBlockNum = getLastBlockNum();
+                ulong sigLockHeight = lastBlockNum > 6 ? lastBlockNum - 5 : 1;
+                if (b.blockNum <= sigLockHeight)
+                {
+                    Logging.error("Trying to force refresh signatures on older block {0} <= {1}", b.blockNum, sigLockHeight);
+                    return false;
+                }
+            }
+
             Block updatestorage_block = null;
             int beforeSigs = 0;
             int afterSigs = 0;
@@ -958,7 +972,24 @@ namespace DLT
 
                     if (forceRefresh)
                     {
-                        if(!b.verifyBlockProposer())
+                        if (b.version > BlockVer.v13)
+                        {
+                            // ensure correct order
+                            bool isOrdered = b.signatures
+                                .SequenceEqual(
+                                    b.signatures
+                                     .OrderBy(x => x.powSolution.difficulty, Comparer<IxiNumber>.Default)
+                                     .ThenBy(x => x.recipientPubKeyOrAddress.addressNoChecksum, new ByteArrayComparer())
+                                );
+
+                            if (!isOrdered)
+                            {
+                                Logging.error("Error verifying block signature order on block {0} ({1})", b.blockNum, Crypto.hashToString(b.blockChecksum));
+                                return false;
+                            }
+                        }
+
+                        if (!b.verifyBlockProposer())
                         {
                             Logging.error("Error verifying block proposer while force refreshing signatures on block {0} ({1})", b.blockNum, Crypto.hashToString(b.blockChecksum));
                             return false;

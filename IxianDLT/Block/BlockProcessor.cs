@@ -1964,7 +1964,7 @@ namespace DLT
                     var address = sig.recipientPubKeyOrAddress;
                     if (frozen_block_sigs.Find(x => x.recipientPubKeyOrAddress.addressNoChecksum.SequenceEqual(address.addressNoChecksum)) == null)
                     {
-                        if(Node.blockChain.getTimeSinceLastBlock() < CoreConfig.blockSignaturePlCheckTimeout
+                        if (Node.blockChain.getTimeSinceLastBlock() < CoreConfig.blockSignaturePlCheckTimeout
                             && PresenceList.getPresenceByAddress(address) == null)
                         {
                             continue;
@@ -2694,12 +2694,20 @@ namespace DLT
             // Calculate the award per signer
             IxiNumber sigs = new IxiNumber(numSigs);
 
-            IxiNumber tAward = IxiNumber.divRem(totalFeeAmount, sigs, out IxiNumber remainder);
+            IxiNumber remainder;
+            IxiNumber tAward;
+            if (b.version > BlockVer.v13)
+            {
+                tAward = IxiNumber.divRem(totalFeeAmount, sigs, out remainder);
+            } else
+            {
+                tAward = IxiNumber.divRemLowPrecision(totalFeeAmount, sigs, out remainder);
+            }
 
             if (b.version < BlockVer.v8)
             {
                 // Division of fee amount and sigs left a remainder, distribute that to the foundation wallet
-                if (remainder > (long) 0)
+                if (remainder > (long)0)
                 {
                     foundation_balance_after = foundation_balance_after + remainder;
                     Node.walletState.setWalletBalance(ConsensusConfig.foundationAddress, foundation_balance_after);

@@ -140,6 +140,43 @@ namespace UnitTests
         }
 
         [TestMethod]
+        public void FuzzedDivRem()
+        {
+            for (int i = 0; i < 100; i++)
+            {
+                // Random decimals between -1000 and 1000
+                decimal d1 = (decimal)(rng.NextDouble() * 2000 - 1000);
+                decimal d2 = (decimal)(rng.NextDouble() * 2000 - 1000);
+
+                // Avoid zero divisor
+                if (Math.Abs(d2) < 0.00000001m)
+                    d2 = 1.23456789m;
+
+                // Round to 8 decimals
+                d1 = Math.Round(d1, 8, MidpointRounding.ToZero);
+                d2 = Math.Round(d2, 8, MidpointRounding.ToZero);
+
+                var n1 = new IxiNumber(d1.ToString("0.00000000", CultureInfo.InvariantCulture));
+                var n2 = new IxiNumber(d2.ToString("0.00000000", CultureInfo.InvariantCulture));
+
+                // Perform divRem
+                IxiNumber remainder;
+                var quotient = IxiNumber.divRem(n1, n2, out remainder);
+
+                // Reconstruct: quotient * n2 + remainder
+                var reconstructed = quotient * n2 + remainder;
+
+                // Compare with original, rounded to 8 decimals
+                string originalStr = RoundTo8Decimals(d1);
+                string reconstructedStr = reconstructed.ToString();
+
+                Assert.AreEqual(originalStr, reconstructedStr,
+                    $"Failed on iteration {i}: {n1} / {n2} -> quotient {quotient}, remainder {remainder}");
+            }
+        }
+
+
+        [TestMethod]
         public void LargeValues()
         {
             var big = BigInteger.Pow(10, 30); // very large integer
@@ -241,5 +278,130 @@ namespace UnitTests
         {
             new IxiNumber(Array.Empty<byte>());
         }
+
+        [TestMethod]
+        public void FuzzedEdgeCases_BigInteger()
+        {
+            BigInteger divisor = BigInteger.Pow(10, 8);
+
+            for (int i = 0; i < 100; i++)
+            {
+                // Random numbers in a moderate-to-large range
+                decimal d1 = (decimal)(rng.NextDouble() * 1_000_000_000 - 500_000_000);
+                decimal d2 = (decimal)(rng.NextDouble() * 1_000_000_000 - 500_000_000);
+
+                // Avoid tiny divisor
+                if (Math.Abs(d2) < 0.00000001m)
+                    d2 = 1.23456789m;
+
+                // Round to 8 decimals
+                d1 = Math.Round(d1, 8, MidpointRounding.ToZero);
+                d2 = Math.Round(d2, 8, MidpointRounding.ToZero);
+
+                var n1 = new IxiNumber(d1.ToString("0.00000000", CultureInfo.InvariantCulture));
+                var n2 = new IxiNumber(d2.ToString("0.00000000", CultureInfo.InvariantCulture));
+
+                // Compute expected results using BigInteger arithmetic
+                BigInteger bi1 = n1.getAmount();
+                BigInteger bi2 = n2.getAmount();
+
+                // Addition/Subtraction
+                string expectedAdd = new IxiNumber(bi1 + bi2).ToString();
+                string expectedSub = new IxiNumber(bi1 - bi2).ToString();
+
+                // Multiplication
+                string expectedMul = new IxiNumber((bi1 * bi2) / divisor).ToString();
+
+                // Division
+                string expectedDiv = new IxiNumber((bi1 * divisor) / bi2).ToString();
+
+                // Assertions
+                Assert.AreEqual(expectedAdd, (n1 + n2).ToString());
+                Assert.AreEqual(expectedSub, (n1 - n2).ToString());
+                Assert.AreEqual(expectedMul, (n1 * n2).ToString());
+                Assert.AreEqual(expectedDiv, (n1 / n2).ToString());
+
+                // DivRem
+                IxiNumber remainder;
+                var quotient = IxiNumber.divRem(n1, n2, out remainder);
+                var reconstructed = quotient * n2 + remainder;
+                Assert.AreEqual(n1.ToString(), reconstructed.ToString(),
+                    $"Failed on iteration {i}: {n1} / {n2} -> quotient {quotient}, remainder {remainder}");
+            }
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentNullException))]
+        public void ConstructorFromInvalidString_Empty()
+        {
+            new IxiNumber("");
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentNullException))]
+        public void ConstructorFromInvalidString_Whitespace()
+        {
+            new IxiNumber("    ");
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public void ConstructorFromByteArray_Empty()
+        {
+            new IxiNumber(Array.Empty<byte>());
+        }
+
+        [TestMethod]
+        public void ByteArrayRoundTrip()
+        {
+            var original = new IxiNumber("12345.67890123");
+            var bytes = original.getBytes();
+            var reconstructed = new IxiNumber(bytes);
+            Assert.AreEqual(original.ToRawString(), reconstructed.ToRawString());
+        }
+
+        [TestMethod]
+        public void DivisionBySmallNumbers()
+        {
+            var n1 = new IxiNumber("1");
+            var n2 = new IxiNumber("0.00000001"); // smallest possible IXI unit
+            var result = n1 / n2;
+            Assert.IsTrue(result > new IxiNumber("99999999.0"));
+        }
+
+        [TestMethod]
+        public void FuzzedNegativeNumbers()
+        {
+            for (int i = 0; i < 20; i++)
+            {
+                // Random numbers between -1000 and 1000
+                decimal d1 = (decimal)(rng.NextDouble() * 2000 - 1000);
+                decimal d2 = (decimal)(rng.NextDouble() * 2000 - 1000);
+
+                // Avoid tiny divisor
+                if (Math.Abs(d2) < 0.00000001m) d2 = -1.23456789m;
+
+                // Round to 8 decimals
+                d1 = Math.Round(d1, 8, MidpointRounding.ToZero);
+                d2 = Math.Round(d2, 8, MidpointRounding.ToZero);
+
+                var n1 = new IxiNumber(d1.ToString("0.00000000", CultureInfo.InvariantCulture));
+                var n2 = new IxiNumber(d2.ToString("0.00000000", CultureInfo.InvariantCulture));
+
+                // Arithmetic checks
+                Assert.AreEqual(RoundTo8Decimals(d1 + d2), (n1 + n2).ToString());
+                Assert.AreEqual(RoundTo8Decimals(d1 - d2), (n1 - n2).ToString());
+                Assert.AreEqual(RoundTo8Decimals(d1 * d2), (n1 * n2).ToString());
+                Assert.AreEqual(RoundTo8Decimals(d1 / d2), (n1 / n2).ToString());
+
+                // DivRem checks
+                IxiNumber remainder;
+                var quotient = IxiNumber.divRem(n1, n2, out remainder);
+                var reconstructed = quotient * n2 + remainder;
+                Assert.AreEqual(n1.ToString(), reconstructed.ToString(),
+    $"Failed on iteration {i}: {n1} / {n2} -> quotient {quotient}, remainder {remainder}");
+            }
+        }
+
     }
 }
