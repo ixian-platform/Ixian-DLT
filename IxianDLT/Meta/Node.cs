@@ -77,8 +77,16 @@ namespace DLT.Meta
 
         public Node()
         {
+            var total_ram = memoryInfoProvider.GetTotalRAM();
+            if (total_ram <= 8L << 30)
+            {
+                Logging.error("RAM is too low: {0}B", total_ram);
+                Program.noStart = true;
+                return;
+            }
+
             Logging.info("Available disk space: {0}GB", Platform.getAvailableDiskSpace(Config.dataFolderBlocks) >> 30);
-            Logging.info("Total RAM: {0}MB", memoryInfoProvider.GetTotalRAM() >> 20);
+            Logging.info("Total RAM: {0}MB", total_ram >> 20);
 
             CoreConfig.device_id = [0];
 
