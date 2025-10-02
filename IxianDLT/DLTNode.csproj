@@ -5,6 +5,19 @@
     <AssemblyName>IxianDLT</AssemblyName>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
+  
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <DefineConstants>$(DefineConstants);WINDOWS</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+    <DefineConstants>$(DefineConstants);LINUX</DefineConstants>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('macOS'))">
+    <DefineConstants>$(DefineConstants);MACCATALYST</DefineConstants>
+  </PropertyGroup>
+  
   <PropertyGroup>
     <ApplicationIcon>IxianDLT.ico</ApplicationIcon>
   </PropertyGroup>

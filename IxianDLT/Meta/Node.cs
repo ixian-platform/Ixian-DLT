@@ -73,8 +73,13 @@ namespace DLT.Meta
 
         private static bool postSyncOperationsDone = false;
 
+        private static MemoryInfoProvider memoryInfoProvider = new MemoryInfoProvider();
+
         public Node()
         {
+            Logging.info("Available disk space: {0}GB", Platform.getAvailableDiskSpace(Config.dataFolderBlocks) >> 30);
+            Logging.info("Total RAM: {0}MB", memoryInfoProvider.GetTotalRAM() >> 20);
+
             CoreConfig.device_id = [0];
 
             // Prevent including client presences to Presence List
@@ -127,7 +132,7 @@ namespace DLT.Meta
             // Initialize storage
             if (storage is null)
             {
-                storage = IStorage.create(Config.blockStorageProvider, Config.dataFolderBlocks, new MemoryInfoProvider());
+                storage = IStorage.create(Config.blockStorageProvider, Config.dataFolderBlocks, memoryInfoProvider);
             }
 
             if (storage is RocksDBStorage)
@@ -803,7 +808,7 @@ namespace DLT.Meta
             // we have to instantiate whatever implementation we are using and remove its data files
             if (storage is null)
             {
-                storage = IStorage.create(Config.blockStorageProvider, Config.dataFolderBlocks, new MemoryInfoProvider());
+                storage = IStorage.create(Config.blockStorageProvider, Config.dataFolderBlocks, memoryInfoProvider);
             }
             storage.deleteData();
 

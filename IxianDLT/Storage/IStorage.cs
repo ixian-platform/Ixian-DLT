@@ -336,7 +336,6 @@ namespace DLT
             public static IStorage create(string name, string dataFolderBlocks, IMemoryInfoProvider memoryInfoProvider)
             {
                 Logging.info("Block storage provider: {0}", name);
-                Logging.info("Available disk space: {0}GB", Platform.getAvailableDiskSpace(dataFolderBlocks) >> 30);
                 switch(name)
                 {
                     case "Auto": return autoDetectStorageEngine(dataFolderBlocks, memoryInfoProvider);
