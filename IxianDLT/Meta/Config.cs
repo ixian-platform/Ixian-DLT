@@ -102,7 +102,7 @@ namespace DLT
             public static ulong forceSyncToBlock = 0;
 
             // Read-only values
-            public static readonly string version = "xdc-0.9.7-rc1"; // DLT Node version
+            public static readonly string version = "xdc-0.9.7-rc2"; // DLT Node version
 
             public static readonly string checkVersionUrl = "https://resources.ixian.io/update.txt";
             public static readonly int checkVersionSeconds = 6 * 60 * 60; // 6 hours
@@ -213,6 +213,7 @@ namespace DLT
                 Console.WriteLine("    --networkType\t\t mainnet, testnet or regtest.");
                 Console.WriteLine("    --dataFolderPath\t\t location where to store block and transaction data.");
                 Console.WriteLine("    --logFolderPath\t\t location where to store log files.");
+                Console.WriteLine("    --maxDatabaseCache\t\t max RAM in bytes to use for RocksDB Cache.");
                 Console.WriteLine("");
                 Console.WriteLine("----------- Developer CLI flags -----------");
                 Console.WriteLine("    --genesis\t\t\t Start node in genesis mode (to be used only when setting up your own private network)");
@@ -255,6 +256,7 @@ namespace DLT
                 Console.WriteLine("    blockNotify\t\t\t Execute command when the block changes");
                 Console.WriteLine("    dataFolderPath\t\t location where to store block and transaction data.");
                 Console.WriteLine("    logFolderPath\t\t location where to store log files.");
+                Console.WriteLine("    maxDatabaseCache\t\t max RAM in bytes to use for RocksDB Cache.");
 
                 return "";
             }
@@ -307,7 +309,8 @@ namespace DLT
                     string key = option[0].Trim(new char[] { ' ', '\t', '\r', '\n' });
                     string value = option[1].Trim(new char[] { ' ', '\t', '\r', '\n' });
 
-                    if (key.StartsWith(";"))
+                    if (key.StartsWith(";")
+                        || key.StartsWith("#"))
                     {
                         continue;
                     }
