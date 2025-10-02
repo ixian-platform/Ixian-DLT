@@ -156,6 +156,8 @@ namespace DLT
 
             public static int maxCachedBlockHashes = 1000000;
 
+            public static ulong maxDatabaseCache = 0;
+
             private Config()
             {
 
@@ -382,6 +384,9 @@ namespace DLT
                         case "logFolderPath":
                             logFolderPath = value;
                             break;
+                        case "maxDatabaseCache":
+                            maxDatabaseCache = ulong.Parse(value);
+                            break;
                         default:
                             // unknown key
                             Logging.warn("Unknown config parameter was specified '" + key + "'");
@@ -592,6 +597,8 @@ namespace DLT
                 cmd_parser.Setup<int>("minActivityBlockHeight").Callback(value => CoreConfig.minActivityBlockHeight = value);
 
                 cmd_parser.Setup<long>("forceSyncToBlock").Callback(value => forceSyncToBlock = (ulong)value);
+
+                cmd_parser.Setup<long>("maxDatabaseCache").Callback(value => maxDatabaseCache = (ulong)value);
 
                 cmd_parser.Parse(args);
 

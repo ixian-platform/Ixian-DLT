@@ -312,7 +312,7 @@ namespace DLT
             protected abstract void cleanupCache();
             public abstract void deleteData();
 
-            private static IStorage autoDetectStorageEngine(string dataFolderBlocks, IMemoryInfoProvider memoryInfoProvider)
+            private static IStorage autoDetectStorageEngine(string dataFolderBlocks, ulong maxDatabaseCache)
             {
                 bool hasRocksDatabase = false;
 
@@ -329,18 +329,18 @@ namespace DLT
 
                 // Default to RocksDB
                 Logging.info("Using RocksDB.");
-                return new RocksDBStorage(dataFolderBlocks, memoryInfoProvider);
+                return new RocksDBStorage(dataFolderBlocks, maxDatabaseCache);
             }
 
             // instantiation for the proper implementation class
-            public static IStorage create(string name, string dataFolderBlocks, IMemoryInfoProvider memoryInfoProvider)
+            public static IStorage create(string name, string dataFolderBlocks, ulong maxDatabaseCache)
             {
                 Logging.info("Block storage provider: {0}", name);
                 switch(name)
                 {
-                    case "Auto": return autoDetectStorageEngine(dataFolderBlocks, memoryInfoProvider);
+                    case "Auto": return autoDetectStorageEngine(dataFolderBlocks, maxDatabaseCache);
                     case "SQLite": return new SQLiteStorage(dataFolderBlocks);
-                    case "RocksDB": return new RocksDBStorage(dataFolderBlocks, memoryInfoProvider);
+                    case "RocksDB": return new RocksDBStorage(dataFolderBlocks, maxDatabaseCache);
                     default: throw new Exception(String.Format("Unknown blocks storage provider: {0}", name));
                 }
             }

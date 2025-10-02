@@ -22,7 +22,6 @@ using IXICore.Meta;
 using IXICore.Miner;
 using IXICore.Network;
 using IXICore.RegNames;
-using IXICore.Streaming;
 using IXICore.Utils;
 using Newtonsoft.Json;
 using System;
@@ -78,15 +77,30 @@ namespace DLT.Meta
         public Node()
         {
             var total_ram = memoryInfoProvider.GetTotalRAM();
-            if (total_ram <= 8L << 30)
+            if (Config.networkType == NetworkType.main
+                && total_ram < 8L << 30)
             {
-                Logging.error("RAM is too low: {0}B", total_ram);
+                Logging.error("Insufficient RAM: at least 8GiB required, but only {0}B available", total_ram);
                 Program.noStart = true;
                 return;
             }
 
-            Logging.info("Available disk space: {0}GB", Platform.getAvailableDiskSpace(Config.dataFolderBlocks) >> 30);
-            Logging.info("Total RAM: {0}MB", total_ram >> 20);
+            if (Config.maxDatabaseCache == 0)
+            {
+                Config.maxDatabaseCache = estimateDBBlockCacheSize((ulong)total_ram);
+            }
+
+            if (Config.networkType == NetworkType.main
+                && Config.maxDatabaseCache < 4L << 30)
+            {
+                Logging.error("Insufficient maxDatabaseCache: at least 4GiB required, but only {0}B available", Config.maxDatabaseCache);
+                Program.noStart = true;
+                return;
+            }
+
+            Logging.info("Available disk space: {0}GiB", Platform.getAvailableDiskSpace(Config.dataFolderBlocks) >> 30);
+            Logging.info("Total RAM: {0}GiB", total_ram >> 30);
+            Logging.info("Using Max Database Cache: {0}MiB", Config.maxDatabaseCache >> 20);
 
             CoreConfig.device_id = [0];
 
@@ -140,7 +154,7 @@ namespace DLT.Meta
             // Initialize storage
             if (storage is null)
             {
-                storage = IStorage.create(Config.blockStorageProvider, Config.dataFolderBlocks, memoryInfoProvider);
+                storage = IStorage.create(Config.blockStorageProvider, Config.dataFolderBlocks, Config.maxDatabaseCache);
             }
 
             if (storage is RocksDBStorage)
@@ -816,7 +830,7 @@ namespace DLT.Meta
             // we have to instantiate whatever implementation we are using and remove its data files
             if (storage is null)
             {
-                storage = IStorage.create(Config.blockStorageProvider, Config.dataFolderBlocks, memoryInfoProvider);
+                storage = IStorage.create(Config.blockStorageProvider, Config.dataFolderBlocks, Config.maxDatabaseCache);
             }
             storage.deleteData();
 
@@ -1243,6 +1257,25 @@ namespace DLT.Meta
             blockProcessor.acceptLocalNewBlock();
 
             PresenceList.forceSendKeepAlive = true;
+        }
+
+        private ulong estimateDBBlockCacheSize(ulong totalRAM)
+        {
+            const ulong MB = 1024 * 1024;
+            const ulong GB = 1024 * MB;
+            ulong memMB = totalRAM / MB;
+            if (memMB < 4096) // 4GB or below or indeterminate
+            {
+                return 512 * MB;
+            }
+            else if (memMB < 8192) // between 4GB and 8GB
+            {
+                return 1 * GB;
+            }
+            else // above 8GB
+            {
+                return totalRAM / 3;
+            }
         }
     }
 

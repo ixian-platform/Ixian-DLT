@@ -895,11 +895,11 @@ namespace DLT
 
             private ulong highestBlockNum = 0;
             private ulong lowestBlockNum = 0;
-            private IMemoryInfoProvider memoryInfoProvider;
+            private ulong maxDatabaseCache;
 
-            public RocksDBStorage(string dataFolderBlocks, IMemoryInfoProvider memoryInfoProvider) : base(dataFolderBlocks)
+            public RocksDBStorage(string dataFolderBlocks, ulong maxDatabaseCache) : base(dataFolderBlocks)
             {
-                this.memoryInfoProvider = memoryInfoProvider;
+                this.maxDatabaseCache = maxDatabaseCache;
             }
 
             private RocksDBInternal getDatabase(ulong blockNum, bool onlyExisting = false)
@@ -949,25 +949,6 @@ namespace DLT
                 return db;
             }
 
-            private ulong estimateDBBlockCacheSize()
-            {
-                const long MB = 1024 * 1024;
-                const long GB = 1024 * MB;
-                long memMB = memoryInfoProvider.GetTotalRAM() / MB;
-                if (memMB < 4096) // 4GB or below or indeterminate
-                {
-                    return 512 * MB;
-                }
-                else if (memMB < 8192) // between 4GB and 8GB
-                {
-                    return 1 * GB;
-                }
-                else // above 8GB
-                {
-                    return (ulong)memMB * MB / 2;
-                }
-            }
-
             public static bool hasRocksDBData(string pathBase)
             {
                 if (Directory.Exists(Path.Combine(pathBase, "0000", "0")))
@@ -999,8 +980,7 @@ namespace DLT
                     }
                 }
                 // Prepare cache
-                ulong blockCacheSize = estimateDBBlockCacheSize();
-                commonBlockCache = Cache.CreateLru(blockCacheSize / 3);
+                commonBlockCache = Cache.CreateLru(maxDatabaseCache);
                 // DB optimization
                 if (Config.optimizeDBStorage)
                 {
