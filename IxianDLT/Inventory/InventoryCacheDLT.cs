@@ -28,6 +28,7 @@ namespace DLTNode.Inventory
         {
             typeOptions[InventoryItemTypes.block].maxItems = 50;
             typeOptions[InventoryItemTypes.blockSignature].maxItems = 20000;
+            typeOptions[InventoryItemTypes.blockSignature2].maxItems = 20000;
             typeOptions[InventoryItemTypes.transaction].maxItems = 1000000;
             typeOptions[InventoryItemTypes.keepAlive].maxItems = 1000000;
         }
@@ -40,6 +41,8 @@ namespace DLTNode.Inventory
                     return handleBlock(item, endpoint);
                 case InventoryItemTypes.blockSignature:
                     return handleSignature(item, endpoint);
+                case InventoryItemTypes.blockSignature2:
+                    return handleSignature2(item, endpoint);
                 case InventoryItemTypes.keepAlive:
                     return handleKeepAlive(item, endpoint);
                 case InventoryItemTypes.transaction:
@@ -114,11 +117,12 @@ namespace DLTNode.Inventory
             return false;
         }
 
+        [Obsolete("Use handleSignature2 instead")]
         private bool handleSignature(InventoryItem item, RemoteEndpoint endpoint)
         {
             InventoryItemSignature iis = (InventoryItemSignature)item;
             ulong last_block_height = IxianHandler.getLastBlockHeight();
-            Address address = iis.address;
+            Address address = new Address(iis.solution);
             ulong block_num = iis.blockNum;
             if (block_num + 5 > last_block_height && block_num <= last_block_height + 1)
             {
@@ -161,6 +165,61 @@ namespace DLTNode.Inventory
                 }else
                 {
                     endpoint.sendData(ProtocolMessageCode.getSignatures2, data, null);
+                }
+                return true;
+            }
+            return false;
+        }
+
+
+        private bool handleSignature2(InventoryItem item, RemoteEndpoint endpoint)
+        {
+            InventoryItemSignature iis = (InventoryItemSignature)item;
+            ulong last_block_height = IxianHandler.getLastBlockHeight();
+            byte[] solution = iis.solution;
+            ulong block_num = iis.blockNum;
+            if (block_num + 5 > last_block_height && block_num <= last_block_height + 1)
+            {
+                if (block_num == last_block_height + 1)
+                {
+                    lock (Node.blockProcessor.localBlockLock)
+                    {
+                        Block local_block = Node.blockProcessor.localNewBlock;
+                        if (local_block == null)
+                        {
+                            return true;
+                        }
+
+                        if (!local_block.blockChecksum.SequenceEqual(iis.blockHash)
+                            || local_block.hasNodeSignature(solution))
+                        {
+                            return false;
+                        }
+                    }
+                }
+                else
+                {
+                    Block sf_block = Node.blockChain.getBlock(block_num);
+                    if (!sf_block.blockChecksum.SequenceEqual(iis.blockHash)
+                        || sf_block.hasNodeSignature(solution))
+                    {
+                        return false;
+                    }
+                }
+                byte[] block_num_bytes = block_num.GetIxiVarIntBytes();
+                byte[] solution_len_bytes = solution.Length.GetIxiVarIntBytes();
+                byte[] data = new byte[block_num_bytes.Length + 1 + solution_len_bytes.Length + solution.Length];
+                Array.Copy(block_num_bytes, data, block_num_bytes.Length);
+                data[block_num_bytes.Length] = 1;
+                Array.Copy(solution_len_bytes, 0, data, block_num_bytes.Length + 1, solution_len_bytes.Length);
+                Array.Copy(solution, 0, data, block_num_bytes.Length + 1 + solution_len_bytes.Length, solution.Length);
+                if (endpoint == null)
+                {
+                    CoreProtocolMessage.broadcastProtocolMessageToSingleRandomNode(new char[] { 'M', 'H' }, ProtocolMessageCode.getSignatures3, data, block_num);
+                }
+                else
+                {
+                    endpoint.sendData(ProtocolMessageCode.getSignatures3, data, null);
                 }
                 return true;
             }

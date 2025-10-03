@@ -125,6 +125,10 @@ namespace DLT
                             SignatureProtocolMessages.handleGetSignatures2(data, endpoint);
                             break;
 
+                        case ProtocolMessageCode.getSignatures3:
+                            SignatureProtocolMessages.handleGetSignatures3(data, endpoint);
+                            break;
+
                         case ProtocolMessageCode.signaturesChunk2:
                             SignatureProtocolMessages.handleSignaturesChunk2(data, endpoint);
                             break;
@@ -323,6 +327,7 @@ namespace DLT
                         ulong network_block_height = IxianHandler.getHighestKnownNetworkBlockHeight();
 
                         Dictionary<ulong, List<InventoryItemSignature>> sig_lists = new Dictionary<ulong, List<InventoryItemSignature>>();
+                        Dictionary<ulong, List<InventoryItemSignature>> sig_lists2 = new Dictionary<ulong, List<InventoryItemSignature>>();
                         List<InventoryItemKeepAlive> ka_list = new List<InventoryItemKeepAlive>();
                         List<byte[]> tx_list = new List<byte[]>();
                         bool updated_block_height = false;
@@ -340,6 +345,7 @@ namespace DLT
                                     break;
 
                                 case InventoryItemTypes.blockSignature:
+                                case InventoryItemTypes.blockSignature2:
                                     var iis = (InventoryItemSignature)item;
                                     if (iis.blockNum > endpoint.blockHeight)
                                     {
@@ -384,35 +390,70 @@ namespace DLT
                                         break;
 
                                     case InventoryItemTypes.blockSignature:
-                                        var iis = (InventoryItemSignature)item;
-                                        if (iis.blockNum + 4 < last_accepted_block_height)
                                         {
-                                            InventoryCache.Instance.setProcessedFlag(iis.type, iis.hash);
-                                            continue;
-                                        }
+                                            var iis = (InventoryItemSignature)item;
+                                            if (iis.blockNum + 4 < last_accepted_block_height)
+                                            {
+                                                InventoryCache.Instance.setProcessedFlag(iis.type, iis.hash);
+                                                continue;
+                                            }
 
-                                        if (iis.blockNum + 4 < network_block_height)
-                                        {
-                                            InventoryCache.Instance.setProcessedFlag(iis.type, iis.hash);
-                                            requestNextBlock(iis.blockNum, iis.blockHash, endpoint);
-                                            continue;
-                                        }
+                                            if (iis.blockNum + 4 < network_block_height)
+                                            {
+                                                InventoryCache.Instance.setProcessedFlag(iis.type, iis.hash);
+                                                requestNextBlock(iis.blockNum, iis.blockHash, endpoint);
+                                                continue;
+                                            }
 
-                                        if (iis.blockNum > last_block_height)
-                                        {
+                                            if (iis.blockNum > last_block_height)
+                                            {
+                                                pii.lastRequested = Clock.getTimestamp();
+                                                requestNextBlock(iis.blockNum, iis.blockHash, endpoint);
+                                                continue;
+                                            }
+
+                                            if (!sig_lists.ContainsKey(iis.blockNum))
+                                            {
+                                                sig_lists.Add(iis.blockNum, new List<InventoryItemSignature>());
+                                            }
+                                            sig_lists[iis.blockNum].Add(iis);
+
                                             pii.lastRequested = Clock.getTimestamp();
-                                            requestNextBlock(iis.blockNum, iis.blockHash, endpoint);
-                                            continue;
+                                            break;
                                         }
 
-                                        if (!sig_lists.ContainsKey(iis.blockNum))
+                                    case InventoryItemTypes.blockSignature2:
                                         {
-                                            sig_lists.Add(iis.blockNum, new List<InventoryItemSignature>());
-                                        }
-                                        sig_lists[iis.blockNum].Add(iis);
+                                            var iis = (InventoryItemSignature)item;
+                                            if (iis.blockNum + 4 < last_accepted_block_height)
+                                            {
+                                                InventoryCache.Instance.setProcessedFlag(iis.type, iis.hash);
+                                                continue;
+                                            }
 
-                                        pii.lastRequested = Clock.getTimestamp();
-                                        break;
+                                            if (iis.blockNum + 4 < network_block_height)
+                                            {
+                                                InventoryCache.Instance.setProcessedFlag(iis.type, iis.hash);
+                                                requestNextBlock(iis.blockNum, iis.blockHash, endpoint);
+                                                continue;
+                                            }
+
+                                            if (iis.blockNum > last_block_height)
+                                            {
+                                                pii.lastRequested = Clock.getTimestamp();
+                                                requestNextBlock(iis.blockNum, iis.blockHash, endpoint);
+                                                continue;
+                                            }
+
+                                            if (!sig_lists2.ContainsKey(iis.blockNum))
+                                            {
+                                                sig_lists2.Add(iis.blockNum, new List<InventoryItemSignature>());
+                                            }
+                                            sig_lists2[iis.blockNum].Add(iis);
+
+                                            pii.lastRequested = Clock.getTimestamp();
+                                            break;
+                                        }
 
                                     case InventoryItemTypes.block:
                                         var iib = ((InventoryItemBlock)item);
@@ -450,6 +491,11 @@ namespace DLT
                         foreach (var sig_list in sig_lists)
                         {
                             SignatureProtocolMessages.broadcastGetSignatures(sig_list.Key, sig_list.Value, endpoint);
+                        }
+
+                        foreach (var sig_list in sig_lists2)
+                        {
+                            SignatureProtocolMessages.broadcastGetSignatures3(sig_list.Key, sig_list.Value, endpoint);
                         }
                     }
                 }

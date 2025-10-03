@@ -965,6 +965,7 @@ namespace DLT
                         foreach (var sig in added_sigs)
                         {
                             InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum));
+                            InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(sig.powSolution.solution, b.blockChecksum));
 
                             SignatureProtocolMessages.broadcastBlockSignature(sig, b.blockNum, b.blockChecksum, endpoint, null);
                         }
