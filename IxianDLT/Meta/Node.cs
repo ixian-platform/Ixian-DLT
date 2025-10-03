@@ -78,9 +78,9 @@ namespace DLT.Meta
         {
             var total_ram = memoryInfoProvider.GetTotalRAM();
             if (Config.networkType == NetworkType.main
-                && total_ram < 8L << 30)
+                && total_ram < 12L << 30)
             {
-                Logging.error("Insufficient RAM: at least 8GiB required, but only {0}B available", total_ram);
+                Logging.error("Insufficient RAM: at least 12GiB required, but only {0}B available", total_ram);
                 Program.noStart = true;
                 return;
             }
@@ -91,9 +91,9 @@ namespace DLT.Meta
             }
 
             if (Config.networkType == NetworkType.main
-                && Config.maxDatabaseCache < 4L << 30)
+                && Config.maxDatabaseCache < 2L << 30)
             {
-                Logging.error("Insufficient maxDatabaseCache: at least 4GiB required, but only {0}B available", Config.maxDatabaseCache);
+                Logging.error("Insufficient maxDatabaseCache: at least 2GiB required, but only {0}B available", Config.maxDatabaseCache);
                 Program.noStart = true;
                 return;
             }
@@ -773,6 +773,7 @@ namespace DLT.Meta
                     if (blockSig != null)
                     {
                         InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum));
+                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(blockSig.powSolution.solution, b.blockChecksum));
                         SignatureProtocolMessages.broadcastBlockSignature(blockSig, b.blockNum, b.blockChecksum, null, null);
                     }
                 }
@@ -1274,7 +1275,7 @@ namespace DLT.Meta
             }
             else // above 8GB
             {
-                return totalRAM / 3;
+                return totalRAM / 5;
             }
         }
     }
