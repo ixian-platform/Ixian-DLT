@@ -2161,9 +2161,13 @@ namespace DLT
                             BlockSignature signature_data = localNewBlock.applySignature(PresenceList.getPowSolution()); // applySignature() will return signature_data, if signature was applied and null, if signature was already present from before
                             if (signature_data != null) 
                             {
+                                CoreProtocolMessage.broadcastProtocolMessage(new[] { 'M', 'H' }, ProtocolMessageCode.blockSignature2, signature_data.getBytesForBroadcast(), null, null);
                                 foreach (var sig in localNewBlock.signatures)
                                 {
-                                    InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum));
+                                    if (!InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum)))
+                                    {
+                                        continue;
+                                    }
                                     InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(sig.powSolution.solution, localNewBlock.blockChecksum));
                                     SignatureProtocolMessages.broadcastBlockSignature(sig, localNewBlock.blockNum, localNewBlock.blockChecksum, null, null);
                                 }
