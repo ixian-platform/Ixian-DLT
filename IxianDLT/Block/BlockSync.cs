@@ -113,6 +113,7 @@ namespace DLT
                     {
                         var lastBh = IxianHandler.getLastBlockHeight();
                         rollForward();
+                        processRequestedBlocks();
                         if (lastBh == IxianHandler.getLastBlockHeight())
                         {
                             Thread.Sleep(50);
@@ -187,6 +188,40 @@ namespace DLT
         }
 
 
+        private void processRequestedBlocks()
+        {
+            long currentTime = Clock.getTimestamp();
+
+            // Check if the block has already been requested
+            lock (requestedBlockTimes)
+            {
+                Dictionary<ulong, long> tmpRequestedBlockTimes = new Dictionary<ulong, long>(requestedBlockTimes);
+                foreach (var entry in tmpRequestedBlockTimes)
+                {
+                    if (!running)
+                    {
+                        return;
+                    }
+                    ulong blockNum = entry.Key;
+                    // Check if the request expired (after 10 seconds)
+                    if (currentTime - requestedBlockTimes[blockNum] > 10)
+                    {
+                        // Re-request block
+                        if (BlockProtocolMessages.broadcastGetBlock(blockNum, null, null, 0, true) == false)
+                        {
+                            Logging.warn("Failed to rebroadcast getBlock request for {0}", blockNum);
+                            Thread.Sleep(500);
+                        }
+                        else
+                        {
+                            // Re-set the block request time
+                            requestedBlockTimes[blockNum] = currentTime;
+                        }
+                    }
+                }
+            }
+        }
+
         private bool requestMissingBlocks()
         {
             if (syncDone)
@@ -200,36 +235,6 @@ namespace DLT
             }
 
             long currentTime = Clock.getTimestamp();
-
-            // Check if the block has already been requested
-            lock (requestedBlockTimes)
-            {
-                Dictionary<ulong, long> tmpRequestedBlockTimes = new Dictionary<ulong, long>(requestedBlockTimes);
-                foreach (var entry in tmpRequestedBlockTimes)
-                {
-                    if (!running)
-                    {
-                        return false;
-                    }
-                    ulong blockNum = entry.Key;
-                    // Check if the request expired (after 10 seconds)
-                    if (currentTime - requestedBlockTimes[blockNum] > 10)
-                    {
-                        // Re-request block
-                        if (BlockProtocolMessages.broadcastGetBlock(blockNum, null, null, 1, true) == false)
-                        {
-                            Logging.warn("Failed to rebroadcast getBlock request for {0}", blockNum);
-                            Thread.Sleep(500);
-                        }
-                        else
-                        {
-                            // Re-set the block request time
-                            requestedBlockTimes[blockNum] = currentTime;
-                        }
-                    }
-                }
-            }
-
 
             ulong syncToBlock = syncTargetBlockNum;
 
@@ -669,8 +674,7 @@ namespace DLT
                         var sw = new System.Diagnostics.Stopwatch();
                         sw.Start();
 
-                        IEnumerable<Transaction> txs = Node.storage.getTransactionsInBlock(b.blockNum);
-
+                        Dictionary<byte[], Transaction> txs = Node.storage.getTransactionsInBlock(b.blockNum).ToDictionary(x => x.id, new ByteArrayComparer());
                         int missed_txs = 0;
                         int found_txs = 0;
 
@@ -685,32 +689,23 @@ namespace DLT
                             Transaction t = TransactionPool.getUnappliedTransaction(txid);
                             if (t == null)
                             {
-                                foreach (Transaction t2 in txs)
-                                {
-                                    if (txid.SequenceEqual(t2.id))
-                                    {
-                                        t = t2;
-                                        found_txs++;
-                                        break;
-                                    }
-                                }
-
-                                if (t == null)
-                                {
-                                    //t = Node.storage.getTransaction(txid, b.blockNum);
-                                    missed_txs++;
-                                }
-
+                                txs.TryGetValue(txid, out t);
                                 if (t != null)
                                 {
+                                    found_txs++;
                                     t.applied = 0;
                                     TransactionPool.addTransaction(t, true, null, Config.fullStorageDataVerification);
                                 }
                                 else
                                 {
+                                    missed_txs++;
                                     txs_to_fetch.Add(txid);
                                     missing = true;
                                 }
+                            }
+                            else
+                            {
+                                found_txs++;
                             }
                         }
 

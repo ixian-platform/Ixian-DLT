@@ -620,7 +620,7 @@ namespace DLT
                         {
                             sigBytes = database.Get(_storage_Index.combineKeys(b.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
                         }
-                        b.setSignaturesFromBytes(sigBytes);
+                        b.setSignaturesFromBytes(sigBytes, false);
                         b.fromLocalStorage = true;
                         return b;
                     }
