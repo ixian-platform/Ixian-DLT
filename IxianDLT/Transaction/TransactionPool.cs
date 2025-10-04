@@ -1358,9 +1358,9 @@ namespace DLT
                     setAppliedFlag(txid, b.blockNum, b.timestamp, !tx.fromLocalStorage);
                 }
                 // set PoW fields
-                for (int i = 0; i < blockSolutionsDictionary.Count; i++)
+                foreach (var solution in blockSolutionsDictionary)
                 {
-                    ulong blockNum = blockSolutionsDictionary.Keys.ElementAt(i);
+                    ulong blockNum = solution.Key;
 
                     Block block = Node.blockChain.getBlock(blockNum, false, true);
                     // Check if the block is valid
@@ -2520,9 +2520,9 @@ namespace DLT
         // Go through a dictionary of block numbers and respective miners and reward them
         private static void rewardMiners(ulong sent_block_num, IDictionary<ulong, List<BlockSolution>> blockSolutionsDictionary)
         {
-            for (int i = 0; i < blockSolutionsDictionary.Count; i++)
+            foreach (var solution in blockSolutionsDictionary)
             {
-                ulong blockNum = blockSolutionsDictionary.Keys.ElementAt(i);
+                ulong blockNum = solution.Key;
 
                 Block block = Node.blockChain.getBlock(blockNum, true, true);
                 // Check if the block is valid
@@ -2631,9 +2631,9 @@ namespace DLT
                 }
             }
 
-            for (int i = 0; i < targetBlockSolutionsDictionary.Count; i++)
+            foreach (var solution in targetBlockSolutionsDictionary)
             {
-                ulong powBlockNum = targetBlockSolutionsDictionary.Keys.ElementAt(i);
+                ulong powBlockNum = solution.Key;
 
                 Block powBlock = Node.blockChain.getBlock(powBlockNum, true, true);
                 // Check if the block is valid
@@ -2668,9 +2668,9 @@ namespace DLT
 
         private static void setPoWAppliedFlagToBlocks(ulong sent_block_num, IDictionary<ulong, List<BlockSolution>> blockSolutionsDictionary)
         {
-            for (int i = 0; i < blockSolutionsDictionary.Count; i++)
+            foreach (var solution in blockSolutionsDictionary)
             {
-                ulong blockNum = blockSolutionsDictionary.Keys.ElementAt(i);
+                ulong blockNum = solution.Key;
 
                 Block block = Node.blockChain.getBlock(blockNum, true, true);
                 // Check if the block is valid
@@ -2890,12 +2890,12 @@ namespace DLT
         {
             List<Transaction> tx_list = new List<Transaction>();
             HashSet<byte[]> tx_ids = block.transactions;
-            for (int i = 0; i < tx_ids.Count; i++)
+            foreach (var tx_id in tx_ids)
             {
-                Transaction t = getAppliedTransaction(tx_ids.ElementAt(i), block.blockNum);
+                Transaction t = getAppliedTransaction(tx_id, block.blockNum);
                 if (t == null)
                 {
-                    Logging.error("nulltx: {0}", Transaction.getTxIdString(tx_ids.ElementAt(i)));
+                    Logging.error("nulltx: {0}", Transaction.getTxIdString(tx_id));
                     continue;
                 }
                 tx_list.Add(t);
@@ -2908,12 +2908,12 @@ namespace DLT
         {
             List<Dictionary<string, object>> tx_list = new List<Dictionary<string, object>>();
             HashSet<byte[]> tx_ids = block.transactions;
-            for (int i = 0; i < tx_ids.Count; i++)
+            foreach (var tx_id in tx_ids)
             {
-                Transaction t = getAppliedTransaction(tx_ids.ElementAt(i), block.blockNum);
+                Transaction t = getAppliedTransaction(tx_id, block.blockNum);
                 if (t == null)
                 {
-                    Logging.error("nulltx: {0}", Transaction.getTxIdString(tx_ids.ElementAt(i)));
+                    Logging.error("nulltx: {0}", Transaction.getTxIdString(tx_id));
                     continue;
                 }
 
@@ -2928,11 +2928,11 @@ namespace DLT
         {
             IxiNumber val = 0;
             HashSet<byte[]> tx_ids = block.transactions;
-            for (int i = 0; i < tx_ids.Count; i++)
+            foreach (var tx_id in tx_ids)
             {
-                Transaction t = getAppliedTransaction(tx_ids.ElementAt(i), block.blockNum);
+                Transaction t = getAppliedTransaction(tx_id, block.blockNum);
                 if (t == null)
-                    Logging.error("nulltx: {0}", Transaction.getTxIdString(tx_ids.ElementAt(i)));
+                    Logging.error("nulltx: {0}", Transaction.getTxIdString(tx_id));
                 else
                     val.add(t.amount);
             }
