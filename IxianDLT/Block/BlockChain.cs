@@ -254,7 +254,7 @@ namespace DLT
             // Cleanup transaction pool
             TransactionPool.performCleanup();
 
-            lastBlockReceivedTime = Clock.getTimestamp();
+            lastBlockReceivedTime = Clock.getNetworkTimestamp();
             return true;
         }
 
@@ -1110,7 +1110,7 @@ namespace DLT
 
         public long getTimeSinceLastBlock()
         {
-            return Clock.getTimestamp() - lastBlockReceivedTime;
+            return Clock.getNetworkTimestamp() - lastBlockReceivedTime;
         }
 
         public Block getPendingSuperBlock(ulong block_num)

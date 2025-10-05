@@ -791,7 +791,7 @@ namespace DLT
                         return;
                     }
 
-                    if (!b.fromLocalStorage && !Node.blockProcessor.verifyBlockSignatures(b, null) && Node.blockChain.Count > 16)
+                    if ((!b.fromLocalStorage || Config.fullStorageDataVerification) && !Node.blockProcessor.verifyBlockSignatures(b, null) && Node.blockChain.Count > 16)
                     {
                         Logging.warn("Block #{0} {1} doesn't have the required consensus. Discarding and requesting a new one.", b.blockNum, Crypto.hashToString(b.blockChecksum));
                         lock (pendingBlocks)

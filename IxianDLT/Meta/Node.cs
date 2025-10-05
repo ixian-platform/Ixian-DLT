@@ -764,7 +764,7 @@ namespace DLT.Meta
                 return;
             }
 
-            for (ulong blockNum = lastBlockHeight - 4; blockNum < lastBlockHeight; blockNum++)
+            for (ulong blockNum = lastBlockHeight - 3; blockNum <= lastBlockHeight; blockNum++)
             {
                 if (blockNum + 5 >= IxianHandler.getHighestKnownNetworkBlockHeight())
                 {
@@ -1250,7 +1250,7 @@ namespace DLT.Meta
 
         public override void onSignerSolutionFound()
         {
-            if (blockChain.getTimeSinceLastBlock() > CoreConfig.blockSignaturePlCheckTimeout)
+            if (Clock.getNetworkTimestamp() - blockChain.getLastBlock().timestamp > CoreConfig.blockSignaturePlCheckTimeout)
             {
                 blockProcessor.applyUpdatedSolutionSignature();
             }

@@ -1967,7 +1967,7 @@ namespace DLT
                     var address = sig.recipientPubKeyOrAddress;
                     if (frozen_block_sigs.Find(x => x.recipientPubKeyOrAddress.addressNoChecksum.SequenceEqual(address.addressNoChecksum)) == null)
                     {
-                        if (Node.blockChain.getTimeSinceLastBlock() < CoreConfig.blockSignaturePlCheckTimeout
+                        if (Clock.getNetworkTimestamp() - Node.blockChain.getLastBlock().timestamp < CoreConfig.blockSignaturePlCheckTimeout
                             && PresenceList.getPresenceByAddress(address) == null)
                         {
                             continue;
@@ -2165,6 +2165,8 @@ namespace DLT
                                 CoreProtocolMessage.broadcastProtocolMessage(new[] { 'M', 'H' }, ProtocolMessageCode.blockSignature2, signature_data.getBytesForBroadcast(), null, null);
                                 InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(signature_data.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum));
                                 InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(signature_data.powSolution.solution, localNewBlock.blockChecksum));
+                                // TODO remove the following line after next upgrade
+                                SignatureProtocolMessages.broadcastBlockSignature(signature_data, localNewBlock.blockNum, localNewBlock.blockChecksum, null, null);
                                 foreach (var sig in localNewBlock.signatures)
                                 {
                                     if (!InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum)))
