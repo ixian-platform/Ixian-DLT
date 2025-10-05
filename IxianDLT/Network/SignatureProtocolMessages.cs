@@ -44,7 +44,9 @@ namespace DLT
                 }
                 else
                 {
-                    return CoreProtocolMessage.addToInventory(new char[] { 'M', 'H' }, new InventoryItemSignature(signature.powSolution.solution, signature.blockNum, signature.blockHash), skipEndpoint);
+                    // TODO enable this after next upgrade
+                    //return CoreProtocolMessage.addToInventory(new char[] { 'M', 'H' }, new InventoryItemSignature(signature.powSolution.solution, signature.blockNum, signature.blockHash), skipEndpoint);
+                    return CoreProtocolMessage.addToInventory(new char[] { 'M', 'H' }, new InventoryItemSignature(signature.recipientPubKeyOrAddress, signature.blockNum, signature.blockHash), skipEndpoint);
                 }
             }
 

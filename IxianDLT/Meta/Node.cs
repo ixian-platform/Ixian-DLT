@@ -764,7 +764,7 @@ namespace DLT.Meta
                 return;
             }
 
-            for (ulong blockNum = lastBlockHeight - 3; blockNum <= lastBlockHeight; blockNum++)
+            for (ulong blockNum = lastBlockHeight - 4; blockNum <= lastBlockHeight; blockNum++)
             {
                 if (blockNum + 5 >= IxianHandler.getHighestKnownNetworkBlockHeight())
                 {
