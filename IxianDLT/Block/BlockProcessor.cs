@@ -1030,12 +1030,12 @@ namespace DLT
             // Note: it is possible we don't have all the required TXs in our TXpool - in this case, request the missing ones and return Indeterminate
             bool hasAllTransactions = true;
             bool fetchTransactions = false;
+            long cur_time = Clock.getTimestamp();
             lock (fetchingTxForBlocks)
             {
                 if (fetchingTxForBlocks.ContainsKey(b.blockNum))
                 {
                     long tx_timeout = fetchingTxForBlocks[b.blockNum];
-                    long cur_time = Clock.getTimestamp();
                     if (cur_time - tx_timeout > 10)
                     {
                         fetchingTxForBlocks[b.blockNum] = cur_time;
@@ -1078,23 +1078,24 @@ namespace DLT
                         Logging.error("Block #{0} includes a transaction that has already been applied in previous.", b.blockNum);
                         return BlockVerifyStatus.PotentiallyForkedBlock;
                     }
+
                     if (fetchTransactions)
                     {
                         Logging.info("Missing transaction '{0}', adding to fetch queue.", Transaction.getTxIdString(txid));
                         var pii = InventoryCache.Instance.add(new InventoryItem(InventoryItemTypes.transaction, txid), endpoint, true);
-                        if (Clock.getTimestamp() - pii.lastRequested > 5)
+                        if (cur_time - pii.lastRequested > 5)
                         {
                             pii.retryCount = 0;
-                            pii.lastRequested = Clock.getTimestamp();
+                            pii.lastRequested = cur_time;
                             txs_to_fetch.Add(txid);
                         }
                     }else
                     {
                         var pii = InventoryCache.Instance.add(new InventoryItem(InventoryItemTypes.transaction, txid), endpoint, true);
-                        if (Clock.getTimestamp() - pii.lastRequested > 5)
+                        if (cur_time - pii.lastRequested > 5)
                         {
                             pii.retryCount = 0;
-                            pii.lastRequested = Clock.getTimestamp();
+                            pii.lastRequested = cur_time;
                             InventoryCache.Instance.processInventoryItem(pii);
                         }
                     }
@@ -1254,8 +1255,8 @@ namespace DLT
                 {
                     if (!fetchingTxForBlocks.ContainsKey(b.blockNum))
                     {
-                        long cur_time = Clock.getTimestamp();
-                        if (missing < b.transactions.Count / 2)
+                        cur_time = Clock.getTimestamp();
+                        if (missing * 64 < (b.transactions.Count - missing) * 2000)
                         {
                             cur_time = cur_time - 30;
                             fetchingBulkTxForBlocks.AddOrReplace(b.blockNum, cur_time);
@@ -2162,6 +2163,8 @@ namespace DLT
                             if (signature_data != null) 
                             {
                                 CoreProtocolMessage.broadcastProtocolMessage(new[] { 'M', 'H' }, ProtocolMessageCode.blockSignature2, signature_data.getBytesForBroadcast(), null, null);
+                                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(signature_data.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum));
+                                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(signature_data.powSolution.solution, localNewBlock.blockChecksum));
                                 foreach (var sig in localNewBlock.signatures)
                                 {
                                     if (!InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum)))

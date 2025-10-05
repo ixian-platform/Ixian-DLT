@@ -229,7 +229,7 @@ namespace DLT
 
                                         if (tx_bytes == null)
                                         {
-                                            Logging.warn("I do not have txid '{0}.", Transaction.getTxIdString(txid)); // convert to string
+                                            Logging.warn("I do not have txid '{0}'.", Transaction.getTxIdString(txid)); // convert to string
                                             continue;
                                         }
 
@@ -405,7 +405,7 @@ namespace DLT
 
                         if (tx_bytes == null)
                         {
-                            Logging.warn("I do not have txid '{0}.", Transaction.getTxIdString(txid));
+                            Logging.warn("I do not have txid '{0}'.", Transaction.getTxIdString(txid));
                             return;
                         }
 

@@ -751,6 +751,8 @@ namespace DLT
                         }
                         
                         BlockSignature newSig = new BlockSignature();
+                        newSig.blockNum = block.blockNum;
+                        newSig.blockHash = block.blockChecksum;
                         if (split_sig[0] != "0")
                         {
                             newSig.signature = Convert.FromBase64String(split_sig[0]);

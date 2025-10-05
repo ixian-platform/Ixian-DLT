@@ -203,11 +203,17 @@ namespace DLT
                         return;
                     }
                     ulong blockNum = entry.Key;
+                    if (blockNum > Node.blockChain.getLastBlockNum() + 1)
+                    {
+                        continue;
+                    }
+
                     // Check if the request expired (after 10 seconds)
                     if (currentTime - requestedBlockTimes[blockNum] > 10)
                     {
                         // Re-request block
-                        if (BlockProtocolMessages.broadcastGetBlock(blockNum, null, null, 0, true) == false)
+                        // TODO set includeTransactions back to 0 after majority upgrades
+                        if (BlockProtocolMessages.broadcastGetBlock(blockNum, null, null, 1, true) == false)
                         {
                             Logging.warn("Failed to rebroadcast getBlock request for {0}", blockNum);
                             Thread.Sleep(500);
@@ -712,6 +718,7 @@ namespace DLT
                         if (missing)
                         {
                             Logging.info("Requesting missing transactions for block {0}", b.blockNum);
+                            Node.blockProcessor.addWaitingForTransactions(b.blockNum);
                             CoreProtocolMessage.broadcastGetTransactions(txs_to_fetch, -(long)b.blockNum, null);
                             Thread.Sleep(100);
                             break;

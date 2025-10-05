@@ -61,7 +61,7 @@ namespace DLT
                     return;
                 }
 
-                BlockSignature blockSig = new BlockSignature(data, true);
+                BlockSignature blockSig = new BlockSignature(data, 0, null);
 
                 lock (Node.blockProcessor.localBlockLock)
                 {
@@ -622,7 +622,7 @@ namespace DLT
                                 int sig_len = (int)reader.ReadIxiVarUInt();
                                 byte[] sig = reader.ReadBytes(sig_len);
 
-                                BlockSignature blockSig = new BlockSignature(sig, false);
+                                BlockSignature blockSig = new BlockSignature(sig, block_num, checksum);
 
                                 InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, checksum));
                                 InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(blockSig.powSolution.solution, checksum));
@@ -646,7 +646,7 @@ namespace DLT
                                 int sig_len = (int)reader.ReadIxiVarUInt();
                                 byte[] sig = reader.ReadBytes(sig_len);
 
-                                BlockSignature blockSig = new BlockSignature(sig, false);
+                                BlockSignature blockSig = new BlockSignature(sig, block_num, checksum);
                                 blockSig.blockHash = checksum;
                                 blockSig.blockNum = block_num;
 
