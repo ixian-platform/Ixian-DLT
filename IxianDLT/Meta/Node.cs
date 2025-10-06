@@ -860,6 +860,8 @@ namespace DLT.Meta
 
                     try
                     {
+                        PeerStorage.savePeersFile();
+
                         TransactionPool.processPendingTransactions();
 
                         // Cleanup the presence list
