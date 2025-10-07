@@ -904,6 +904,10 @@ namespace DLT
 
             private RocksDBInternal getDatabase(ulong blockNum, bool onlyExisting = false)
             {
+                if (ctsLoop == null)
+                {
+                    throw new Exception("Error while getting database, RocksDB is shutting down.");
+                }
                 // Open or create the db which should contain blockNum
                 ulong baseBlockNum = blockNum / Config.maxBlocksPerDatabase;
                 RocksDBInternal db = null;
@@ -1080,9 +1084,9 @@ namespace DLT
                         continue;
                     }
 
-                    Logging.info("RocksDB: Compacting closed database [{0}].", db.dbPath);
                     if (force || db.maxBlockNumber < highestBlockNum - ConsensusConfig.getRedactedWindowSize(BlockVer.v9))
                     {
+                        Logging.info("RocksDB: Compacting closed database [{0}].", db.dbPath);
                         try
                         {
                             db.openDatabase();

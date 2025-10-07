@@ -13,11 +13,11 @@
 using DLT.Meta;
 using IXICore;
 using IXICore.Meta;
-using IXICore.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace DLT
 {
@@ -27,8 +27,9 @@ namespace DLT
         {
             protected string pathBase;
             // Threading
-            private Thread thread = null;
-            protected bool running = false;
+            protected CancellationTokenSource ctsLoop;
+            private Task storageTask;
+            private TaskCompletionSource wakeSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
             private ThreadLiveCheck TLC;
             private long lastCleanupPass = Clock.getTimestamp();
 
@@ -57,32 +58,61 @@ namespace DLT
 
             public virtual bool prepareStorage()
             {
-                running = true;
+                if (ctsLoop != null)
+                {
+                    return false;
+                }
+
+                ctsLoop = new CancellationTokenSource();
+
                 if (!prepareStorageInternal())
                 {
-                    running = false;
+                    ctsLoop = null;
                     return false;
                 }
                 // Start thread
                 TLC = new ThreadLiveCheck();
-                thread = new Thread(new ThreadStart(threadLoop));
-                thread.Name = "Storage_Thread";
-                thread.Start();
+
+                storageTask = Task.Run(() => threadLoop(ctsLoop.Token));
 
                 return true;
             }
 
             public virtual void stopStorage()
             {
-                running = false;
+                if (ctsLoop == null)
+                {
+                    return;
+                }
+
+                Logging.info("Stopping storage, please wait...");
+
+                ctsLoop.Cancel();
+                wakeSignal.TrySetResult();
+                try
+                {
+                    // Wait for reconnect loop to finish
+                    storageTask.GetAwaiter().GetResult();
+                }
+                catch (OperationCanceledException) { }
+                finally
+                {
+                    ctsLoop.Dispose();
+                    ctsLoop = null;
+                    storageTask = null;
+                }
+
+                shutdown();
+                Logging.info("Storage stopped.");
             }
-            protected virtual void threadLoop()
+
+            protected virtual async void threadLoop(CancellationToken token)
             {
                 QueueStorageMessage active_message = new QueueStorageMessage();
 
                 bool pending_statements = false;
 
-                while (running || pending_statements == true)
+                while (!token.IsCancellationRequested || pending_statements == true)
                 {
                     bool message_found = false;
                     pending_statements = false;
@@ -132,8 +162,18 @@ namespace DLT
                                 }
                             }
                             // Sleep for 50ms to yield CPU schedule slot
-                            Thread.Sleep(50);
+
+                            // setup fresh wake signal
+                            var currentWake = wakeSignal;
+                            wakeSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                            // wait either interval or wake signal
+                            await Task.WhenAny(Task.Delay(50, token), currentWake.Task);
                         }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
                     }
                     catch (Exception e)
                     {
@@ -153,11 +193,14 @@ namespace DLT
                                 throw new Exception("Too many storage retries. Aborting storage thread.");
                             }
                         }
+                        // setup fresh wake signal
+                        var currentWake = wakeSignal;
+                        wakeSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                        // wait either interval or wake signal
+                        await Task.WhenAny(Task.Delay(50, token), currentWake.Task);
                     }
-                    Thread.Yield();
                 }
-                shutdown();
-                Logging.info("Storage stopped.");
             }
 
             private void debugDumpCrashObject(QueueStorageMessage message)

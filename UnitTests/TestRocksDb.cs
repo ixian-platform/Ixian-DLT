@@ -24,7 +24,6 @@ namespace UnitTests
         public void cleanup()
         {
             db.stopStorage();
-            Thread.Sleep(100);
             db.deleteData();
         }
 

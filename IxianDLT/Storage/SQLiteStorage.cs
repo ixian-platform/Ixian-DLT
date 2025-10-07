@@ -331,7 +331,7 @@ namespace DLT
             // Returns true if connection to matching blocknum range database is established
             private bool seekDatabase(ulong blocknum = 0, bool cache = false)
             {
-                if(!running)
+                if (ctsLoop == null)
                 {
                     return false;
                 }
@@ -1314,7 +1314,7 @@ namespace DLT
 
                     srcCon.Execute("PRAGMA writable_schema=ON;");
 
-                    for (int i = 0; running; i += 10)
+                    for (int i = 0; ctsLoop != null; i += 10)
                     {
                         try
                         {
@@ -1336,7 +1336,7 @@ namespace DLT
                         }
                     }
 
-                    for (int i = 0; running; i += 10)
+                    for (int i = 0; ctsLoop != null; i += 10)
                     {
                         try
                         {
