@@ -692,16 +692,21 @@ namespace DLT
                 }
 
                 // Limit to max *2, /2
+                int changeFactor = 2;
+                if (blockVersion > BlockVer.v13)
+                {
+                    changeFactor = 4;
+                }
                 if (lastSuperBlock != null && lastSuperBlock.signerBits > 0)
                 {
-                    IxiNumber maxDifficulty = SignerPowSolution.bitsToDifficulty(lastSuperBlock.signerBits) * 2;
+                    IxiNumber maxDifficulty = SignerPowSolution.bitsToDifficulty(lastSuperBlock.signerBits) * changeFactor;
                     if (newDifficulty > maxDifficulty)
                     {
                         newDifficulty = maxDifficulty;
                     }
                     else
                     {
-                        IxiNumber minDifficulty = SignerPowSolution.bitsToDifficulty(lastSuperBlock.signerBits) / 2;
+                        IxiNumber minDifficulty = SignerPowSolution.bitsToDifficulty(lastSuperBlock.signerBits) / changeFactor;
                         if (newDifficulty < minDifficulty)
                         {
                             newDifficulty = minDifficulty;

@@ -1055,35 +1055,7 @@ namespace DLT
 
                     if ((DateTime.Now - lastReopenOptimize).TotalSeconds > 60.0)
                     {
-                        int reopenListCount = reopenCleanupList.Count;
-                        for (int i = 0; i < reopenListCount; i++)
-                        {
-                            var db = reopenCleanupList.Dequeue();
-                            if (openDatabases.Values.Any(x => x.dbPath == db.dbPath))
-                            {
-                                Logging.info("RocksDB: Database [{0}] was still in use, skipping until it is closed.", db.dbPath);
-                                continue;
-                            }
-
-                            Logging.info("RocksDB: Compacting closed database [{0}].", db.dbPath);
-                            try
-                            {
-                                db.openDatabase();
-                            }
-                            catch (Exception)
-                            {
-                                // these were attempted too quickly and RocksDB internal still has some pointers open
-                                reopenCleanupList.Enqueue(db);
-                                Logging.info("RocksDB: Database [{0}] was locked by another process, will try again later.", db.dbPath);
-                            }
-                            if (db.isOpen)
-                            {
-                                db.compact();
-                                db.closeDatabase();
-                                Logging.info("RocksDB: Compacting succeeded");
-                            }
-                        }
-                        lastReopenOptimize = DateTime.Now;
+                        compact(false);
                     }
 
                     // check disk status and close databases if we're running low
@@ -1094,6 +1066,46 @@ namespace DLT
                         closeDatabases();
                     }
                 }
+            }
+
+            private void compact(bool force)
+            {
+                int reopenListCount = reopenCleanupList.Count;
+                for (int i = 0; i < reopenListCount; i++)
+                {
+                    var db = reopenCleanupList.Dequeue();
+                    if (openDatabases.Values.Any(x => x.dbPath == db.dbPath))
+                    {
+                        Logging.info("RocksDB: Database [{0}] was still in use, skipping until it is closed.", db.dbPath);
+                        continue;
+                    }
+
+                    Logging.info("RocksDB: Compacting closed database [{0}].", db.dbPath);
+                    if (force || db.maxBlockNumber < highestBlockNum - ConsensusConfig.getRedactedWindowSize(BlockVer.v9))
+                    {
+                        try
+                        {
+                            db.openDatabase();
+                        }
+                        catch (Exception)
+                        {
+                            // these were attempted too quickly and RocksDB internal still has some pointers open
+                            reopenCleanupList.Enqueue(db);
+                            Logging.info("RocksDB: Database [{0}] was locked by another process, will try again later.", db.dbPath);
+                        }
+                        if (db.isOpen)
+                        {
+                            db.compact();
+                            db.closeDatabase();
+                            Logging.info("RocksDB: Compacting succeeded");
+                        }
+                    }
+                    else
+                    {
+                        reopenCleanupList.Enqueue(db);
+                    }
+                }
+                lastReopenOptimize = DateTime.Now;
             }
 
             private void closeOldestDatabase()
@@ -1112,10 +1124,12 @@ namespace DLT
 
             private void closeDatabases()
             {
-                foreach (var db in openDatabases.Values)
+                foreach (var db in openDatabases)
                 {
-                    Logging.info("RocksDB: Shutdown, closing '{0}'", db.dbPath);
-                    db.closeDatabase();
+                    Logging.info("RocksDB: Shutdown, closing '{0}'", db.Value.dbPath);
+                    db.Value.closeDatabase();
+                    openDatabases.Remove(db.Key);
+                    reopenCleanupList.Enqueue(db.Value);
                 }
             }
 
@@ -1124,6 +1138,7 @@ namespace DLT
                 lock (openDatabases)
                 {
                     closeDatabases();
+                    compact(true);
                 }
             }
 
