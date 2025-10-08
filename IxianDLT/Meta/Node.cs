@@ -655,9 +655,6 @@ namespace DLT.Meta
                 maintenanceThread = null;
             }
 
-            // Stop the block storage
-            storage.stopStorage();
-
             // Stop activity scanning
             ActivityScanner.stop();
 
@@ -678,6 +675,9 @@ namespace DLT.Meta
             statsConsoleScreen.stop();
 
             NetDump.Instance.shutdown();
+
+            // Stop the block storage
+            storage.stopStorage();
         }
 
         // Checks to see if this node can handle the block number
