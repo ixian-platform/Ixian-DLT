@@ -1951,18 +1951,14 @@ namespace DLT
                 failed_transactions.Add(tx);
                 return true;
             }
-            List<Address> blockStakers = new List<Address>();
+
+            var signatureWallets = targetBlock.getSignaturesWalletAddressesWithDifficulty();
+
+            HashSet<Address> blockStakers = new(new AddressComparer());
             foreach (var toEntry in tx.toList)
             {
-                // Check if the staker's transaction has already been processed
-                bool valid = true;
-                if(blockStakers.Exists(x => x.addressNoChecksum.SequenceEqual(toEntry.Key.addressNoChecksum)))
-                {
-                    valid = false;
-                }
-
                 // If there's another staking transaction for the staker in this block, ignore
-                if (valid == false)
+                if (blockStakers.Contains(toEntry.Key))
                 {
                     Logging.error("There's a duplicate staker transaction {0}.", tx.getTxIdString());
                     failed_transactions.Add(tx);
@@ -1981,8 +1977,7 @@ namespace DLT
                     return true;
                 }
 
-                valid = false;
-                var signatureWallets = targetBlock.getSignaturesWalletAddressesWithDifficulty();
+                bool valid = false;
                 foreach (var wallet_addr_diff in signatureWallets)
                 {
                     Address wallet_addr = wallet_addr_diff.address;
