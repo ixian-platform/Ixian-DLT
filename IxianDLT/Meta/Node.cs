@@ -76,8 +76,23 @@ namespace DLT.Meta
 
         public Node()
         {
+            Logging.info("Available disk space: {0}GiB", Platform.getAvailableDiskSpace(Config.dataFolderBlocks) >> 30);
+
             var total_ram = memoryInfoProvider.GetTotalRAM();
-            if (Config.networkType == NetworkType.main
+            if (total_ram == 0)
+            {
+                if (Config.maxDatabaseCache == 0)
+                {
+                    Logging.error("Could not determine total RAM and maxDatabaseCache is not specified. Please set --maxDatabaseCache CLI parameter.");
+                    Program.noStart = true;
+                    return;
+                }
+                else
+                {
+                    Logging.warn("Could not determine total RAM.");
+                }
+            }
+            else if (Config.networkType == NetworkType.main
                 && total_ram < 12L << 30)
             {
                 Logging.error("Insufficient RAM: at least 12GiB required, but only {0}B available", total_ram);
@@ -98,7 +113,6 @@ namespace DLT.Meta
                 return;
             }
 
-            Logging.info("Available disk space: {0}GiB", Platform.getAvailableDiskSpace(Config.dataFolderBlocks) >> 30);
             Logging.info("Total RAM: {0}GiB", total_ram >> 30);
             Logging.info("Using Max Database Cache: {0}MiB", Config.maxDatabaseCache >> 20);
 

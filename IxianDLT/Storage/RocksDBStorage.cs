@@ -1084,7 +1084,7 @@ namespace DLT
                         continue;
                     }
 
-                    if (force || db.maxBlockNumber < highestBlockNum - ConsensusConfig.getRedactedWindowSize(BlockVer.v9))
+                    if ((force && db.maxBlockNumber < highestBlockNum - ConsensusConfig.getRedactedWindowSize(Block.maxVersion)) || db.maxBlockNumber < highestBlockNum - ConsensusConfig.getRedactedWindowSize(BlockVer.v9))
                     {
                         Logging.info("RocksDB: Compacting closed database [{0}].", db.dbPath);
                         try
