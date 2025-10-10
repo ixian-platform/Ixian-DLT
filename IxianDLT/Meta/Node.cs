@@ -204,7 +204,7 @@ namespace DLT.Meta
 
             InventoryCache.init(new InventoryCacheDLT());
 
-            NetworkClientManager.init(new NetworkClientManagerRandomized(Config.maxOutgoingConnections / 2));
+            NetworkClientManager.init(new NetworkClientManagerRandomized(Config.maxOutgoingConnections / 2, Config.dltBind));
 
             RelaySectors.init(CoreConfig.relaySectorLevels, null);
 

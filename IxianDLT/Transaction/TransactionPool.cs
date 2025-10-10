@@ -1952,7 +1952,7 @@ namespace DLT
                 return true;
             }
 
-            var signatureWallets = targetBlock.getSignaturesWalletAddressesWithDifficulty();
+            var signatureWallets = targetBlock.getSignaturesWalletAddressesWithDifficulty().ToDictionary(new AddressComparer());
 
             HashSet<Address> blockStakers = new(new AddressComparer());
             foreach (var toEntry in tx.toList)
@@ -1977,16 +1977,7 @@ namespace DLT
                     return true;
                 }
 
-                bool valid = false;
-                foreach (var wallet_addr_diff in signatureWallets)
-                {
-                    Address wallet_addr = wallet_addr_diff.address;
-                    if (toEntry.Key.addressNoChecksum.SequenceEqual(wallet_addr.addressNoChecksum))
-                    {
-                        valid = true;
-                        break;
-                    }
-                }
+                bool valid = signatureWallets.ContainsKey(toEntry.Key);
                 if (valid == false)
                 {
                     Logging.error("Staking transaction {0} does not have a corresponding block signature.", tx.getTxIdString());

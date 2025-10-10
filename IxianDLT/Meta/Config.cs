@@ -30,6 +30,7 @@ namespace DLT
             // Providing pre-defined values
             // Can be read from a file later, or read from the command line
             public static int serverPort = 10234;
+            public static string dltBind = null;
 
             private static int defaultServerPort = 10234;
             private static int defaultTestnetServerPort = 11234;
@@ -102,7 +103,7 @@ namespace DLT
             public static ulong forceSyncToBlock = 0;
 
             // Read-only values
-            public static readonly string version = "xdc-0.9.7-rc8"; // DLT Node version
+            public static readonly string version = "xdc-0.9.7-rc9"; // DLT Node version
 
             public static readonly string checkVersionUrl = "https://resources.ixian.io/update.txt";
             public static readonly int checkVersionSeconds = 6 * 60 * 60; // 6 hours
@@ -236,6 +237,7 @@ namespace DLT
                 Console.WriteLine("");
                 Console.WriteLine(" Available options:");
                 Console.WriteLine("    dltPort\t\t\t Port to listen on (same as -p CLI)");
+                Console.WriteLine("    dltBind\t\t\t Bind to given IP Address");
                 Console.WriteLine("    testnetDltPort\t\t Port to listen on in testnet mode (same as -p CLI)");
 
                 Console.WriteLine("    apiPort\t\t\t HTTP/API port to listen on (same as -a CLI)");
@@ -319,6 +321,9 @@ namespace DLT
                     {
                         case "dltPort":
                             defaultServerPort = int.Parse(value);
+                            break;
+                        case "dltBind":
+                            dltBind = value;
                             break;
                         case "testnetDltPort":
                             defaultTestnetServerPort = int.Parse(value);

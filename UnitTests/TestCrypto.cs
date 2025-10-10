@@ -1,6 +1,8 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using IXICore;
+using IXICore.Meta;
+using System.Threading.Tasks;
 
 
 namespace UnitTests
@@ -59,6 +61,64 @@ namespace UnitTests
             Assert.AreEqual(Crypto.hashToString(hash2), Crypto.hashToString(hash));
         }
 
+        [TestMethod]
+        [Ignore]
+        public void Benchmark_RSA_Verification()
+        {
+            int sigCount = 10000;
+            IxianKeyPair[] keys = new IxianKeyPair[sigCount];
+            byte[][] inputs = new byte[sigCount][];
+            byte[][] sigs = new byte[sigCount][];
+            Parallel.For(0, sigCount, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
+                i =>
+                {
+                    keys[i] = CryptoManager.lib.generateKeys(4096, 0);
+                    byte[] input = new byte[64];
+                    Random.Shared.NextBytes(input);
+                    inputs[i] = input;
+                    sigs[i] = CryptoManager.lib.getSignature(input, keys[i].privateKeyBytes);
+                });
 
+            var start = Clock.getTimestampMillis();
+            for (int i = 0; i < sigCount; i++)
+            {
+                var key = keys[i];
+                var input = inputs[i];
+                var sig = sigs[i];
+                Assert.IsTrue(CryptoManager.lib.verifySignature(input, key.publicKeyBytes, sig));
+            }
+            Logging.info("Verification for {0} sigs took {1}ms", sigCount, Clock.getTimestampMillis() - start);
+        }
+
+        [TestMethod]
+        [Ignore]
+        public void Benchmark_RSA_Verification_Parallel()
+        {
+            int sigCount = 10000;
+            IxianKeyPair[] keys = new IxianKeyPair[sigCount];
+            byte[][] inputs = new byte[sigCount][];
+            byte[][] sigs = new byte[sigCount][];
+            Parallel.For(0, sigCount, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
+                i =>
+                {
+                    keys[i] = CryptoManager.lib.generateKeys(4096, 0);
+                    byte[] input = new byte[64];
+                    Random.Shared.NextBytes(input);
+                    inputs[i] = input;
+                    sigs[i] = CryptoManager.lib.getSignature(input, keys[i].privateKeyBytes);
+                });
+
+            var start = Clock.getTimestampMillis();
+            Parallel.For(0, sigCount,
+                new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
+                i =>
+                {
+                    var key = keys[i];
+                    var input = inputs[i];
+                    var sig = sigs[i];
+                    Assert.IsTrue(CryptoManager.lib.verifySignature(input, key.publicKeyBytes, sig));
+                });
+            Logging.info("Verification for {0} sigs took {1}ms", sigCount, Clock.getTimestampMillis() - start);
+        }
     }
 }
