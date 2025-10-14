@@ -406,8 +406,15 @@ namespace DLT
             private void updateBlockIndexes(WriteBatch writeBatch, Block sb)
             {
                 writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_TXS), sb.getTransactionIDsBytes(), rocksCFBlocks);
-                writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS), sb.getSignaturesBytes(true, false), rocksCFBlocks);
-                writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), sb.getSignaturesBytes(true, true), rocksCFBlocks);
+                if (sb.version >= BlockVer.v10)
+                {
+                    writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS), sb.getSignaturesBytes(true, false), rocksCFBlocks);
+                    writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), sb.getSignaturesBytes(true, true), rocksCFBlocks);
+                }
+                else
+                {
+                    writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), sb.getSignaturesBytes(true, false), rocksCFBlocks);
+                }
 
                 var blockNumBytes = sb.blockNum.GetBytesBE();
 
@@ -559,7 +566,6 @@ namespace DLT
                         if (asBlockHeader)
                         {
                             byte[] sigBytes = database.Get(_storage_Index.combineKeys(blockHash, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
-
                             byte[] mergedBytes = new byte[blockBytes.Length + sigBytes.Length];
                             Buffer.BlockCopy(blockBytes, 0, mergedBytes, 0, blockBytes.Length);
                             Buffer.BlockCopy(sigBytes, 0, mergedBytes, blockBytes.Length, sigBytes.Length);
@@ -568,6 +574,10 @@ namespace DLT
                         else
                         {
                             byte[] sigBytes = database.Get(_storage_Index.combineKeys(blockHash, BLOCKS_KEY_SIGNERS), rocksCFBlocks);
+                            if (sigBytes == null)
+                            {
+                                sigBytes = database.Get(_storage_Index.combineKeys(blockHash, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
+                            }
                             byte[] txIDBytes = database.Get(_storage_Index.combineKeys(blockHash, BLOCKS_KEY_TXS), rocksCFBlocks);
 
                             byte[] mergedBytes = new byte[blockBytes.Length + sigBytes.Length + txIDBytes.Length];
@@ -896,6 +906,7 @@ namespace DLT
             private ulong highestBlockNum = 0;
             private ulong lowestBlockNum = 0;
             private ulong maxDatabaseCache;
+            private int lastBlockVersion = BlockVer.v0;
 
             public RocksDBStorage(string dataFolderBlocks, ulong maxDatabaseCache) : base(dataFolderBlocks)
             {
@@ -1040,9 +1051,9 @@ namespace DLT
                         if (db.Value.isOpen
                             && (DateTime.Now - db.Value.lastUsedTime).TotalSeconds >= closeAfterSeconds)
                         {
-                            if (db.Key == getHighestBlockInStorage() / Config.maxBlocksPerDatabase)
+                            if (db.Value.maxBlockNumber + ConsensusConfig.getRedactedWindowSize(lastBlockVersion) > highestBlockNum)
                             {
-                                // never close the latest database
+                                // never close the databases within redacted window
                                 continue;
                             }
                             Logging.info("RocksDB: Closing '{0}' due to inactivity.", db.Value.dbPath);
@@ -1059,7 +1070,7 @@ namespace DLT
 
                     if ((DateTime.Now - lastReopenOptimize).TotalSeconds > 60.0)
                     {
-                        compact(false);
+                        compact();
                     }
 
                     // check disk status and close databases if we're running low
@@ -1072,7 +1083,7 @@ namespace DLT
                 }
             }
 
-            private void compact(bool force)
+            private void compact()
             {
                 int reopenListCount = reopenCleanupList.Count;
                 for (int i = 0; i < reopenListCount; i++)
@@ -1084,7 +1095,7 @@ namespace DLT
                         continue;
                     }
 
-                    if ((force && db.maxBlockNumber < highestBlockNum - ConsensusConfig.getRedactedWindowSize(Block.maxVersion)) || db.maxBlockNumber < highestBlockNum - ConsensusConfig.getRedactedWindowSize(BlockVer.v9))
+                    if (db.maxBlockNumber + ConsensusConfig.getRedactedWindowSize(lastBlockVersion) < highestBlockNum)
                     {
                         Logging.info("RocksDB: Compacting closed database [{0}].", db.dbPath);
                         try
@@ -1142,7 +1153,7 @@ namespace DLT
                 lock (openDatabases)
                 {
                     closeDatabases();
-                    compact(true);
+                    compact();
                 }
             }
 
@@ -1225,6 +1236,7 @@ namespace DLT
                         if (block.blockNum > getHighestBlockInStorage())
                         {
                             highestBlockNum = block.blockNum;
+                            lastBlockVersion = block.version;
                         }
                         return true;
                     }

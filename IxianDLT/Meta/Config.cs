@@ -98,7 +98,7 @@ namespace DLT
             /// <summary>
             /// Number of transactions that the node will include in the block.
             /// </summary>
-            public static ulong maxTransactionsPerBlockToInclude = 19980;
+            public static ulong maxTransactionsPerBlockToInclude = 70200;
 
             public static ulong forceSyncToBlock = 0;
 
@@ -394,6 +394,9 @@ namespace DLT
                             break;
                         case "maxDatabaseCache":
                             maxDatabaseCache = ulong.Parse(value);
+                            break;
+                        case "walletPassword":
+                            dangerCommandlinePasswordCleartextUnsafe = value;
                             break;
                         default:
                             // unknown key
