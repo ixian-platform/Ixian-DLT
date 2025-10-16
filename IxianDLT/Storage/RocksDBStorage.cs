@@ -40,18 +40,14 @@ namespace DLT
 
                 public static byte[] combineKeys(ReadOnlySpan<byte> key1, ReadOnlySpan<byte> key2 = default)
                 {
-                    if (key1.Length > ushort.MaxValue)
-                        throw new ArgumentOutOfRangeException(nameof(key1), "Key1 length cannot exceed 65,535 bytes.");
-
                     if (key2 == default)
                         key2 = ReadOnlySpan<byte>.Empty;
 
-                    int size = 2 + key1.Length + key2.Length;
+                    int size = key1.Length + key2.Length;
 
                     var combined = GC.AllocateUninitializedArray<byte>(size);
-                    BinaryPrimitives.WriteUInt16BigEndian(combined, (ushort)key1.Length);
-                    key1.CopyTo(combined.AsSpan(2));
-                    key2.CopyTo(combined.AsSpan(2 + key1.Length));
+                    key1.CopyTo(combined.AsSpan());
+                    key2.CopyTo(combined.AsSpan(key1.Length));
 
                     return combined;
                 }
@@ -91,19 +87,21 @@ namespace DLT
                 public IEnumerable<(ReadOnlyMemory<byte> index, ReadOnlyMemory<byte> value)> getEntriesForKey(ReadOnlyMemory<byte> key,
                                                                                                               ReadOnlyMemory<byte> index = default)
                 {
-                    var keyWithLen = combineKeys(key.Span, index.Span);
-                    var iter = db.NewIterator(rocksIndexHandle);
+                    var combinedKeys = combineKeys(key.Span, index.Span);
+
+                    var ro = new ReadOptions().SetPrefixSameAsStart(true);
+                    var iter = db.NewIterator(rocksIndexHandle, ro);
 
                     try
                     {
-                        for (iter.Seek(keyWithLen); iter.Valid(); iter.Next())
+                        for (iter.Seek(combinedKeys); iter.Valid(); iter.Next())
                         {
                             var k = iter.Key();
-                            if (!k.AsSpan(0, keyWithLen.Length).SequenceEqual(keyWithLen))
+                            if (!k.AsSpan(0, combinedKeys.Length).SequenceEqual(combinedKeys))
                                 yield break;
 
                             var v = iter.Value();
-                            var indexSpan = k.AsMemory().Slice(2 + key.Length);
+                            var indexSpan = k.AsMemory().Slice(key.Length);
                             var valueMem = v.AsMemory();
 
                             yield return (indexSpan, valueMem);
@@ -136,9 +134,6 @@ namespace DLT
             private readonly byte[] BLOCKS_KEY_SIGNERS_COMPACT = new byte[] { 3 };
 
             private readonly byte[] BLOCKS_KEY_PRIMARY_INDEX = new byte[] { 0 };
-
-            private readonly byte[] TRANSACTIONS_KEY_TX = new byte[] { 0 };
-            //private readonly byte[] TRANSACTIONS_KEY_PROOF = new byte[] { 1 };
 
             public ulong minBlockNumber { get; private set; }
             public ulong maxBlockNumber { get; private set; }
@@ -234,7 +229,7 @@ namespace DLT
                     txIndexBbto.SetBlockSize(32 * 1024);
                     txIndexBbto.SetCacheIndexAndFilterBlocks(true);
                     txIndexBbto.SetPinL0FilterAndIndexBlocksInCache(true);
-                    txIndexBbto.SetFilterPolicy(BloomFilterPolicy.Create(14, true));
+                    txIndexBbto.SetFilterPolicy(BloomFilterPolicy.Create(16, true));
                     txIndexBbto.SetWholeKeyFiltering(false);
                     txIndexBbto.SetFormatVersion(6);
 
@@ -245,14 +240,14 @@ namespace DLT
                             .SetWriteBufferSize(32UL << 20)
                             .SetMaxWriteBufferNumber(2)
                             .SetMinWriteBufferNumberToMerge(1)
-                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(34))
+                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(32))
                         },
                         { "transactions", new ColumnFamilyOptions()
                             .SetBlockBasedTableFactory(txBbto)
                             .SetWriteBufferSize(128UL << 20)
                             .SetMaxWriteBufferNumber(4)
                             .SetMinWriteBufferNumberToMerge(2)
-                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(36))
+                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(16))
                         },
                         { "meta", new ColumnFamilyOptions()
                             .SetBlockBasedTableFactory(metaBbto)
@@ -265,21 +260,21 @@ namespace DLT
                             .SetWriteBufferSize(2UL << 20)
                             .SetMaxWriteBufferNumber(2)
                             .SetMinWriteBufferNumberToMerge(1)
-                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(10))
+                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(8))
                         },
                         { "index_tx_applied_type", new ColumnFamilyOptions()
                             .SetBlockBasedTableFactory(txIndexBbto)
                             .SetWriteBufferSize(8UL << 20)
                             .SetMaxWriteBufferNumber(4)
                             .SetMinWriteBufferNumberToMerge(2)
-                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(10))
+                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(8))
                         },
                         { "index_address_txs", new ColumnFamilyOptions()
                             .SetBlockBasedTableFactory(txIndexBbto)
-                            .SetWriteBufferSize(32UL << 20)
+                            .SetWriteBufferSize(16UL << 20)
                             .SetMaxWriteBufferNumber(6)
                             .SetMinWriteBufferNumberToMerge(3)
-                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(35))
+                            .SetPrefixExtractor(SliceTransform.CreateFixedPrefix(16))
                         }
                     };
 
@@ -424,11 +419,11 @@ namespace DLT
                 idxBlocksChecksum.addIndexEntry(blockNumBytes, BLOCKS_KEY_PRIMARY_INDEX, sb.blockChecksum, writeBatch);
             }
 
-            private static byte[] typeAndTxIDToBytes(short type, ReadOnlySpan<byte> txid)
+            private static byte[] typeAndTxIDToBytes(byte type, ReadOnlySpan<byte> txid)
             {
-                byte[] buffer = GC.AllocateUninitializedArray<byte>(2 + txid.Length);
-                BinaryPrimitives.WriteInt16BigEndian(buffer.AsSpan(0, 2), type);
-                txid.CopyTo(buffer.AsSpan(2));
+                byte[] buffer = GC.AllocateUninitializedArray<byte>(1 + txid.Length);
+                buffer[0] = type;
+                txid.CopyTo(buffer.AsSpan(1));
 
                 return buffer;
             }
@@ -444,19 +439,19 @@ namespace DLT
 
             private void updateTXIndexes(WriteBatch writeBatch, Transaction st)
             {
-                byte[] tx_id_bytes = st.id;
+                var txIdBytesShort = st.id.AsSpan(0, 16);
 
                 foreach (var from in st.fromList)
                 {
-                    idxAddressTXs.addIndexEntry(new Address(st.pubKey.addressNoChecksum, from.Key).addressNoChecksum, blockHeightAndTxIDToBytes(st.applied, tx_id_bytes), Array.Empty<byte>(), writeBatch);
+                    idxAddressTXs.addIndexEntry(new Address(st.pubKey.addressNoChecksum, from.Key).addressNoChecksum.AsSpan(0, 16), blockHeightAndTxIDToBytes(st.applied, txIdBytesShort), Array.Empty<byte>(), writeBatch);
                 }
 
                 foreach (var to in st.toList)
                 {
-                    idxAddressTXs.addIndexEntry(to.Key.addressNoChecksum, blockHeightAndTxIDToBytes(st.applied, tx_id_bytes), Array.Empty<byte>(), writeBatch);
+                    idxAddressTXs.addIndexEntry(to.Key.addressNoChecksum.AsSpan(0, 16), blockHeightAndTxIDToBytes(st.applied, txIdBytesShort), Array.Empty<byte>(), writeBatch);
                 }
 
-                idxTXAppliedType.addIndexEntry(st.applied.GetBytesBE(), typeAndTxIDToBytes((short)st.type, tx_id_bytes), Array.Empty<byte>(), writeBatch);
+                idxTXAppliedType.addIndexEntry(st.applied.GetBytesBE(), typeAndTxIDToBytes((byte)st.type, txIdBytesShort), Array.Empty<byte>(), writeBatch);
             }
 
             private void updateMinMax(WriteBatch writeBatch, ulong blockNum)
@@ -504,7 +499,7 @@ namespace DLT
                     lastUsedTime = DateTime.Now;
                     using (WriteBatch writeBatch = new WriteBatch())
                     {
-                        writeBatch.Put(_storage_Index.combineKeys(transaction.id, TRANSACTIONS_KEY_TX), transaction.getBytes(true, true), rocksCFTransactions);
+                        writeBatch.Put(transaction.id, transaction.getBytes(true, true), rocksCFTransactions);
                         updateTXIndexes(writeBatch, transaction);
                         database.Write(writeBatch);
                     }
@@ -641,20 +636,61 @@ namespace DLT
 
             private Transaction getTransactionInternal(ReadOnlySpan<byte> txid)
             {
-                var tx_bytes = getTransactionBytesInternal(txid);
-                if (tx_bytes != null)
+                var txBytes = getTransactionBytesInternal(txid);
+                if (txBytes != null)
                 {
-                    Transaction t = new Transaction(txid.ToArray(), tx_bytes);
+                    Transaction t = new Transaction(txid.ToArray(), txBytes);
                     t.fromLocalStorage = true;
                     return t;
                 }
                 return null;
             }
 
+            private IEnumerable<(ReadOnlyMemory<byte> index, Transaction value)> getTransactionsByPrefixInternal(ReadOnlyMemory<byte> txid)
+            {
+                var txs = getTransactionsBytesByPrefixInternal(txid);
+
+                foreach (var tx in txs)
+                {
+                    Transaction t = new Transaction(tx.index.ToArray(), tx.value.ToArray());
+                    t.fromLocalStorage = true;
+                    yield return (tx.index, t);
+                }
+            }
+
             private byte[] getTransactionBytesInternal(ReadOnlySpan<byte> txid)
             {
                 lastUsedTime = DateTime.Now;
-                return database.Get(_storage_Index.combineKeys(txid, TRANSACTIONS_KEY_TX), rocksCFTransactions);
+                return database.Get(txid, rocksCFTransactions);
+            }
+
+
+            private IEnumerable<(ReadOnlyMemory<byte> index, ReadOnlyMemory<byte> value)> getTransactionsBytesByPrefixInternal(ReadOnlyMemory<byte> txid)
+            {
+                lastUsedTime = DateTime.Now;
+
+                var ro = new ReadOptions().SetPrefixSameAsStart(true);
+                var iter = database.NewIterator(rocksCFTransactions, ro);
+
+                try
+                {
+                    for (iter.Seek(txid.Span); iter.Valid(); iter.Next())
+                    {
+                        var k = iter.Key();
+                        if (!k.AsSpan(0, txid.Length).SequenceEqual(txid.Span))
+                            yield break;
+
+                        var v = iter.Value();
+                        var indexSpan = k.AsMemory();
+                        var valueMem = v.AsMemory();
+
+                        yield return (indexSpan, valueMem);
+                    }
+                }
+                finally
+                {
+                    iter.Dispose();
+                }
             }
 
             public Transaction getTransaction(byte[] txid)
@@ -694,15 +730,19 @@ namespace DLT
                     IEnumerable<(ReadOnlyMemory<byte> index, ReadOnlyMemory<byte> value)> entries;
                     if (blockNum == 0)
                     {
-                        entries = idxAddressTXs.getEntriesForKey(addr);
+                        entries = idxAddressTXs.getEntriesForKey(addr.AsMemory(0, 16));
                     }
                     else
                     {
-                        entries = idxAddressTXs.getEntriesForKey(addr, blockNum.GetBytesBE());
+                        entries = idxAddressTXs.getEntriesForKey(addr.AsMemory(0, 16), blockNum.GetBytesBE());
                     }
                     foreach (var i in entries)
                     {
-                        txs.Add(getTransactionInternal(i.index.Span.Slice(8)));
+                        var tmpTxs = getTransactionsByPrefixInternal(i.index.Slice(8));
+                        foreach (var tx in tmpTxs)
+                        {
+                            txs.Add(tx.value);
+                        }
                     }
                     return txs;
                 }
@@ -725,13 +765,16 @@ namespace DLT
                     }
                     else
                     {
-                        entries = idxTXAppliedType.getEntriesForKey(blockNum.GetBytesBE(), txType.GetBytesBE());
+                        entries = idxTXAppliedType.getEntriesForKey(blockNum.GetBytesBE(), new byte[] { (byte)txType });
                     }
 
                     foreach (var txid in entries)
                     {
-                        var tx = getTransactionInternal(txid.index.Span.Slice(2));
-                        txs.Add(tx);
+                        var tmpTxs = getTransactionsByPrefixInternal(txid.index.Slice(1));
+                        foreach (var tx in tmpTxs)
+                        {
+                            txs.Add(tx.value);
+                        }
                     }
                     return txs;
                 }
@@ -754,13 +797,16 @@ namespace DLT
                     }
                     else
                     {
-                        entries = idxTXAppliedType.getEntriesForKey(blockNum.GetBytesBE(), txType.GetBytesBE());
+                        entries = idxTXAppliedType.getEntriesForKey(blockNum.GetBytesBE(), new byte[] { (byte)txType });
                     }
 
                     foreach (var txid in entries)
                     {
-                        var tx = getTransactionBytesInternal(txid.index.Span.Slice(2));
-                        txs.Add(tx);
+                        var tmpTxs = getTransactionsBytesByPrefixInternal(txid.index.Slice(1));
+                        foreach (var tx in tmpTxs)
+                        {
+                            txs.Add(tx.value.ToArray());
+                        }
                     }
                     return txs;
                 }
@@ -770,16 +816,17 @@ namespace DLT
             {
                 lock (rockLock)
                 {
-                    byte[] blockChecksum = getBlockTotalSignerDifficulty(blockNum).blockChecksum;
-                    if (blockChecksum != null)
+                    Block block = getBlock(blockNum);
+                    if (block != null)
                     {
                         lastUsedTime = DateTime.Now;
+                        var blockChecksum = block.blockChecksum;
                         var blockNumBytes = blockNum.GetBytesBE();
 
                         // Delete all transactions applied on this block height
-                        foreach (var tx_id_bytes in idxTXAppliedType.getEntriesForKey(blockNumBytes))
+                        foreach (var txIdBytes in block.transactions)
                         {
-                            removeTransactionInternal(tx_id_bytes.index.Span.Slice(2));
+                            removeTransactionInternal(txIdBytes);
                         }
 
                         using (WriteBatch writeBatch = new WriteBatch())
@@ -801,26 +848,16 @@ namespace DLT
                 }
             }
 
-            private bool removeTransactionInternal(ReadOnlySpan<byte> tx_id_bytes)
+            private bool removeTransactionInternal(ReadOnlySpan<byte> txid)
             {
-                Transaction tx = getTransactionInternal(tx_id_bytes);
+                Transaction tx = getTransactionInternal(txid);
                 if (tx != null)
                 {
                     using (WriteBatch writeBatch = new WriteBatch())
                     {
-                        writeBatch.Delete(_storage_Index.combineKeys(tx_id_bytes, TRANSACTIONS_KEY_TX), rocksCFTransactions);
-
-                        // remove it from indexes
-                        foreach (var f in tx.fromList.Keys)
-                        {
-                            idxAddressTXs.delIndexEntry(new Address(tx.pubKey.addressNoChecksum, f).addressNoChecksum, blockHeightAndTxIDToBytes(tx.applied, tx_id_bytes), writeBatch);
-                        }
-                        foreach (var t in tx.toList.Keys)
-                        {
-                            idxAddressTXs.delIndexEntry(t.addressNoChecksum, blockHeightAndTxIDToBytes(tx.applied, tx_id_bytes), writeBatch);
-                        }
-                        idxTXAppliedType.delIndexEntry(tx.applied.GetBytesBE(), typeAndTxIDToBytes((short)tx.type, tx_id_bytes), writeBatch);
-
+                        writeBatch.Delete(txid, rocksCFTransactions);
+                        var txIdBytesShort = txid.Slice(0, 16);
+                        removeTransactionIndexes(tx, txIdBytesShort, writeBatch);
                         database.Write(writeBatch);
                     }
                     return true;
@@ -828,13 +865,26 @@ namespace DLT
                 return false;
             }
 
+            private void removeTransactionIndexes(Transaction tx, ReadOnlySpan<byte> txIdBytesShort, WriteBatch writeBatch)
+            {
+                // remove it from indexes
+                foreach (var f in tx.fromList.Keys)
+                {
+                    idxAddressTXs.delIndexEntry(new Address(tx.pubKey.addressNoChecksum, f).addressNoChecksum.AsSpan(0, 16), blockHeightAndTxIDToBytes(tx.applied, txIdBytesShort), writeBatch);
+                }
+                foreach (var t in tx.toList.Keys)
+                {
+                    idxAddressTXs.delIndexEntry(t.addressNoChecksum.AsSpan(0, 16), blockHeightAndTxIDToBytes(tx.applied, txIdBytesShort), writeBatch);
+                }
+                idxTXAppliedType.delIndexEntry(tx.applied.GetBytesBE(), typeAndTxIDToBytes((byte)tx.type, txIdBytesShort), writeBatch);
+            }
+
             public bool removeTransaction(byte[] txid)
             {
                 lock (rockLock)
                 {
                     lastUsedTime = DateTime.Now;
-                    var tx_id_bytes = txid;
-                    return removeTransactionInternal(tx_id_bytes);
+                    return removeTransactionInternal(txid);
                 }
             }
 
@@ -1125,11 +1175,13 @@ namespace DLT
 
             private void closeOldestDatabase()
             {
-                var baseBlockHeight = getHighestBlockInStorage() / Config.maxBlocksPerDatabase;
-                var oldestDb = openDatabases.OrderBy(x => x.Value.lastUsedTime).Where(x => x.Value.isOpen && x.Key != baseBlockHeight).First();
-                oldestDb.Value.closeDatabase();
-                openDatabases.Remove(oldestDb.Key);
-                reopenCleanupList.Enqueue(oldestDb.Value);
+                var oldestDb = openDatabases.OrderBy(x => x.Value.lastUsedTime).Where(x => x.Value.isOpen && x.Value.maxBlockNumber + ConsensusConfig.getRedactedWindowSize(lastBlockVersion) < highestBlockNum).FirstOrDefault();
+                if (oldestDb.Value != null)
+                {
+                    oldestDb.Value.closeDatabase();
+                    openDatabases.Remove(oldestDb.Key);
+                    reopenCleanupList.Enqueue(oldestDb.Value);
+                }
             }
 
             public override void deleteData()
@@ -1139,12 +1191,14 @@ namespace DLT
 
             private void closeDatabases()
             {
-                foreach (var db in openDatabases)
+                var toClose = openDatabases.Keys.ToList();
+                foreach (var key in toClose)
                 {
-                    Logging.info("RocksDB: Shutdown, closing '{0}'", db.Value.dbPath);
-                    db.Value.closeDatabase();
-                    openDatabases.Remove(db.Key);
-                    reopenCleanupList.Enqueue(db.Value);
+                    var db = openDatabases[key];
+                    Logging.info("RocksDB: Shutdown, closing '{0}'", db.dbPath);
+                    db.closeDatabase();
+                    openDatabases.Remove(key);
+                    reopenCleanupList.Enqueue(db);
                 }
             }
 
@@ -1248,6 +1302,10 @@ namespace DLT
             {
                 lock (openDatabases)
                 {
+                    if (transaction.applied == 0)
+                    {
+                        throw new Exception(string.Format("Cannot insert transaction {0}, applied is 0.", transaction.getTxIdString()));
+                    }
                     var db = getDatabase(transaction.applied);
                     return db.insertTransaction(transaction);
                 }

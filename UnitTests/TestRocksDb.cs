@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Collections.Generic;
 using System;
+using IXICore.Utils;
 
 namespace UnitTests
 {
@@ -27,7 +28,7 @@ namespace UnitTests
             db.deleteData();
         }
 
-        private Block InsertDummyBlock(ulong blockNum)
+        private Block InsertDummyBlock(ulong blockNum, HashSet<byte[]> txs = null)
         {
             Block block = new Block()
             {
@@ -41,6 +42,13 @@ namespace UnitTests
                 powField = new byte[8],
                 signatureCount = Random.Shared.Next(2000)
             };
+            if (txs != null)
+            {
+                foreach (var txid in txs)
+                {
+                    block.addTransaction(txid);
+                }
+            }
             Random.Shared.NextBytes(block.powField);
             Random.Shared.NextBytes(block.walletStateChecksum);
             Random.Shared.NextBytes(block.regNameStateChecksum);
@@ -435,8 +443,8 @@ namespace UnitTests
         [TestMethod]
         public void InsertAndDeleteBlock()
         {
-            var block = InsertDummyBlock(1);
             var tx = InsertDummyTransaction(1, 1, 42);
+            var block = InsertDummyBlock(1, [tx.id]);
 
             var found = db.getTransaction(tx.id, 1);
             Assert.IsNotNull(found);
