@@ -135,9 +135,19 @@ namespace DLT
 
             private readonly byte[] BLOCKS_KEY_PRIMARY_INDEX = new byte[] { 0 };
 
+            private readonly byte[] META_KEY_DB_VERSION = Encoding.UTF8.GetBytes("db_version");
+            private readonly byte[] META_KEY_MIN_BLOCK = Encoding.UTF8.GetBytes("min_block");
+            private readonly byte[] META_KEY_MAX_BLOCK = Encoding.UTF8.GetBytes("max_block");
+            private readonly byte[] META_KEY_COMPACTION_TYPE = Encoding.UTF8.GetBytes("compaction_type");
+
+            private readonly byte[] COMPACTION_TYPE_NONE = new byte[] { 0 };
+            private readonly byte[] COMPACTION_TYPE_SIGS = new byte[] { 1 };
+            private readonly byte[] COMPACTION_TYPE_FULL = new byte[] { 2 };
+
             public ulong minBlockNumber { get; private set; }
             public ulong maxBlockNumber { get; private set; }
             public int dbVersion { get; private set; }
+            public byte[] compactionType { get; private set; }
             public bool isOpen
             {
                 get
@@ -154,6 +164,7 @@ namespace DLT
                 minBlockNumber = 0;
                 maxBlockNumber = 0;
                 dbVersion = 0;
+                compactionType = COMPACTION_TYPE_NONE;
 
                 this.dbPath = dbPath;
                 this.blockCache = blockCache;
@@ -291,39 +302,36 @@ namespace DLT
                     idxAddressTXs = new _storage_Index("index_address_txs", database);
 
                     // read initial meta values
-                    string versionStr = database.Get("db_version", rocksCFMeta);
-                    if (versionStr == null || versionStr == "")
+                    byte[] versionBytes = database.Get(META_KEY_DB_VERSION, rocksCFMeta);
+                    if (versionBytes == null)
                     {
-                        database.Put("db_version", dbVersion.ToString(), rocksCFMeta);
+                        database.Put(META_KEY_DB_VERSION, dbVersion.GetBytesBE(), rocksCFMeta);
+                        database.Put(META_KEY_MIN_BLOCK, minBlockNumber.GetBytesBE(), rocksCFMeta);
+                        database.Put(META_KEY_MAX_BLOCK, maxBlockNumber.GetBytesBE(), rocksCFMeta);
+                        database.Put(META_KEY_COMPACTION_TYPE, compactionType, rocksCFMeta);
                     }
                     else
                     {
-                        dbVersion = int.Parse(versionStr);
+                        try
+                        {
+                            dbVersion = BinaryPrimitives.ReadInt32BigEndian(versionBytes);
+
+                            byte[] minBlockBytes = database.Get(META_KEY_MIN_BLOCK, rocksCFMeta);
+                            minBlockNumber = BinaryPrimitives.ReadUInt64BigEndian(minBlockBytes);
+
+                            byte[] maxBlockBytes = database.Get(META_KEY_MAX_BLOCK, rocksCFMeta);
+                            maxBlockNumber = BinaryPrimitives.ReadUInt64BigEndian(maxBlockBytes);
+
+                            byte[] compactionTypeBytes = database.Get(META_KEY_COMPACTION_TYPE, rocksCFMeta);
+                            compactionType = compactionTypeBytes;
+                        }
+                        catch
+                        {
+                            throw new Exception(string.Format("Unable to read database metadata. Database {0} could be corrupt or invalid.", dbPath));
+                        }
                     }
 
-                    byte[] minBlockBytes = database.Get(Encoding.UTF8.GetBytes("min_block"), rocksCFMeta);
-                    if (minBlockBytes == null)
-                    {
-                        minBlockNumber = 0;
-                        database.Put(Encoding.UTF8.GetBytes("min_block"), BitConverter.GetBytes(minBlockNumber), rocksCFMeta);
-                    }
-                    else
-                    {
-                        minBlockNumber = BitConverter.ToUInt64(minBlockBytes);
-                    }
-
-                    byte[] maxBlockBytes = database.Get(Encoding.UTF8.GetBytes("max_block"), rocksCFMeta);
-                    if (maxBlockBytes == null)
-                    {
-                        maxBlockNumber = 0;
-                        database.Put(Encoding.UTF8.GetBytes("max_block"), BitConverter.GetBytes(maxBlockNumber), rocksCFMeta);
-                    }
-                    else
-                    {
-                        maxBlockNumber = BitConverter.ToUInt64(maxBlockBytes);
-                    }
-
-                    Logging.info("RocksDB: Opened Database {0}: Blocks {1} - {2}, version {3}", dbPath, minBlockNumber, maxBlockNumber, dbVersion);
+                    Logging.info("RocksDB: Opened Database {0}: Blocks {1} - {2}, version {3}, compaction type {4}", dbPath, minBlockNumber, maxBlockNumber, dbVersion, Crypto.hashToString(compactionType));
                     Logging.trace("RocksDB: Stats: {0}", database.GetProperty("rocksdb.stats"));
                     lastUsedTime = DateTime.Now;
                 }
@@ -459,12 +467,12 @@ namespace DLT
                 if (minBlockNumber == 0 || blockNum < minBlockNumber)
                 {
                     minBlockNumber = blockNum;
-                    writeBatch.Put(Encoding.UTF8.GetBytes("min_block"), BitConverter.GetBytes(minBlockNumber), rocksCFMeta);
+                    writeBatch.Put(META_KEY_MIN_BLOCK, minBlockNumber.GetBytesBE(), rocksCFMeta);
                 }
                 if (maxBlockNumber == 0 || blockNum > maxBlockNumber)
                 {
                     maxBlockNumber = blockNum;
-                    writeBatch.Put(Encoding.UTF8.GetBytes("max_block"), BitConverter.GetBytes(maxBlockNumber), rocksCFMeta);
+                    writeBatch.Put(META_KEY_MAX_BLOCK, maxBlockNumber.GetBytesBE(), rocksCFMeta);
                 }
             }
 
