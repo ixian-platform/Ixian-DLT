@@ -186,7 +186,7 @@ namespace DLT
                         .SetRecycleLogFileNum(10)
                         .IncreaseParallelism(Environment.ProcessorCount)
                         .SetMaxBackgroundCompactions(Environment.ProcessorCount)
-                        .SetMaxBackgroundFlushes(Math.Min(4, Environment.ProcessorCount / 2))
+                        .SetMaxBackgroundFlushes(Math.Max(1, Math.Min(4, Environment.ProcessorCount / 2)))
                         .SetAllowMmapReads(false)
                         .SetAllowMmapWrites(false)
                         .SetTargetFileSizeBase(256 * 1024 * 1024)
@@ -1073,7 +1073,7 @@ namespace DLT
                             Logging.warn("RocksDB: Error while opening database {0}: {1}", db, e.Message);
                         }
                     }
-                    Logging.info("RocksDB: Pre-start optimnization complete.");
+                    Logging.info("RocksDB: Pre-start optimization complete.");
                 }
 
                 Logging.info("Last storage block number is: #{0}", getHighestBlockInStorage());
@@ -1109,7 +1109,7 @@ namespace DLT
                         if (db.Value.isOpen
                             && (DateTime.Now - db.Value.lastUsedTime).TotalSeconds >= closeAfterSeconds)
                         {
-                            if (db.Value.maxBlockNumber + ConsensusConfig.getRedactedWindowSize(lastBlockVersion) > highestBlockNum)
+                            if (db.Value.maxBlockNumber + ConsensusConfig.getRedactedWindowSize(lastBlockVersion) >= highestBlockNum)
                             {
                                 // never close the databases within redacted window
                                 continue;
