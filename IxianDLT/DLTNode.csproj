@@ -1,5 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <DefineConstants>$(DefineConstants);__ROCKS_DB_SHARP__</DefineConstants>
     <TargetFramework>net8.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <AssemblyName>IxianDLT</AssemblyName>

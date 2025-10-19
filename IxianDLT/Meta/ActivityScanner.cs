@@ -55,13 +55,9 @@ namespace DLTNode.Meta
         {
             try
             {
-                if (!ActivityStorage.clearStorage(0))
-                {
-                    Logging.error("Cannot clear storage before starting ActivityScanner");
-                    shouldStop = true;
-                    active = false;
-                    return;
-                }
+                Node.activityStorage.stopStorage();
+                Node.activityStorage.deleteData();
+                Node.activityStorage.prepareStorage(false);
 
                 ulong scanToBlockNum = IxianHandler.getLastBlockHeight();
 

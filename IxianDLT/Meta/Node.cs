@@ -17,6 +17,7 @@ using DLTNode;
 using DLTNode.Inventory;
 using DLTNode.Meta;
 using IXICore;
+using IXICore.Activity;
 using IXICore.Inventory;
 using IXICore.Meta;
 using IXICore.Miner;
@@ -73,6 +74,8 @@ namespace DLT.Meta
         private static bool postSyncOperationsDone = false;
 
         private static MemoryInfoProvider memoryInfoProvider = new MemoryInfoProvider();
+
+        public static IActivityStorage activityStorage;
 
         public Node()
         {
@@ -371,7 +374,8 @@ namespace DLT.Meta
             // Generate presence list
             PresenceList.init(IxianHandler.publicIP, Config.serverPort, node_type, CoreConfig.serverKeepAliveInterval);
 
-            ActivityStorage.prepareStorage();
+            activityStorage = new ActivityStorage(Config.dataFolderActivity, 0, 0);
+            activityStorage.prepareStorage(true);
 
             // Initialize the block chain
             blockChain = new BlockChain();
@@ -398,7 +402,7 @@ namespace DLT.Meta
             }
 
             // Start the HTTP JSON API server
-            apiServer = new APIServer(Config.apiBinds, Config.apiUsers, Config.apiAllowedIps);
+            apiServer = new APIServer(Config.apiBinds, Config.apiUsers, Config.apiAllowedIps, activityStorage);
 
             if (IXICore.Platform.onWindows() && !Config.disableWebStart)
             {
@@ -673,7 +677,7 @@ namespace DLT.Meta
             ActivityScanner.stop();
 
             // Stop activity storage
-            ActivityStorage.stopStorage();
+            activityStorage.stopStorage();
 
             // Stop the network queue
             NetworkQueue.stop();
@@ -839,7 +843,9 @@ namespace DLT.Meta
         // Cleans the storage cache and logs
         public static bool cleanCacheAndLogs()
         {
-            ActivityStorage.deleteCache();
+            activityStorage.stopStorage();
+            activityStorage.deleteData();
+            activityStorage.prepareStorage(false);
 
             // deleting block storage is a special case
             // we have to instantiate whatever implementation we are using and remove its data files
@@ -894,12 +900,11 @@ namespace DLT.Meta
                         if (blockSync.synchronizing)
                         {
                             int storageQueueCount = storage.getQueuedQueryCount();
-                            int activityQueueCount = ActivityStorage.getQueuedQueryCount();
-                            if (storageQueueCount > 2000 || activityQueueCount > 2000)
+                            if (storageQueueCount > 2000)
                             {
                                 blockSync.paused = true;
                             }
-                            else if (storageQueueCount < 1000 && activityQueueCount < 1000)
+                            else if (storageQueueCount < 1000)
                             {
                                 blockSync.paused = false;
                             }

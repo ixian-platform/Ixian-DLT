@@ -66,6 +66,13 @@ namespace DLT
                     return dataFolderPath + Path.DirectorySeparatorChar + "blocks";
                 }
             }
+            public static string dataFolderActivity
+            {
+                get
+                {
+                    return dataFolderPath + Path.DirectorySeparatorChar + "activity";
+                }
+            }
             public static bool optimizeDBStorage = false;
             public static string configFilename = "ixian.cfg";
             public static string walletFile = "ixian.wal";

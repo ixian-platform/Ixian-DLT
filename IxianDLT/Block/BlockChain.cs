@@ -13,6 +13,7 @@
 using DLT.Meta;
 using DLT.Network;
 using IXICore;
+using IXICore.Activity;
 using IXICore.Inventory;
 using IXICore.Meta;
 using IXICore.Network;
@@ -1394,7 +1395,7 @@ namespace DLT
                 }
                 if (IxianHandler.isMyAddress(tx.pubKey) || IxianHandler.extractMyAddressesFromAddressList(tx.toList) != null)
                 {
-                    ActivityStorage.updateStatus(tx.id, ActivityStatus.Error, block.blockNum);
+                    Node.activityStorage.updateStatus(tx.id, ActivityStatus.Error, block.blockNum);
                     tx.fromLocalStorage = false;
                 }
                 if (tx.type == (int)Transaction.Type.StakingReward)

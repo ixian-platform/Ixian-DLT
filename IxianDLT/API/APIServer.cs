@@ -14,6 +14,7 @@ using DLT;
 using DLT.Meta;
 using DLTNode.Meta;
 using IXICore;
+using IXICore.Activity;
 using IXICore.Inventory;
 using IXICore.Meta;
 using IXICore.Network;
@@ -28,10 +29,10 @@ namespace DLTNode
 {
     class APIServer : GenericAPIServer
     {
-        public APIServer(List<string> listen_URLs, Dictionary<string, string> authorized_users = null, List<string> allowed_IPs = null)
+        public APIServer(List<string> listen_URLs, Dictionary<string, string> authorized_users = null, List<string> allowed_IPs = null, IActivityStorage activity_storage = null)
         {
             // Start the API server
-            start(listen_URLs, authorized_users, allowed_IPs);
+            start(listen_URLs, authorized_users, allowed_IPs, activity_storage);
         }
 
         protected override bool processRequest(HttpListenerContext context, string methodName, Dictionary<string, object> parameters)
@@ -858,7 +859,6 @@ namespace DLTNode
                 queues.Add("Storage", Node.storage.getQueuedQueryCount());
                 queues.Add("Inventory", InventoryCache.Instance.getItemCount());
                 queues.Add("Inventory Processed", InventoryCache.Instance.getProcessedItemCount());
-                queues.Add("Activity", ActivityStorage.getQueuedQueryCount());
 
                 networkArray.Add("Queues", queues);
 

@@ -28,92 +28,6 @@ namespace DLT
     {
         class RocksDBInternal
         {
-            class _storage_Index
-            {
-                public ColumnFamilyHandle rocksIndexHandle;
-                private RocksDb db;
-                public _storage_Index(string cf_name, RocksDb db)
-                {
-                    this.db = db;
-                    rocksIndexHandle = db.GetColumnFamily(cf_name);
-                }
-
-                public static byte[] combineKeys(ReadOnlySpan<byte> key1, ReadOnlySpan<byte> key2 = default)
-                {
-                    if (key2 == default)
-                        key2 = ReadOnlySpan<byte>.Empty;
-
-                    int size = key1.Length + key2.Length;
-
-                    var combined = GC.AllocateUninitializedArray<byte>(size);
-                    key1.CopyTo(combined.AsSpan());
-                    key2.CopyTo(combined.AsSpan(key1.Length));
-
-                    return combined;
-                }
-
-                public void addIndexEntry(ReadOnlySpan<byte> key, ReadOnlySpan<byte> index, ReadOnlySpan<byte> data, WriteBatch writeBatch = null)
-                {
-                    byte[] keyWithSuffix = combineKeys(key, index);
-                    if (writeBatch != null)
-                    {
-                        writeBatch.Put(keyWithSuffix, data, rocksIndexHandle);
-                    }
-                    else
-                    {
-                        db.Put(keyWithSuffix, data, rocksIndexHandle);
-                    }
-                }
-
-                public void delIndexEntry(ReadOnlySpan<byte> key, ReadOnlySpan<byte> index, WriteBatch writeBatch = null)
-                {
-                    byte[] keyWithSuffix = combineKeys(key, index);
-                    if (writeBatch != null)
-                    {
-                        writeBatch.Delete(keyWithSuffix, rocksIndexHandle);
-                    }
-                    else
-                    {
-                        db.Remove(keyWithSuffix, rocksIndexHandle);
-                    }
-                }
-
-                public byte[] getEntry(ReadOnlySpan<byte> key, ReadOnlySpan<byte> index)
-                {
-                    var keyWithSuffix = combineKeys(key, index);
-                    return db.Get(keyWithSuffix, rocksIndexHandle);
-                }
-
-                public IEnumerable<(ReadOnlyMemory<byte> index, ReadOnlyMemory<byte> value)> getEntriesForKey(ReadOnlyMemory<byte> key,
-                                                                                                              ReadOnlyMemory<byte> index = default)
-                {
-                    var combinedKeys = combineKeys(key.Span, index.Span);
-
-                    var ro = new ReadOptions().SetPrefixSameAsStart(true);
-                    var iter = db.NewIterator(rocksIndexHandle, ro);
-
-                    try
-                    {
-                        for (iter.Seek(combinedKeys); iter.Valid(); iter.Next())
-                        {
-                            var k = iter.Key();
-                            if (!k.AsSpan(0, combinedKeys.Length).SequenceEqual(combinedKeys))
-                                yield break;
-
-                            var v = iter.Value();
-                            var indexSpan = k.AsMemory().Slice(key.Length);
-                            var valueMem = v.AsMemory();
-
-                            yield return (indexSpan, valueMem);
-                        }
-                    }
-                    finally
-                    {
-                        iter.Dispose();
-                    }
-                }
-            }
-
             public string dbPath { get; private set; }
             private RocksDb database = null;
             // global column families
@@ -122,10 +36,10 @@ namespace DLT
             private ColumnFamilyHandle rocksCFMeta;
             // index column families
             // block
-            private _storage_Index idxBlocksChecksum;
+            private StorageIndex idxBlocksChecksum;
             // transaction
-            private _storage_Index idxTXAppliedType;
-            private _storage_Index idxAddressTXs;
+            private StorageIndex idxTXAppliedType;
+            private StorageIndex idxAddressTXs;
             private readonly object rockLock = new object();
 
             private readonly byte[] BLOCKS_KEY_HEADER = new byte[] { 0 };
@@ -297,9 +211,9 @@ namespace DLT
                     rocksCFMeta = database.GetColumnFamily("meta");
 
                     // initialize indexes
-                    idxBlocksChecksum = new _storage_Index("index_blocks_checksum_meta", database);
-                    idxTXAppliedType = new _storage_Index("index_tx_applied_type", database);
-                    idxAddressTXs = new _storage_Index("index_address_txs", database);
+                    idxBlocksChecksum = new StorageIndex("index_blocks_checksum_meta", database);
+                    idxTXAppliedType = new StorageIndex("index_tx_applied_type", database);
+                    idxAddressTXs = new StorageIndex("index_address_txs", database);
 
                     // read initial meta values
                     byte[] versionBytes = database.Get(META_KEY_DB_VERSION, rocksCFMeta);
@@ -408,15 +322,15 @@ namespace DLT
 
             private void updateBlockIndexes(WriteBatch writeBatch, Block sb)
             {
-                writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_TXS), sb.getTransactionIDsBytes(), rocksCFBlocks);
+                writeBatch.Put(StorageIndex.combineKeys(sb.blockChecksum, BLOCKS_KEY_TXS), sb.getTransactionIDsBytes(), rocksCFBlocks);
                 if (sb.version >= BlockVer.v10)
                 {
-                    writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS), sb.getSignaturesBytes(true, false), rocksCFBlocks);
-                    writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), sb.getSignaturesBytes(true, true), rocksCFBlocks);
+                    writeBatch.Put(StorageIndex.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS), sb.getSignaturesBytes(true, false), rocksCFBlocks);
+                    writeBatch.Put(StorageIndex.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), sb.getSignaturesBytes(true, true), rocksCFBlocks);
                 }
                 else
                 {
-                    writeBatch.Put(_storage_Index.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), sb.getSignaturesBytes(true, false), rocksCFBlocks);
+                    writeBatch.Put(StorageIndex.combineKeys(sb.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), sb.getSignaturesBytes(true, false), rocksCFBlocks);
                 }
 
                 var blockNumBytes = sb.blockNum.GetBytesBE();
@@ -487,7 +401,7 @@ namespace DLT
                     lastUsedTime = DateTime.Now;
                     using (WriteBatch writeBatch = new WriteBatch())
                     {
-                        writeBatch.Put(_storage_Index.combineKeys(block.blockChecksum, BLOCKS_KEY_HEADER), block.getBytes(true, true, true, true, true), rocksCFBlocks);
+                        writeBatch.Put(StorageIndex.combineKeys(block.blockChecksum, BLOCKS_KEY_HEADER), block.getBytes(true, true, true, true, true), rocksCFBlocks);
                         updateBlockIndexes(writeBatch, block);
                         updateMinMax(writeBatch, block.blockNum);
                         database.Write(writeBatch);
@@ -563,12 +477,12 @@ namespace DLT
                         return null;
                     }
 
-                    byte[] blockBytes = database.Get(_storage_Index.combineKeys(blockHash, BLOCKS_KEY_HEADER), rocksCFBlocks);
+                    byte[] blockBytes = database.Get(StorageIndex.combineKeys(blockHash, BLOCKS_KEY_HEADER), rocksCFBlocks);
                     if (blockBytes != null)
                     {
                         if (asBlockHeader)
                         {
-                            byte[] sigBytes = database.Get(_storage_Index.combineKeys(blockHash, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
+                            byte[] sigBytes = database.Get(StorageIndex.combineKeys(blockHash, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
                             byte[] mergedBytes = new byte[blockBytes.Length + sigBytes.Length];
                             Buffer.BlockCopy(blockBytes, 0, mergedBytes, 0, blockBytes.Length);
                             Buffer.BlockCopy(sigBytes, 0, mergedBytes, blockBytes.Length, sigBytes.Length);
@@ -576,12 +490,12 @@ namespace DLT
                         }
                         else
                         {
-                            byte[] sigBytes = database.Get(_storage_Index.combineKeys(blockHash, BLOCKS_KEY_SIGNERS), rocksCFBlocks);
+                            byte[] sigBytes = database.Get(StorageIndex.combineKeys(blockHash, BLOCKS_KEY_SIGNERS), rocksCFBlocks);
                             if (sigBytes == null)
                             {
-                                sigBytes = database.Get(_storage_Index.combineKeys(blockHash, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
+                                sigBytes = database.Get(StorageIndex.combineKeys(blockHash, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
                             }
-                            byte[] txIDBytes = database.Get(_storage_Index.combineKeys(blockHash, BLOCKS_KEY_TXS), rocksCFBlocks);
+                            byte[] txIDBytes = database.Get(StorageIndex.combineKeys(blockHash, BLOCKS_KEY_TXS), rocksCFBlocks);
 
                             byte[] mergedBytes = new byte[blockBytes.Length + sigBytes.Length + txIDBytes.Length];
                             Buffer.BlockCopy(blockBytes, 0, mergedBytes, 0, blockBytes.Length);
@@ -609,10 +523,10 @@ namespace DLT
             {
                 lock (rockLock)
                 {
-                    byte[] blockBytes = database.Get(_storage_Index.combineKeys(checksum, BLOCKS_KEY_HEADER), rocksCFBlocks);
+                    byte[] blockBytes = database.Get(StorageIndex.combineKeys(checksum, BLOCKS_KEY_HEADER), rocksCFBlocks);
                     if (blockBytes != null)
                     {
-                        byte[] txIDsBytes = database.Get(_storage_Index.combineKeys(checksum, BLOCKS_KEY_TXS), rocksCFBlocks);
+                        byte[] txIDsBytes = database.Get(StorageIndex.combineKeys(checksum, BLOCKS_KEY_TXS), rocksCFBlocks);
                         Block b = new Block(checksum.ToArray(), blockBytes, txIDsBytes);
                         (int sigCount, IxiNumber totalSignerDifficulty, byte[] powField) blockMeta;
                         if (blockMetaBytes != null)
@@ -628,10 +542,10 @@ namespace DLT
                         b.powField = blockMeta.powField;
                         b.signatureCount = blockMeta.sigCount;
 
-                        byte[] sigBytes = database.Get(_storage_Index.combineKeys(b.blockChecksum, BLOCKS_KEY_SIGNERS), rocksCFBlocks);
+                        byte[] sigBytes = database.Get(StorageIndex.combineKeys(b.blockChecksum, BLOCKS_KEY_SIGNERS), rocksCFBlocks);
                         if (sigBytes == null)
                         {
-                            sigBytes = database.Get(_storage_Index.combineKeys(b.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
+                            sigBytes = database.Get(StorageIndex.combineKeys(b.blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
                         }
                         b.setSignaturesFromBytes(sigBytes, false);
                         b.fromLocalStorage = true;
@@ -839,10 +753,10 @@ namespace DLT
 
                         using (WriteBatch writeBatch = new WriteBatch())
                         {
-                            writeBatch.Delete(_storage_Index.combineKeys(blockChecksum, BLOCKS_KEY_HEADER), rocksCFBlocks);
-                            writeBatch.Delete(_storage_Index.combineKeys(blockChecksum, BLOCKS_KEY_SIGNERS), rocksCFBlocks);
-                            writeBatch.Delete(_storage_Index.combineKeys(blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
-                            writeBatch.Delete(_storage_Index.combineKeys(blockChecksum, BLOCKS_KEY_TXS), rocksCFBlocks);
+                            writeBatch.Delete(StorageIndex.combineKeys(blockChecksum, BLOCKS_KEY_HEADER), rocksCFBlocks);
+                            writeBatch.Delete(StorageIndex.combineKeys(blockChecksum, BLOCKS_KEY_SIGNERS), rocksCFBlocks);
+                            writeBatch.Delete(StorageIndex.combineKeys(blockChecksum, BLOCKS_KEY_SIGNERS_COMPACT), rocksCFBlocks);
+                            writeBatch.Delete(StorageIndex.combineKeys(blockChecksum, BLOCKS_KEY_TXS), rocksCFBlocks);
 
                             idxBlocksChecksum.delIndexEntry(blockNumBytes, blockChecksum, writeBatch);
 

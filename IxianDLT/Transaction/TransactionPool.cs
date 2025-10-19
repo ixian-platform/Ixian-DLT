@@ -13,6 +13,7 @@
 using DLT.Meta;
 using DLTNode;
 using IXICore;
+using IXICore.Activity;
 using IXICore.Inventory;
 using IXICore.Meta;
 using IXICore.Network;
@@ -720,7 +721,7 @@ namespace DLT
                             {
                                 txTimestamp = blockTimestamp;
                             }
-                            ActivityStorage.updateStatus(t.id, ActivityStatus.Final, t.applied, txTimestamp);
+                            Node.activityStorage.updateStatus(t.id, ActivityStatus.Final, t.applied, txTimestamp);
                         }
                     }
 
@@ -913,55 +914,72 @@ namespace DLT
 
         public static void addTransactionToActivityStorage(Transaction transaction)
         {
-            Activity activity = null;
-            int type = -1;
+            ActivityObject activity = null;
+            ActivityType type = ActivityType.None;
             IxiNumber value = transaction.amount;
             Dictionary<byte[], List<byte[]>> wallet_list = null;
             Address wallet = null;
             Address primary_address = transaction.pubKey;
+
+            ActivityStatus status = ActivityStatus.Pending;
+            if (transaction.applied > 0)
+            {
+                status = ActivityStatus.Final;
+            }
+
             if (IxianHandler.isMyAddress(primary_address))
             {
+                // We are the sender
                 wallet = primary_address;
-                type = (int)ActivityType.TransactionSent;
+                type = ActivityType.TransactionSent;
                 if (transaction.type == (int)Transaction.Type.PoWSolution)
                 {
-                    type = (int)ActivityType.MiningReward;
+                    type = ActivityType.MiningReward;
                     value = ConsensusConfig.calculateMiningRewardForBlock(transaction.powSolution.blockNum);
                 }
-            }else
+
+                activity = new ActivityObject(IxianHandler.getWalletStorageBySecondaryAddress(primary_address).getSeedHash(),
+                              wallet,
+                              transaction.id,
+                              transaction.toList.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.amount),
+                              type,
+                              null,
+                              value,
+                              transaction.timeStamp,
+                              status,
+                              transaction.applied);
+                Node.activityStorage.insertActivity(activity);
+            }
+            else
             {
                 wallet_list = IxianHandler.extractMyAddressesFromAddressList(transaction.toList);
                 if (wallet_list != null)
                 {
-                    type = (int)ActivityType.TransactionReceived;
+                    // We are the recipient
+                    type = ActivityType.TransactionReceived;
                     if (transaction.type == (int)Transaction.Type.StakingReward)
                     {
-                        type = (int)ActivityType.StakingReward;
+                        type = ActivityType.StakingReward;
                     }
-                }
-            }
-            if (type != -1)
-            {
-                int status = (int)ActivityStatus.Pending;
-                if (transaction.applied > 0)
-                {
-                    status = (int)ActivityStatus.Final;
-                }
-                if(wallet_list != null)
-                {
+
                     foreach (var extractedWallet in wallet_list)
                     {
-                        foreach(var address in extractedWallet.Value)
+                        foreach (var addressBytes in extractedWallet.Value)
                         {
-                            activity = new Activity(extractedWallet.Key, new Address(address).ToString(), primary_address.ToString(), transaction.toList, type, transaction.id, transaction.toList[new Address(address)].amount.ToString(), transaction.timeStamp, status, transaction.applied, transaction.getTxIdString());
-                            ActivityStorage.insertActivity(activity);
+                            Address address = new Address(addressBytes);
+                            activity = new ActivityObject(extractedWallet.Key,
+                                                          address,
+                                                          transaction.id,
+                                                          transaction.fromList.ToDictionary(kvp => new Address(transaction.pubKey.addressNoChecksum, kvp.Key), kvp => kvp.Value),
+                                                          type,
+                                                          null,
+                                                          transaction.toList[address].amount,
+                                                          transaction.timeStamp,
+                                                          status,
+                                                          transaction.applied);
+                            Node.activityStorage.insertActivity(activity);
                         }
                     }
-                }
-                else if(wallet != null)
-                {
-                    activity = new Activity(IxianHandler.getWalletStorageBySecondaryAddress(primary_address).getSeedHash(), wallet.ToString(), primary_address.ToString(), transaction.toList, type, transaction.id, value.ToString(), transaction.timeStamp, status, transaction.applied, transaction.getTxIdString());
-                    ActivityStorage.insertActivity(activity);
                 }
             }
         }
@@ -2536,7 +2554,7 @@ namespace DLT
 
                     if (miner_wallet.id.addressNoChecksum.SequenceEqual(IxianHandler.getWalletStorage().getPrimaryAddress().addressNoChecksum))
                     {
-                        ActivityStorage.updateValue(entry.tx.id, powRewardPart);
+                        Node.activityStorage.updateValue(entry.tx.id, powRewardPart);
                     }
                 }
 
@@ -2646,7 +2664,7 @@ namespace DLT
 
                     if (miner_wallet.id.addressNoChecksum.SequenceEqual(IxianHandler.getWalletStorage().getPrimaryAddress().addressNoChecksum))
                     {
-                        ActivityStorage.updateValue(entry.tx.id, powRewardPart);
+                        Node.activityStorage.updateValue(entry.tx.id, powRewardPart);
                     }
                 }
             }
@@ -2724,7 +2742,7 @@ namespace DLT
                         {
                             if (IxianHandler.isMyAddress(entry.pubKey))
                             {
-                                ActivityStorage.updateStatus(entry.id, ActivityStatus.Error, 0);
+                                Node.activityStorage.updateStatus(entry.id, ActivityStatus.Error, 0);
                             }
                             unappliedTransactions.Remove(entry.id);
                         }
@@ -2771,7 +2789,7 @@ namespace DLT
                         // if transaction expired, remove it from pending transactions
                         if (last_block_height > ConsensusConfig.getRedactedWindowSize() && t.blockHeight < last_block_height - ConsensusConfig.getRedactedWindowSize())
                         {
-                            ActivityStorage.updateStatus(t.id, ActivityStatus.Error, 0);
+                            Node.activityStorage.updateStatus(t.id, ActivityStatus.Error, 0);
                             PendingTransactions.pendingTransactions.RemoveAll(x => x.transaction.id.SequenceEqual(t.id));
                             continue;
                         }
@@ -2784,7 +2802,7 @@ namespace DLT
                             Block tmpBlock = Node.blockChain.getBlock(pow_block_num, false, false);
                             if (tmpBlock == null || tmpBlock.powField != null)
                             {
-                                ActivityStorage.updateStatus(t.id, ActivityStatus.Error, 0);
+                                Node.activityStorage.updateStatus(t.id, ActivityStatus.Error, 0);
                                 PendingTransactions.pendingTransactions.RemoveAll(x => x.transaction.id.SequenceEqual(t.id));
                                 continue;
                             }
@@ -2794,7 +2812,7 @@ namespace DLT
                             // check if transaction is still valid
                             if (getUnappliedTransaction(t.id) == null && !verifyTransaction(t, null, out _, false))
                             {
-                                ActivityStorage.updateStatus(t.id, ActivityStatus.Error, 0);
+                                Node.activityStorage.updateStatus(t.id, ActivityStatus.Error, 0);
                                 PendingTransactions.pendingTransactions.RemoveAll(x => x.transaction.id.SequenceEqual(t.id));
                                 continue;
                             }

@@ -2743,18 +2743,6 @@ namespace DLT
                     }
                 }
                 Node.walletState.setWalletBalance(sigAddress, balance_after);
-                if(!Node.walletState.inTransaction)
-                {
-                    WalletStorage ws = IxianHandler.getWalletStorage();
-                    if (signer_wallet.id.addressNoChecksum.SequenceEqual(ws.getPrimaryAddress().addressNoChecksum))
-                    {
-                        SortedDictionary<Address, Transaction.ToEntry> to_list = new SortedDictionary<Address, Transaction.ToEntry>(new AddressComparer());
-                        to_list.Add(sigAddress, new Transaction.ToEntry(Transaction.getExpectedVersion(b.version), tAward));
-                        string address = ws.getPrimaryAddress().ToString();
-                        Activity activity = new Activity(ws.getSeedHash(), address, ConsensusConfig.ixianInfiniMineAddress.ToString(), to_list, (int)ActivityType.TxFeeReward, Encoding.UTF8.GetBytes("TXFEEREWARD-" + b.blockNum + "-" + address), tAward.ToString(), b.timestamp, (int)ActivityStatus.Final, b.blockNum, "");
-                        ActivityStorage.insertActivity(activity);
-                    }
-                }
                 //Logging.info(string.Format("Awarded {0} IXI to {1}", tAward.ToString(), addr.ToString()));
             }          
         }
