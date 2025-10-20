@@ -374,7 +374,7 @@ namespace DLT.Meta
             // Generate presence list
             PresenceList.init(IxianHandler.publicIP, Config.serverPort, node_type, CoreConfig.serverKeepAliveInterval);
 
-            activityStorage = new ActivityStorage(Config.dataFolderActivity, 0, 0);
+            activityStorage = new ActivityStorage(Config.dataFolderActivity, 32 << 20, 0);
             activityStorage.prepareStorage(true);
 
             // Initialize the block chain

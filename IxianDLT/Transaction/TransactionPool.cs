@@ -915,7 +915,7 @@ namespace DLT
         public static void addTransactionToActivityStorage(Transaction transaction)
         {
             ActivityObject activity = null;
-            ActivityType type = ActivityType.None;
+            ActivityType type;
             IxiNumber value = transaction.amount;
             Dictionary<byte[], List<byte[]>> wallet_list = null;
             Address wallet = null;
@@ -937,17 +937,21 @@ namespace DLT
                     type = ActivityType.MiningReward;
                     value = ConsensusConfig.calculateMiningRewardForBlock(transaction.powSolution.blockNum);
                 }
+                else if (transaction.type == (int)Transaction.Type.RegName)
+                {
+                    type = ActivityType.IxiName;
+                }
 
                 activity = new ActivityObject(IxianHandler.getWalletStorageBySecondaryAddress(primary_address).getSeedHash(),
-                              wallet,
-                              transaction.id,
-                              transaction.toList.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.amount),
-                              type,
-                              null,
-                              value,
-                              transaction.timeStamp,
-                              status,
-                              transaction.applied);
+                                wallet,
+                                transaction.id,
+                                transaction.toList.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.amount),
+                                type,
+                                null,
+                                value,
+                                transaction.timeStamp,
+                                status,
+                                transaction.applied);
                 Node.activityStorage.insertActivity(activity);
             }
             else
