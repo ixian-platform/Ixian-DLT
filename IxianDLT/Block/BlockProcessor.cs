@@ -3204,7 +3204,10 @@ namespace DLT
                     if (signature_data != null)
                     {
                         InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(signature_data.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum));
-                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(signature_data.powSolution.solution, localNewBlock.blockChecksum));
+                        if (signature_data.powSolution != null)
+                        {
+                            InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(signature_data.powSolution.solution, localNewBlock.blockChecksum));
+                        }
                     }
                     else
                     {
