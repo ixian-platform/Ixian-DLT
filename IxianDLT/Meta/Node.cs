@@ -106,6 +106,12 @@ namespace DLT.Meta
             if (Config.maxDatabaseCache == 0)
             {
                 Config.maxDatabaseCache = estimateDBBlockCacheSize((ulong)total_ram);
+
+                ulong database_cache_cap = 8L << 30;
+                if (Config.maxDatabaseCache > database_cache_cap)
+                {
+                    Config.maxDatabaseCache = database_cache_cap;
+                }
             }
 
             if (Config.networkType == NetworkType.main
@@ -374,7 +380,7 @@ namespace DLT.Meta
             // Generate presence list
             PresenceList.init(IxianHandler.publicIP, Config.serverPort, node_type, CoreConfig.serverKeepAliveInterval);
 
-            activityStorage = new ActivityStorage(Config.dataFolderActivity, 32 << 20, 0);
+            activityStorage = new ActivityStorage(Config.activityFolderPath, 32 << 20, 0);
             activityStorage.prepareStorage(true);
 
             // Initialize the block chain

@@ -57,6 +57,7 @@ namespace DLT
             public static uint cpuThreads = (uint)Environment.ProcessorCount;
 
             public static string dataFolderPath = "data";
+            public static string activityFolderPath = "activity";
             public static string logFolderPath = Environment.CurrentDirectory;
             public static string blockStorageProvider = "Auto";
             public static string dataFolderBlocks
@@ -64,13 +65,6 @@ namespace DLT
                 get
                 {
                     return dataFolderPath + Path.DirectorySeparatorChar + "blocks";
-                }
-            }
-            public static string dataFolderActivity
-            {
-                get
-                {
-                    return dataFolderPath + Path.DirectorySeparatorChar + "activity";
                 }
             }
             public static bool optimizeDBStorage = false;
@@ -117,7 +111,7 @@ namespace DLT
 
             public static readonly ulong maxBlocksPerDatabase = 1000; // number of blocks to store in a single database file
             
-            public static readonly ulong nodeDeprecationBlock = 6000000 + (ulong)(new Random()).Next(50); // block height on which this version of Ixian DLT stops working on
+            public static readonly ulong nodeDeprecationBlock = 6100000 + (ulong)(new Random()).Next(50); // block height on which this version of Ixian DLT stops working on
 
             public static readonly ulong saveWalletStateEveryBlock = ConsensusConfig.superblockInterval; // Saves wallet state every 1000 blocks
 
@@ -221,6 +215,7 @@ namespace DLT
                 Console.WriteLine("    --networkType\t\t mainnet, testnet or regtest.");
                 Console.WriteLine("    --dataFolderPath\t\t location where to store block and transaction data.");
                 Console.WriteLine("    --logFolderPath\t\t location where to store log files.");
+                Console.WriteLine("    --activityFolderPath\t\t location where to store activity files.");
                 Console.WriteLine("    --maxDatabaseCache\t\t max RAM in bytes to use for RocksDB Cache.");
                 Console.WriteLine("");
                 Console.WriteLine("----------- Developer CLI flags -----------");
@@ -261,10 +256,10 @@ namespace DLT
                 Console.WriteLine("    logVerbosity\t\t Sets log verbosity (same as --logVerbosity CLI)");
                 Console.WriteLine("    disableWebStart\t\t 1 to disable running http://localhost:8081 on startup (same as --disableWebStart CLI)");
                 Console.WriteLine("    blockStorage\t\t Specify storage provider for block and transaction (same as --blockStorage CLI)");
-                Console.WriteLine("    walletNotify\t\t Execute command when a wallet transaction changes");
                 Console.WriteLine("    blockNotify\t\t\t Execute command when the block changes");
                 Console.WriteLine("    dataFolderPath\t\t location where to store block and transaction data.");
                 Console.WriteLine("    logFolderPath\t\t location where to store log files.");
+                Console.WriteLine("    activityFolderPath\t\t location where to store activity files.");
                 Console.WriteLine("    maxDatabaseCache\t\t max RAM in bytes to use for RocksDB Cache.");
 
                 return "";
@@ -378,9 +373,6 @@ namespace DLT
                         case "blockStorage":
                             blockStorageProvider = value;
                             break;
-                        case "walletNotify":
-                            CoreConfig.walletNotifyCommand = value;
-                            break;
                         case "blockNotify":
                             blockNotifyCommand = value;
                             break;
@@ -399,6 +391,9 @@ namespace DLT
                         case "logFolderPath":
                             logFolderPath = value;
                             break;
+                        case "activityFolderPath":
+                            activityFolderPath = value;
+                            break;                            
                         case "maxDatabaseCache":
                             maxDatabaseCache = ulong.Parse(value);
                             break;
@@ -567,6 +562,8 @@ namespace DLT
 
                 cmd_parser.Setup<string>("logFolderPath").Callback(value => logFolderPath = value).Required();
 
+                cmd_parser.Setup<string>("activityFolderPath").Callback(value => activityFolderPath = value).Required();
+                
                 cmd_parser.Setup<bool>("optimizeDBStorage").Callback(value => optimizeDBStorage = value).Required();
 
                 cmd_parser.Setup<bool>("verifyStorage").Callback(value => fullStorageDataVerification = true).Required();
