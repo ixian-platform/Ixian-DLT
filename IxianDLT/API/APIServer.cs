@@ -807,7 +807,7 @@ namespace DLTNode
                     networkArray.Add("Signer Bits", Crypto.hashToString(BitConverter.GetBytes(Node.blockChain.getRequiredSignerBits())));
                     networkArray.Add("Signer Hashrate", Node.signerPowMiner.lastHashRate);
 
-                    var tmpSolution = Node.signerPowMiner.lastSignerPowSolution;
+                    var tmpSolution = Node.signerPowMiner.GetSolutions(0, 0).LastOrDefault();
                     Dictionary<string, object> signerPowSolution = new Dictionary<string, object>();
                     if (tmpSolution != null)
                     {
@@ -819,7 +819,7 @@ namespace DLTNode
                     }
                     networkArray.Add("Signer Last PoW Solution", signerPowSolution);
 
-                    tmpSolution = PresenceList.getPowSolution();
+                    tmpSolution = Node.signerPowMiner.GetBestSolution(0, 0);
                     signerPowSolution = new Dictionary<string, object>();
                     if (tmpSolution != null)
                     {

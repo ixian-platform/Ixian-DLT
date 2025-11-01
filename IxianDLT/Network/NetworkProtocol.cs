@@ -239,6 +239,17 @@ namespace DLT
                     using (BinaryReader reader = new BinaryReader(m))
                     {
                         CoreProtocolMessage.processHelloMessageV6(endpoint, reader);
+
+                        char node_type = endpoint.presenceAddress.type;
+                        if (node_type == 'M'
+                            || node_type == 'H'
+                            || node_type == 'R')
+                        {
+                            if (PresenceList.getPresenceByAddress(endpoint.serverWalletAddress) == null)
+                            {
+                                CoreProtocolMessage.broadcastGetPresence(endpoint.serverWalletAddress.addressNoChecksum, endpoint);
+                            }
+                        }
                     }
                 }
             }
@@ -288,6 +299,11 @@ namespace DLT
                         Node.blockSync.onHelloDataReceived(last_block_num, block_checksum, block_version, null, null, 0, 0, true);
                         endpoint.helloReceived = true;
                         NetworkClientManager.recalculateLocalTimeDifference();
+
+                        if (PresenceList.getPresenceByAddress(endpoint.serverWalletAddress) == null)
+                        {
+                            CoreProtocolMessage.broadcastGetPresence(endpoint.serverWalletAddress.addressNoChecksum, endpoint);
+                        }
                     }
                 }
             }

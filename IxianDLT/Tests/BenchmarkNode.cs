@@ -211,10 +211,5 @@ namespace DLTNode
         {
             throw new NotImplementedException();
         }
-
-        public override void onSignerSolutionFound()
-        {
-            throw new NotImplementedException();
-        }
     }
 }

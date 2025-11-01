@@ -1813,15 +1813,7 @@ namespace DLT
                 if (block.blockNum > 13 && required_consensus_count > 1)
                 {
                     // verify if over 50% signatures are from the previous block
-                    int required_consensus_count_adj;
-                    if (block.version > BlockVer.v12)
-                    {
-                        required_consensus_count_adj = (required_consensus_count / 2) + 1;
-                    }
-                    else
-                    {
-                        required_consensus_count_adj = required_consensus_count > 2 ? ((required_consensus_count / 2) + 1) : 1;
-                    }
+                    int required_consensus_count_adj = required_consensus_count > 2 ? ((required_consensus_count / 2) + 1) : 1;
 
                     if (required_sigs.Count < required_consensus_count_adj
                         && !handleBlockchainRecoveryMode(block, required_sigs.Count, frozen_sig_count, frozen_sig_difficulty, required_signer_difficulty))
@@ -2159,7 +2151,7 @@ namespace DLT
                     {
                         if (Node.isMasterNode() && localNewBlock.blockNum > 7)
                         {
-                            BlockSignature signature_data = localNewBlock.applySignature(PresenceList.getPowSolution()); // applySignature() will return signature_data, if signature was applied and null, if signature was already present from before
+                            BlockSignature signature_data = localNewBlock.applySignature(Node.signerPowMiner.GetBestSolution(0, localNewBlock.blockNum)); // applySignature() will return signature_data, if signature was applied and null, if signature was already present from before
                             if (signature_data != null) 
                             {
                                 foreach (var sig in localNewBlock.signatures)
@@ -2172,6 +2164,7 @@ namespace DLT
                                     SignatureProtocolMessages.broadcastBlockSignature(sig, localNewBlock.blockNum, localNewBlock.blockChecksum, null, null);
                                 }
                                 BlockProtocolMessages.broadcastNewBlock(localNewBlock, null, null);
+                                applyUpdatedSolutionSignature();
                             }
                         }
                     }
@@ -3200,7 +3193,7 @@ namespace DLT
 
                     removeBlockBlacklist(localNewBlock);
 
-                    BlockSignature signature_data = localNewBlock.applySignature(PresenceList.getPowSolution());
+                    BlockSignature signature_data = localNewBlock.applySignature(Node.signerPowMiner.GetBestSolution(0, localNewBlock.blockNum));
                     if (signature_data != null)
                     {
                         InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(signature_data.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum));
@@ -4070,7 +4063,7 @@ namespace DLT
                 for (uint i = 0; i < 5; i++)
                 {
                     Block b = Node.blockChain.getBlock(lastBlockHeight - i);
-                    BlockSignature blockSig = b.applySignature(PresenceList.getPowSolution());
+                    BlockSignature blockSig = b.applySignature(Node.signerPowMiner.GetBestSolution(0, b.blockNum));
                     if (blockSig != null)
                     {
                         InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum));

@@ -377,8 +377,11 @@ namespace DLT.Meta
 
             UpdateVerify.start();
 
+            signerPowMiner = new SignerPowMiner();
+            //signerPowMiner.test();
+
             // Generate presence list
-            PresenceList.init(IxianHandler.publicIP, Config.serverPort, node_type, CoreConfig.serverKeepAliveInterval);
+            PresenceList.init(IxianHandler.publicIP, Config.serverPort, node_type, CoreConfig.serverKeepAliveInterval, signerPowMiner);
 
             activityStorage = new ActivityStorage(Config.activityFolderPath, 32 << 20, 0);
             activityStorage.prepareStorage(true);
@@ -416,9 +419,7 @@ namespace DLT.Meta
             }
 
             miner = new Miner();
-            signerPowMiner = new SignerPowMiner();
             //Node.blockProcessor.resumeOperation();
-            //signerPowMiner.test();
 
             // Start the network queue
             NetworkQueue.start();
@@ -449,7 +450,7 @@ namespace DLT.Meta
                 PresenceList.myPresenceType = 'M';
                 IxianHandler.enableNetworkServer = true;
                 blockProcessor.resumeOperation();
-                signerPowMiner.start(Config.cpuThreads > 2 ? (int)Config.cpuThreads / 2 : 1);
+                signerPowMiner.Start(Config.cpuThreads > 2 ? (int)Config.cpuThreads / 2 : 1);
                 serverStarted = true;
                 if (!isMasterNode())
                 {
@@ -668,7 +669,7 @@ namespace DLT.Meta
 
             if(signerPowMiner != null)
             {
-                signerPowMiner.stop();
+                signerPowMiner.Stop();
                 signerPowMiner = null;
             }
 
@@ -762,10 +763,10 @@ namespace DLT.Meta
         public static void doPostSyncOperations()
         {
             if (postSyncOperationsDone
-                || Node.blockSync == null
-                || Node.blockSync.synchronizing
-                || !Node.blockProcessor.operating
-                || NetworkClientManager.getConnectedClients().Count() == 0)
+                || blockSync == null
+                || blockSync.synchronizing
+                || !blockProcessor.operating
+                || (!genesisNode && NetworkClientManager.getConnectedClients().Count() == 0 && NetworkServer.getConnectedClients().Count() == 0))
             {
                 return;
             }
@@ -775,7 +776,9 @@ namespace DLT.Meta
                 return;
             }
 
-            if (signerPowMiner.lastSignerPowSolution == null)
+            signerPowMiner.pause = false;
+
+            if (signerPowMiner.GetBestSolution(0, 0) == null)
             {
                 return;
             }
@@ -793,7 +796,7 @@ namespace DLT.Meta
                 if (blockNum + 5 >= IxianHandler.getHighestKnownNetworkBlockHeight())
                 {
                     Block b = blockChain.getBlock(blockNum);
-                    BlockSignature blockSig = b.applySignature(PresenceList.getPowSolution());
+                    BlockSignature blockSig = b.applySignature(signerPowMiner.GetBestSolution(0, b.blockNum));
                     if (blockSig != null)
                     {
                         InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum));
@@ -849,6 +852,10 @@ namespace DLT.Meta
         // Cleans the storage cache and logs
         public static bool cleanCacheAndLogs()
         {
+            if (activityStorage is null)
+            {
+                activityStorage = new ActivityStorage(Config.activityFolderPath, 32 << 20, 0);
+            }
             activityStorage.stopStorage();
             activityStorage.deleteData();
             activityStorage.prepareStorage(false);
@@ -1047,6 +1054,12 @@ namespace DLT.Meta
             if (!Directory.Exists(Config.dataFolderPath + Path.DirectorySeparatorChar + "names" + Path.DirectorySeparatorChar + "0000"))
             {
                 Directory.CreateDirectory(Config.dataFolderPath + Path.DirectorySeparatorChar + "names" + Path.DirectorySeparatorChar + "0000");
+            }
+
+
+            if (!Directory.Exists(Config.activityFolderPath))
+            {
+                Directory.CreateDirectory(Config.activityFolderPath);
             }
         }
 
@@ -1273,18 +1286,6 @@ namespace DLT.Meta
         public override long getTimeSinceLastBlock()
         {
             return blockChain.getTimeSinceLastBlock();
-        }
-
-        public override void onSignerSolutionFound()
-        {
-            if (Clock.getNetworkTimestamp() - blockChain.getLastBlock().timestamp > CoreConfig.blockSignaturePlCheckTimeout)
-            {
-                blockProcessor.applyUpdatedSolutionSignature();
-            }
-
-            blockProcessor.acceptLocalNewBlock();
-
-            PresenceList.forceSendKeepAlive = true;
         }
 
         private ulong estimateDBBlockCacheSize(ulong totalRAM)
