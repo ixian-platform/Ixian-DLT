@@ -198,7 +198,7 @@ namespace DLT
                 }
                 catch (Exception e)
                 {
-                    Logging.error("Error parsing network message. Details: {0}", e.ToString());
+                    Logging.error("Error parsing network message. Details: {0}", e);
                 }
             }
 
@@ -238,7 +238,10 @@ namespace DLT
                 {
                     using (BinaryReader reader = new BinaryReader(m))
                     {
-                        CoreProtocolMessage.processHelloMessageV6(endpoint, reader);
+                        if (!CoreProtocolMessage.processHelloMessageV6(endpoint, reader))
+                        {
+                            return;
+                        }
 
                         char node_type = endpoint.presenceAddress.type;
                         if (node_type == 'M'

@@ -171,7 +171,7 @@ namespace DLT
 
                 Console.WriteLine("Starts a new instance of Ixian DLT Node");
                 Console.WriteLine("");
-                Console.WriteLine(" IxianDLT.exe [-h] [-v] [-t] [-s] [-x] [-c] [-p 10234] [-a 8081] [-i ip] [-w ixian.wal] [-n seed1.ixian.io:10234]");
+                Console.WriteLine(" IxianDLT.exe [-h] [-v] [-t] [-x] [-c] [-p 10234] [-a 8081] [-i ip] [-w ixian.wal] [-n seed1.ixian.io:10234]");
                 Console.WriteLine("   [--worker] [--threads 1] [--config ixian.cfg] [--maxLogSize 50] [--maxLogCount 10] [--logVerbosity 14]");
                 Console.WriteLine("   [--lastGoodBlock 110234] [--disableWebStart] [--onlyShowAddresses] [--walletPassword] [--blockStorage SQLite]");
                 Console.WriteLine("   [--maxTxPerBlock 19980] [--disableSetTitle] [--disableFastBlockLoading] [--checksumLock Ixian] [--verboseOutput]");
@@ -183,7 +183,6 @@ namespace DLT
                 Console.WriteLine("    -h\t\t\t\t Displays this help");
                 Console.WriteLine("    -v\t\t\t\t Displays version");
                 Console.WriteLine("    -t\t\t\t\t Starts node in testnet mode");
-                Console.WriteLine("    -s\t\t\t\t Saves full history");
                 Console.WriteLine("    -x\t\t\t\t Change password of an existing wallet");
                 Console.WriteLine("    -c\t\t\t\t Removes blockchain, walletstate, peers.dat, logs and other files before starting");
                 Console.WriteLine("    -p\t\t\t\t Port to listen on");
@@ -525,18 +524,15 @@ namespace DLT
                 // version
                 cmd_parser.Setup<bool>('v', "version").Callback(text => outputVersion());
 
-                // Toggle between full history node and no history
-                cmd_parser.Setup<bool>('s', "save-history").Callback(value => storeFullHistory = value).Required();
-
                 // Check for password change
-                cmd_parser.Setup<bool>('x', "changepass").Callback(value => changePass = value).Required();
+                cmd_parser.Setup<bool>('x', "changePass").Callback(value => changePass = value).Required();
 
                 // Check for recovery parameter
                 cmd_parser.Setup<bool>("recover").Callback(value => recoverFromFile = value).Required();
 
                 cmd_parser.Setup<int>('p', "port").Callback(value => Config.serverPort = value).Required();
 
-                cmd_parser.Setup<int>('a', "apiport").Callback(value => apiPort = value).Required();
+                cmd_parser.Setup<int>('a', "apiPort").Callback(value => apiPort = value).Required();
 
                 cmd_parser.Setup<string>('i', "ip").Callback(value => externalIp = value).Required();
 

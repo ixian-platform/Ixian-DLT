@@ -1959,11 +1959,6 @@ namespace DLT
                     var address = sig.recipientPubKeyOrAddress;
                     if (frozen_block_sigs.Find(x => x.recipientPubKeyOrAddress.addressNoChecksum.SequenceEqual(address.addressNoChecksum)) == null)
                     {
-                        if (Clock.getNetworkTimestamp() - Node.blockChain.getLastBlock().timestamp < CoreConfig.blockSignaturePlCheckTimeout
-                            && PresenceList.getPresenceByAddress(address) == null)
-                        {
-                            continue;
-                        }
                         frozen_block_sigs.Add(sig);
                         sig_count++;
                     }
