@@ -199,7 +199,6 @@ namespace DLT
                 }
             }
 
-
             public static void handleGetPIT2(byte[] data, RemoteEndpoint endpoint)
             {
                 MemoryStream ms = new MemoryStream(data);

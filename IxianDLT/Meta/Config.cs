@@ -175,7 +175,7 @@ namespace DLT
                 Console.WriteLine("   [--worker] [--threads 1] [--config ixian.cfg] [--maxLogSize 50] [--maxLogCount 10] [--logVerbosity 14]");
                 Console.WriteLine("   [--lastGoodBlock 110234] [--disableWebStart] [--onlyShowAddresses] [--walletPassword] [--blockStorage SQLite]");
                 Console.WriteLine("   [--maxTxPerBlock 19980] [--disableSetTitle] [--disableFastBlockLoading] [--checksumLock Ixian] [--verboseOutput]");
-                Console.WriteLine("   [--maxOutgoingConnections] [--maxIncomingMasterNodes] [--maxIncomingClientNodes] [--minActivityBlockHeight]");
+                Console.WriteLine("   [--maxOutgoingConnections] [--maxIncomingMasterNodes] [--maxIncomingClientNodes]");
                 Console.WriteLine("   [--forceSyncToBlock]");
                 Console.WriteLine("   [--genesis] [--netdump dumpfile] [--benchmark type] [--recover] [--verifyStorage] [--generateWallet]");
                 Console.WriteLine("   [--optimizeDBStorage] [--offline] [--disableChainReorg] [--chainReorgTest]");
@@ -209,7 +209,6 @@ namespace DLT
                 Console.WriteLine("    --maxOutgoingConnections\t Max outgoing connections.");
                 Console.WriteLine("    --maxIncomingMasterNodes\t Max incoming masternode connections.");
                 Console.WriteLine("    --maxIncomingClientNodes\t Max incoming client connections.");
-                Console.WriteLine("    --minActivityBlockHeight\t Prune activity older than specified block height (30000 is default, 0 disables it).");
                 Console.WriteLine("    --forceSyncToBlock\t\t Force sync to specified block height.");
                 Console.WriteLine("    --networkType\t\t mainnet, testnet or regtest.");
                 Console.WriteLine("    --dataFolderPath\t\t location where to store block and transaction data.");
@@ -258,8 +257,8 @@ namespace DLT
                 Console.WriteLine("    blockNotify\t\t\t Execute command when the block changes");
                 Console.WriteLine("    dataFolderPath\t\t location where to store block and transaction data.");
                 Console.WriteLine("    logFolderPath\t\t location where to store log files.");
-                Console.WriteLine("    activityFolderPath\t\t location where to store activity files.");
-                Console.WriteLine("    maxDatabaseCache\t\t max RAM in bytes to use for RocksDB Cache.");
+                Console.WriteLine("    activityFolderPath\t location where to store activity files.");
+                Console.WriteLine("    maxDatabaseCache\t max RAM in bytes to use for RocksDB Cache.");
 
                 return "";
             }
@@ -604,8 +603,6 @@ namespace DLT
                 cmd_parser.Setup<int>("maxIncomingMasterNodes").Callback(value => maxIncomingMasterNodes = value);
 
                 cmd_parser.Setup<int>("maxIncomingClientNodes").Callback(value => maxIncomingClientNodes = value);
-
-                cmd_parser.Setup<int>("minActivityBlockHeight").Callback(value => CoreConfig.minActivityBlockHeight = value);
 
                 cmd_parser.Setup<long>("forceSyncToBlock").Callback(value => forceSyncToBlock = (ulong)value);
 

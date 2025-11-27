@@ -2770,15 +2770,13 @@ namespace DLT
 
         public static void processPendingTransactions()
         {
-            // TODO TODO this has to be refactored and moved to PendingTransactions
             ulong last_block_height = IxianHandler.getLastBlockHeight();
             lock (stateLock) // this lock must be here to prevent deadlocks TODO: improve this at some point
             {
                 lock (PendingTransactions.pendingTransactions)
                 {
                     long cur_time = Clock.getTimestamp();
-                    List<PendingTransaction> tmp_pending_transactions = new List<PendingTransaction>(PendingTransactions.pendingTransactions);
-                    int idx = 0;
+                    List<PendingTransaction> tmp_pending_transactions = new(PendingTransactions.pendingTransactions);
                     foreach (var entry in tmp_pending_transactions)
                     {
                         Transaction t = entry.transaction;
@@ -2791,8 +2789,10 @@ namespace DLT
                         }
 
                         // if transaction expired, remove it from pending transactions
-                        if (last_block_height > ConsensusConfig.getRedactedWindowSize() && t.blockHeight < last_block_height - ConsensusConfig.getRedactedWindowSize())
+                        if (last_block_height > ConsensusConfig.getRedactedWindowSize()
+                            && t.blockHeight < last_block_height - ConsensusConfig.getRedactedWindowSize())
                         {
+                            Logging.error("Error sending the transaction {0}, expired", t.getTxIdString());
                             Node.activityStorage.updateStatus(t.id, ActivityStatus.Error, 0);
                             PendingTransactions.pendingTransactions.RemoveAll(x => x.transaction.id.SequenceEqual(t.id));
                             continue;
@@ -2822,29 +2822,15 @@ namespace DLT
                             }
                         }
 
-                        if ((int)entry.confirmedNodeList.Count() > 3) // already received 3+ feedback
+                        if (cur_time - tx_time > 60) // if the transaction is pending for over 60 seconds, resend
                         {
-                            continue;
-                        }
-
-                        if (cur_time - tx_time > 40) // if the transaction is pending for over 40 seconds, resend
-                        {
+                            Logging.warn("Transaction {0} pending for a while, resending", t.getTxIdString());
                             CoreProtocolMessage.broadcastProtocolMessage(new char[] { 'M', 'H' }, ProtocolMessageCode.transactionData2, t.getBytes(true, true), null);
+
                             entry.addedTimestamp = cur_time;
                             entry.confirmedNodeList.Clear();
+                            entry.rejectedNodeList.Clear();
                         }
-
-                        if (entry.confirmedNodeList.Count() > 3) // already received 3+ feedback
-                        {
-                            continue;
-                        }
-
-                        if (cur_time - tx_time > 20) // if the transaction is pending for over 20 seconds, send inquiry
-                        {
-                            CoreProtocolMessage.broadcastGetTransaction(t.id, 0, null, false);
-                        }
-
-                        idx++;
                     }
                 }
             }
