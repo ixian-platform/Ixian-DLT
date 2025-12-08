@@ -263,14 +263,21 @@ namespace DLT
                 {
                     using (BinaryReader reader = new BinaryReader(m))
                     {
-                        if(!CoreProtocolMessage.processHelloMessageV6(endpoint, reader))
+                        if(!CoreProtocolMessage.processHelloMessageV6(endpoint, reader, false))
                         {
                             return;
                         }
                         char node_type = endpoint.presenceAddress.type;
                         if (node_type != 'M' && node_type != 'H')
                         {
-                            CoreProtocolMessage.sendBye(endpoint, ProtocolByeCode.expectingMaster, string.Format("Expecting master node."), "", true);
+                            if (node_type != 'R'
+                                || NetworkClientManager.getConnectedClients(true).Length > 1)
+                            {
+                                CoreProtocolMessage.sendBye(endpoint, ProtocolByeCode.expectingMaster, string.Format("Expecting master node."), "", true);
+                                return;
+                            }
+                            endpoint.sendData(ProtocolMessageCode.getRandomPresences, new byte[1] { (byte)'M' });
+                            endpoint.sendData(ProtocolMessageCode.getRandomPresences, new byte[1] { (byte)'H' });
                             return;
                         }
 
@@ -299,9 +306,9 @@ namespace DLT
                         }
 
                         // Process the hello data
-                        Node.blockSync.onHelloDataReceived(last_block_num, block_checksum, block_version, null, null, 0, 0, true);
                         endpoint.helloReceived = true;
                         NetworkClientManager.recalculateLocalTimeDifference();
+                        Node.blockSync.onHelloDataReceived(last_block_num, block_checksum, block_version, null, null, 0, 0, true);
 
                         if (PresenceList.getPresenceByAddress(endpoint.serverWalletAddress) == null)
                         {
