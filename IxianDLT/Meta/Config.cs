@@ -104,7 +104,7 @@ namespace DLT
             public static ulong forceSyncToBlock = 0;
 
             // Read-only values
-            public static readonly string version = "xdc-0.9.7a"; // DLT Node version
+            public static readonly string version = "xdc-0.9.7b"; // DLT Node version
 
             public static readonly string checkVersionUrl = "https://resources.ixian.io/update.txt";
             public static readonly int checkVersionSeconds = 6 * 60 * 60; // 6 hours
@@ -213,7 +213,7 @@ namespace DLT
                 Console.WriteLine("    --networkType\t\t mainnet, testnet or regtest.");
                 Console.WriteLine("    --dataFolderPath\t\t location where to store block and transaction data.");
                 Console.WriteLine("    --logFolderPath\t\t location where to store log files.");
-                Console.WriteLine("    --activityFolderPath\t\t location where to store activity files.");
+                Console.WriteLine("    --activityFolderPath\t location where to store activity files.");
                 Console.WriteLine("    --maxDatabaseCache\t\t max RAM in bytes to use for RocksDB Cache.");
                 Console.WriteLine("");
                 Console.WriteLine("----------- Developer CLI flags -----------");
@@ -257,8 +257,10 @@ namespace DLT
                 Console.WriteLine("    blockNotify\t\t\t Execute command when the block changes");
                 Console.WriteLine("    dataFolderPath\t\t location where to store block and transaction data.");
                 Console.WriteLine("    logFolderPath\t\t location where to store log files.");
-                Console.WriteLine("    activityFolderPath\t location where to store activity files.");
-                Console.WriteLine("    maxDatabaseCache\t max RAM in bytes to use for RocksDB Cache.");
+                Console.WriteLine("    activityFolderPath\t\t location where to store activity files.");
+                Console.WriteLine("    maxDatabaseCache\t\t max RAM in bytes to use for RocksDB Cache.");
+                Console.WriteLine("    wallet\t\t\t Specify location of the ixian.wal file");
+                Console.WriteLine("    walletPassword\t\t Specify the password for the wallet.");
 
                 return "";
             }
@@ -394,6 +396,9 @@ namespace DLT
                             break;                            
                         case "maxDatabaseCache":
                             maxDatabaseCache = ulong.Parse(value);
+                            break;
+                        case "wallet":
+                            walletFile = value;
                             break;
                         case "walletPassword":
                             dangerCommandlinePasswordCleartextUnsafe = value;

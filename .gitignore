@@ -337,3 +337,5 @@ TestingScripts/TestClients/
 
 VersionSigner/bin/Debug/*.xml
 VersionSigner/bin/Release/*.xml
+
+.DS_Store

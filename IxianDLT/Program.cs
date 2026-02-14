@@ -37,25 +37,6 @@ namespace DLTNode
 
         static void checkRequiredFiles()
         {
-            string[] critical_dlls =
-            {
-                "BouncyCastle.Cryptography.dll",
-                "FluentCommandLineParser.dll",
-                "Newtonsoft.Json.dll",
-                "Open.Nat.dll"
-            };
-
-            foreach(string critical_dll in critical_dlls)
-            {
-                if(!File.Exists(critical_dll))
-                {
-                    Logging.error("Missing '{0}' in the program folder. Possibly the IXIAN archive was corrupted or incorrectly installed. Please re-download the archive from https://www.ixian.io!", critical_dll);
-                    Logging.info("Press ENTER to exit.");
-                    Console.ReadLine();
-                    Environment.Exit(-1);
-                }
-            }
-
             // Special case for argon
             if (!File.Exists("libargon2.dll") && !File.Exists("libargon2.so") && !File.Exists("libargon2.dylib"))
             {
@@ -65,6 +46,7 @@ namespace DLTNode
                 Environment.Exit(-1);
             }
         }
+
         static void checkVCRedist()
         {
 #pragma warning disable CA1416 // Validate platform compatibility
@@ -73,14 +55,14 @@ namespace DLTNode
             bool success = false;
             if ((installed_vc_redist is int && (int)installed_vc_redist > 0) || (installed_vc_redist_debug is int && (int)installed_vc_redist_debug > 0))
             {
-                Logging.info("Visual C++ 2015-2022 (v170) redistributable is already installed.");
+                Logging.info("Visual C++ 2017-2026 redistributable is already installed.");
                 success = true;
             }
             else
             {
                 if (!File.Exists("vc_redist.x64.exe"))
                 {
-                    Logging.warn("The VC++ 2015-2022 redistributable file is not found. Please download the v170 version of the Visual C++ 2017 redistributable and install it manually!");
+                    Logging.warn("The VC++ 2017-2026 redistributable file is not found. Please download the the Visual C++ 2017-2026 redistributable and install it manually!");
                     Logging.flush();
                     Console.WriteLine("You can download it from this URL:");
                     Console.WriteLine("https://visualstudio.microsoft.com/downloads/");
@@ -91,7 +73,7 @@ namespace DLTNode
                     Console.WriteLine();
                     Console.WriteLine();
                     Console.WriteLine();
-                    Console.WriteLine("NOTICE: In order to run this IXIAN node, Visual Studio 2015-2022 Redistributable (v170) must be installed.");
+                    Console.WriteLine("NOTICE: In order to run this IXIAN node, Visual C++ 2017-2026 Redistributable must be installed.");
                     Console.WriteLine("This can be done automatically by IXIAN, or, you can install it manually from this URL:");
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine("https://visualstudio.microsoft.com/downloads/");
@@ -99,13 +81,13 @@ namespace DLTNode
                     Console.WriteLine("The installer may open a UAC (User Account Control) prompt. Please verify that the executable is signed by Microsoft Corporation before allowing it to install!");
                     Console.ResetColor();
                     Console.WriteLine();
-                    Console.WriteLine("Automatically install Visual C++ 2015-2022 redistributable? (Y/N): ");
+                    Console.WriteLine("Automatically install Visual C++ 2017-2026 redistributable? (Y/N): ");
                     ConsoleKeyInfo k = Console.ReadKey();
                     Console.WriteLine();
                     Console.WriteLine();
                     if (k.Key == ConsoleKey.Y)
                     {
-                        Logging.info("Installing Visual C++ 2015-2022 (v170) redistributable...");
+                        Logging.info("Installing Visual C++ 2017-2026 redistributable...");
                         ProcessStartInfo installer = new ProcessStartInfo("vc_redist.x64.exe");
                         installer.Arguments = "/install /passive /norestart";
                         installer.LoadUserProfile = false;
@@ -113,11 +95,11 @@ namespace DLTNode
                         installer.RedirectStandardInput = true;
                         installer.RedirectStandardOutput = true;
                         installer.UseShellExecute = false;
-                        Logging.info("Starting installer. Please allow up to one minute for installation...");
+                        Logging.info("Starting installer. Please allow a few minutes for installation...");
                         Process p = Process.Start(installer);
                         while (!p.HasExited)
                         {
-                            if (!p.WaitForExit(60000))
+                            if (!p.WaitForExit(300000))
                             {
                                 Logging.info("The install process seems to be stuck. Terminate? (Y/N): ");
                                 k = Console.ReadKey();
@@ -134,7 +116,7 @@ namespace DLTNode
                         installed_vc_redist_debug = Microsoft.Win32.Registry.GetValue("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\debug\\x64", "Installed", 0);
                         if ((installed_vc_redist is int && (int)installed_vc_redist > 0) || (installed_vc_redist_debug is int && (int)installed_vc_redist_debug > 0))
                         {
-                            Logging.info("Visual C++ 2015-2022 (v1702015-2022) redistributable has installed successfully.");
+                            Logging.info("Visual C++ 2017-2026 redistributable has installed successfully.");
                             success = true;
                         }
                         else
@@ -166,7 +148,30 @@ namespace DLTNode
                 Console.Clear();
             }
 
-            IXICore.Utils.ConsoleHelpers.prepareWindowsConsole();
+            ConsoleHelpers.prepareWindowsConsole();
+
+            ConsoleHelpers.verboseConsoleOutput = true;
+
+            Console.ForegroundColor = ConsoleColor.DarkGreen;
+            Console.WriteLine(string.Format("IXIAN DLT {0} ({1})", Config.version, CoreConfig.version));
+            Console.ResetColor();
+
+            // Read configuration from command line
+            Config.init(args);
+
+            if (noStart)
+            {
+                return;
+            }
+
+            // Start logging
+            if (!Logging.start(Config.logFolderPath, Config.logVerbosity))
+            {
+                IxianHandler.forceShutdown = true;
+                Logging.info("Press ENTER to exit.");
+                Console.ReadLine();
+                return;
+            }
 
             Console.CancelKeyPress += delegate (object sender, ConsoleCancelEventArgs e) {
                 ConsoleHelpers.verboseConsoleOutput = true;
@@ -204,34 +209,11 @@ namespace DLTNode
 
         static void onStart(string[] args)
         {
-            ConsoleHelpers.verboseConsoleOutput = true;
-
-            Console.ForegroundColor = ConsoleColor.DarkGreen;
-            Console.WriteLine(string.Format("IXIAN DLT {0} ({1})", Config.version, CoreConfig.version));
-            Console.ResetColor();
-
             // Check for critical files in the exe dir
             checkRequiredFiles();
 
-            // Read configuration from command line
-            Config.init(args);
-
-            if (noStart)
-            {
-                return;
-            }
-
             // First create the data folder if it does not already exist
             Node.checkDataFolder();
-
-            // Start logging
-            if (!Logging.start(Config.logFolderPath, Config.logVerbosity))
-            {
-                IxianHandler.forceShutdown = true;
-                Logging.info("Press ENTER to exit.");
-                Console.ReadLine();
-                return;
-            }
 
             // Set the logging options
             Logging.setOptions(Config.maxLogSize, Config.maxLogCount);
