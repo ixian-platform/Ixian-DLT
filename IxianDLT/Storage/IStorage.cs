@@ -366,7 +366,7 @@ namespace DLT
 
                 if (!hasRocksDatabase && SQLiteStorage.hasSQLiteData(dataFolderBlocks))
                 {
-                    Logging.info("Using SQLite.");
+                    Logging.warn("Using SQLite. Please upgrade to RocksDB.");
                     return new SQLiteStorage(dataFolderBlocks);
                 }
 
@@ -382,7 +382,9 @@ namespace DLT
                 switch(name)
                 {
                     case "Auto": return autoDetectStorageEngine(dataFolderBlocks, maxDatabaseCache);
-                    case "SQLite": return new SQLiteStorage(dataFolderBlocks);
+                    case "SQLite":
+                            Logging.warn("Using SQLite. Please upgrade to RocksDB.");
+                            return new SQLiteStorage(dataFolderBlocks);
                     case "RocksDB": return new RocksDBStorage(dataFolderBlocks, maxDatabaseCache);
                     default: throw new Exception(String.Format("Unknown blocks storage provider: {0}", name));
                 }
