@@ -173,7 +173,7 @@ namespace DLTNode
                 return;
             }
 
-            Console.CancelKeyPress += delegate (object sender, ConsoleCancelEventArgs e) {
+            Console.CancelKeyPress += delegate (object? sender, ConsoleCancelEventArgs e) {
                 ConsoleHelpers.verboseConsoleOutput = true;
                 Logging.consoleOutput = ConsoleHelpers.verboseConsoleOutput;
                 e.Cancel = true;
@@ -345,33 +345,6 @@ namespace DLTNode
                                 Logging.consoleOutput = ConsoleHelpers.verboseConsoleOutput;
                                 IxianHandler.forceShutdown = true;
                             }
-                            else if (key.Key == ConsoleKey.M)
-                            {
-                                if (Node.miner != null)
-                                    Node.miner.pause = !Node.miner.pause;
-
-                                if (ConsoleHelpers.verboseConsoleOutput == false)
-                                    Node.statsConsoleScreen.clearScreen();
-                            }
-                            else if (key.Key == ConsoleKey.B)
-                            {
-                                if (Node.miner != null)
-                                {
-                                    // Adjust the search mode
-                                    if (Node.miner.searchMode + 1 > BlockSearchMode.random)
-                                    {
-                                        Node.miner.searchMode = BlockSearchMode.lowestDifficulty;
-                                    }
-                                    else
-                                    {
-                                        Node.miner.searchMode++;
-                                    }
-
-                                    // Force a new block search using the newly chosen method
-                                    Node.miner.forceSearchForBlock();
-                                }
-                            }
-
                         }
                     }
                     catch (Exception e)

@@ -812,11 +812,7 @@ namespace DLT
 
             Transaction tx = new Transaction((int)Transaction.Type.PoWSolution, new IxiNumber(0), new IxiNumber(0), ConsensusConfig.ixianInfiniMineAddress, IxianHandler.getWalletStorage().getPrimaryAddress(), data, pubkey, Node.blockChain.getLastBlockNum());
 
-            if (TransactionPool.addTransaction(tx))
-            {
-                PendingTransactions.addPendingLocalTransaction(tx, null);
-            }
-            else
+            if (!TransactionPool.addTransaction(tx))
             {
                 Logging.error("An unknown error occurred while sending API PoW solution.");
                 return false;
@@ -861,11 +857,7 @@ namespace DLT
 
             Transaction tx = new Transaction((int)Transaction.Type.PoWSolution, new IxiNumber(0), new IxiNumber(0), ConsensusConfig.ixianInfiniMineAddress, IxianHandler.getWalletStorage().getPrimaryAddress(), data, pubkey, Node.blockChain.getLastBlockNum());
 
-            if (TransactionPool.addTransaction(tx))
-            {
-                PendingTransactions.addPendingLocalTransaction(tx, null);
-            }
-            else
+            if (!TransactionPool.addTransaction(tx))
             {
                 Logging.error("An unknown error occurred while sending PoW solution.");
             }
