@@ -13,6 +13,7 @@
 using DLT.Meta;
 using IXICore;
 using IXICore.Meta;
+using IXICore.Storage;
 using IXICore.Utils;
 using SQLite;
 using System;
@@ -112,7 +113,7 @@ namespace DLT
             }
 
             // Creates the storage file if not found
-            protected override bool prepareStorageInternal()
+            protected override bool prepareStorageInternal(bool optimize)
             {
                 string db_path = pathBase + Path.DirectorySeparatorChar + "superblocks.dat";
 
@@ -1569,6 +1570,11 @@ namespace DLT
             protected override void shutdown()
             {
                 resetConnectionCache();
+            }
+
+            public override void redactBlockStorage(ulong removeBlocksBelow)
+            {
+                throw new NotImplementedException();
             }
         }
     }

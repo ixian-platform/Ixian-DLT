@@ -1,19 +1,32 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <DefineConstants>$(DefineConstants);__ROCKS_DB_SHARP__</DefineConstants>
-    <RootNamespace>UnitTests</RootNamespace>
-    <AssemblyName>UnitTests</AssemblyName>
-  </PropertyGroup>
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\IxianDLT\DLTNode.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.4.0" />
-    <PackageReference Include="MSTest.TestFramework" Version="3.0.0" />
-    <PackageReference Include="MSTest.TestAdapter" Version="3.0.0" />
-  </ItemGroup>
+	<PropertyGroup>
+		<DefineConstants>$(DefineConstants);__ROCKS_DB_SHARP__</DefineConstants>
+		<TargetFramework>net10.0</TargetFramework>
+		<RootNamespace>UnitTests</RootNamespace>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\IxianDLT\DLTNode.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+		<PackageReference Include="MSTest.TestFramework" Version="4.1.0" />
+		<PackageReference Include="MSTest.TestAdapter" Version="4.1.0" />
+	</ItemGroup>
+
+	<PropertyGroup>
+		<AssemblyName>IxianDLTUnitTests</AssemblyName>
+		<AssemblyTitle>Ixian DLT Unit Tests</AssemblyTitle>
+		<AssemblyDescription></AssemblyDescription>
+		<AssemblyCompany>Ixian</AssemblyCompany>
+		<Product>Ixian DLT Unit Tests</Product>
+		<Copyright>Copyright © 2026 Ixian</Copyright>
+		<VersionPrefix>1.0.0.0</VersionPrefix>
+		<PackageProjectUrl>https://www.ixian.io</PackageProjectUrl>
+		<CLSCompliant>true</CLSCompliant>
+		<ComVisible>false</ComVisible>
+	</PropertyGroup>
 </Project>

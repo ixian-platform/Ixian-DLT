@@ -15,6 +15,7 @@ using DLT.Meta;
 using DLT.Storage;
 using IXICore;
 using IXICore.Meta;
+using IXICore.Storage;
 using IXICore.Utils;
 using System;
 using System.Collections.Generic;
@@ -330,14 +331,9 @@ namespace DLTNode
 
         private static void storageThreadLoop()
         {
-            IStorage storage = null;
-
             // Initialize storage
-            if (storage is null)
-            {
-                storage = IStorage.create(Config.blockStorageProvider, "benchmark", 10UL << 20);
-            }
-            if (!storage.prepareStorage())
+            IStorage storage = new RocksDBStorage("benchmark", 10UL << 20, 1000, 50);
+            if (!storage.prepareStorage(Config.optimizeDBStorage))
             {
                 Logging.error("Error while preparing block storage! Aborting.");
                 Program.noStart = true;

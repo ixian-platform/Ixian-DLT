@@ -162,7 +162,7 @@ namespace DLTNode
             return Block.maxVersion - 1;          
         }
 
-        public override bool addTransaction(Transaction tx, List<Address> relayNodeAddresses, bool force_broadcast)
+        public override bool addTransaction(Transaction transaction, List<Address> relayNodeAddresses, List<ExtendedAddress>? extendedAddresses, byte[]? requestId, bool force_broadcast)
         {
             return true;
         }
@@ -194,7 +194,7 @@ namespace DLTNode
 
         public override Block getBlockHeader(ulong blockNum)
         {
-            return BlockHeaderStorage.getBlockHeader(blockNum);
+            throw new NotImplementedException();
         }
 
         public override IxiNumber getMinSignerPowDifficulty(ulong blockNum, int curBlockVersion, long curBlockTimestamp)

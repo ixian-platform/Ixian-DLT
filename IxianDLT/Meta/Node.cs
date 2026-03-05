@@ -23,6 +23,7 @@ using IXICore.Meta;
 using IXICore.Miner;
 using IXICore.Network;
 using IXICore.RegNames;
+using IXICore.Storage;
 using IXICore.Utils;
 using Newtonsoft.Json;
 using System;
@@ -152,6 +153,41 @@ namespace DLT.Meta
             init();
         }
 
+        private static IStorage autoDetectStorageEngine(string dataFolderBlocks, ulong maxDatabaseCache, ulong maxBlocksPerDatabase, int maxOpenDatabases)
+        {
+            bool hasRocksDatabase = false;
+
+            if (RocksDBStorage.hasRocksDBData(dataFolderBlocks))
+            {
+                hasRocksDatabase = true;
+            }
+
+            if (!hasRocksDatabase && SQLiteStorage.hasSQLiteData(dataFolderBlocks))
+            {
+                Logging.warn("Using SQLite. Please upgrade to RocksDB.");
+                return new SQLiteStorage(dataFolderBlocks);
+            }
+
+            // Default to RocksDB
+            Logging.info("Using RocksDB.");
+            return new RocksDBStorage(dataFolderBlocks, maxDatabaseCache, maxBlocksPerDatabase, maxOpenDatabases);
+        }
+
+        // instantiation for the proper implementation class
+        private static IStorage createStorageProvider(string name, string dataFolderBlocks, ulong maxDatabaseCache, ulong maxBlocksPerDatabase, int maxOpenDatabases)
+        {
+            Logging.info("Block storage provider: {0}", name);
+            switch (name)
+            {
+                case "Auto": return autoDetectStorageEngine(dataFolderBlocks, maxDatabaseCache, maxBlocksPerDatabase, maxOpenDatabases);
+                case "SQLite":
+                    Logging.warn("Using SQLite. Please upgrade to RocksDB.");
+                    return new SQLiteStorage(dataFolderBlocks);
+                case "RocksDB": return new RocksDBStorage(dataFolderBlocks, maxDatabaseCache, maxBlocksPerDatabase, maxOpenDatabases);
+                default: throw new Exception(String.Format("Unknown blocks storage provider: {0}", name));
+            }
+        }
+
         // Perform basic initialization of node
         public void init()
         {
@@ -177,7 +213,7 @@ namespace DLT.Meta
             // Initialize storage
             if (storage is null)
             {
-                storage = IStorage.create(Config.blockStorageProvider, Config.dataFolderBlocks, Config.maxDatabaseCache);
+                storage = createStorageProvider(Config.blockStorageProvider, Config.dataFolderBlocks, Config.maxDatabaseCache, Config.maxBlocksPerDatabase, 50);
             }
 
             if (storage is RocksDBStorage)
@@ -189,7 +225,7 @@ namespace DLT.Meta
                 CoreConfig.productVersion = Config.version + "-s";
             }
 
-            if (!storage.prepareStorage())
+            if (!storage.prepareStorage(Config.optimizeDBStorage))
             {
                 Logging.error("Error while preparing block storage! Aborting.");
                 Program.noStart = true;
@@ -864,9 +900,11 @@ namespace DLT.Meta
             // we have to instantiate whatever implementation we are using and remove its data files
             if (storage is null)
             {
-                storage = IStorage.create(Config.blockStorageProvider, Config.dataFolderBlocks, Config.maxDatabaseCache);
+                storage = createStorageProvider(Config.blockStorageProvider, Config.dataFolderBlocks, Config.maxDatabaseCache, Config.maxBlocksPerDatabase, 50);
             }
+            storage.stopStorage();
             storage.deleteData();
+            storage.prepareStorage(false);
 
             WalletStateStorage.deleteCache();
             regNamesMemoryStorage.deleteCache();
@@ -1089,9 +1127,13 @@ namespace DLT.Meta
             return false;
         }
 
-        public override bool addTransaction(Transaction transaction, List<Address> relayNodeAddresses, bool force_broadcast)
+        public override bool addTransaction(Transaction transaction, List<Address> relayNodeAddresses, List<ExtendedAddress>? extendedAddresses, byte[]? requestId, bool force_broadcast)
         {
-            return TransactionPool.addTransaction(transaction, false, null, true, force_broadcast);
+            if (PendingTransactions.addPendingLocalTransaction(transaction, relayNodeAddresses))
+            {
+                return TransactionPool.addTransaction(transaction, false, null, true, force_broadcast);
+            }
+            return false;
         }
 
         public override Wallet getWallet(Address id)
