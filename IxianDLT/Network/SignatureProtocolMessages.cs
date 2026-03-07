@@ -44,9 +44,7 @@ namespace DLT
                 }
                 else
                 {
-                    // TODO enable this after next upgrade
-                    //return CoreProtocolMessage.addToInventory(new char[] { 'M', 'H' }, new InventoryItemSignature(signature.powSolution.solution, signature.blockNum, signature.blockHash), skipEndpoint);
-                    return CoreProtocolMessage.addToInventory(new char[] { 'M', 'H' }, new InventoryItemSignature(signature.recipientPubKeyOrAddress, signature.blockNum, signature.blockHash), skipEndpoint);
+                    return CoreProtocolMessage.addToInventory(new char[] { 'M', 'H' }, new InventoryItemSignature(signature.powSolution.solution, signature.blockNum, signature.blockHash), skipEndpoint);
                 }
             }
 
@@ -78,7 +76,6 @@ namespace DLT
                     }
                 }
 
-                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, blockSig.blockHash));
                 InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(blockSig.powSolution.solution, blockSig.blockHash));
 
                 if (PresenceList.getPresenceByAddress(blockSig.recipientPubKeyOrAddress) == null)
@@ -200,55 +197,6 @@ namespace DLT
                     }
                 }
             }
-
-            [Obsolete("Use broadcastGetSignatures2 instead")]
-            public static void broadcastGetSignatures(ulong block_num, List<InventoryItemSignature> sig_list, RemoteEndpoint endpoint)
-            {
-                int sig_count = sig_list.Count;
-                int max_sig_per_chunk = ConsensusConfig.maximumBlockSigners;
-                for (int i = 0; i < sig_count;)
-                {
-                    using (MemoryStream mOut = new MemoryStream(max_sig_per_chunk * 570))
-                    {
-                        using (BinaryWriter writer = new BinaryWriter(mOut))
-                        {
-                            writer.WriteIxiVarInt(block_num);
-
-                            int next_sig_count;
-                            if (sig_count - i > max_sig_per_chunk)
-                            {
-                                next_sig_count = max_sig_per_chunk;
-                            }
-                            else
-                            {
-                                next_sig_count = sig_count - i;
-                            }
-
-                            writer.WriteIxiVarInt(next_sig_count);
-
-                            for (int j = 0; j < next_sig_count && i < sig_count; j++)
-                            {
-                                InventoryItemSignature sig = sig_list[i];
-                                i++;
-
-                                long out_rollback_len = mOut.Length;
-
-                                writer.WriteIxiVarInt(new Address(sig.solution).addressNoChecksum.Length);
-                                writer.Write(new Address(sig.solution).addressNoChecksum);
-
-                                if (mOut.Length > CoreConfig.maxMessageSize)
-                                {
-                                    mOut.SetLength(out_rollback_len);
-                                    i--;
-                                    break;
-                                }
-                            }
-                        }
-                        endpoint.sendData(ProtocolMessageCode.getSignatures2, mOut.ToArray(), null);
-                    }
-                }
-            }
-
 
             public static void broadcastGetSignatures3(ulong block_num, List<InventoryItemSignature> sig_list, RemoteEndpoint endpoint)
             {
@@ -626,7 +574,6 @@ namespace DLT
 
                                 BlockSignature blockSig = new BlockSignature(sig, block_num, checksum);
 
-                                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, checksum));
                                 InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(blockSig.powSolution.solution, checksum));
 
                                 dummy_block.signatures.Add(blockSig);
@@ -652,7 +599,6 @@ namespace DLT
                                 blockSig.blockHash = checksum;
                                 blockSig.blockNum = block_num;
 
-                                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, checksum));
                                 InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(blockSig.powSolution.solution, checksum));
 
                                 if (PresenceList.getPresenceByAddress(blockSig.recipientPubKeyOrAddress) == null)

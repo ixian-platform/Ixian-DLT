@@ -121,10 +121,6 @@ namespace DLT
                             handleInventory2(data, endpoint);
                             break;
 
-                        case ProtocolMessageCode.getSignatures2:
-                            SignatureProtocolMessages.handleGetSignatures2(data, endpoint);
-                            break;
-
                         case ProtocolMessageCode.getSignatures3:
                             SignatureProtocolMessages.handleGetSignatures3(data, endpoint);
                             break;
@@ -353,7 +349,6 @@ namespace DLT
                         ulong network_block_height = IxianHandler.getHighestKnownNetworkBlockHeight();
 
                         Dictionary<ulong, List<InventoryItemSignature>> sig_lists = new Dictionary<ulong, List<InventoryItemSignature>>();
-                        Dictionary<ulong, List<InventoryItemSignature>> sig_lists2 = new Dictionary<ulong, List<InventoryItemSignature>>();
                         List<InventoryItemKeepAlive> ka_list = new List<InventoryItemKeepAlive>();
                         List<byte[]> tx_list = new List<byte[]>();
                         bool updated_block_height = false;
@@ -370,7 +365,6 @@ namespace DLT
                                     PendingTransactions.increaseReceivedCount(item.hash, endpoint.presence.wallet);
                                     break;
 
-                                case InventoryItemTypes.blockSignature:
                                 case InventoryItemTypes.blockSignature2:
                                     var iis = (InventoryItemSignature)item;
                                     if (iis.blockNum > endpoint.blockHeight)
@@ -415,7 +409,7 @@ namespace DLT
                                         pii.lastRequested = Clock.getTimestamp();
                                         break;
 
-                                    case InventoryItemTypes.blockSignature:
+                                    case InventoryItemTypes.blockSignature2:
                                         {
                                             var iis = (InventoryItemSignature)item;
                                             if (iis.blockNum + 4 < last_accepted_block_height)
@@ -443,39 +437,6 @@ namespace DLT
                                                 sig_lists.Add(iis.blockNum, new List<InventoryItemSignature>());
                                             }
                                             sig_lists[iis.blockNum].Add(iis);
-
-                                            pii.lastRequested = Clock.getTimestamp();
-                                            break;
-                                        }
-
-                                    case InventoryItemTypes.blockSignature2:
-                                        {
-                                            var iis = (InventoryItemSignature)item;
-                                            if (iis.blockNum + 4 < last_accepted_block_height)
-                                            {
-                                                InventoryCache.Instance.setProcessedFlag(iis.type, iis.hash);
-                                                continue;
-                                            }
-
-                                            if (iis.blockNum + 4 < network_block_height)
-                                            {
-                                                InventoryCache.Instance.setProcessedFlag(iis.type, iis.hash);
-                                                requestNextBlock(iis.blockNum, iis.blockHash, endpoint);
-                                                continue;
-                                            }
-
-                                            if (iis.blockNum > last_block_height)
-                                            {
-                                                pii.lastRequested = Clock.getTimestamp();
-                                                requestNextBlock(iis.blockNum, iis.blockHash, endpoint);
-                                                continue;
-                                            }
-
-                                            if (!sig_lists2.ContainsKey(iis.blockNum))
-                                            {
-                                                sig_lists2.Add(iis.blockNum, new List<InventoryItemSignature>());
-                                            }
-                                            sig_lists2[iis.blockNum].Add(iis);
 
                                             pii.lastRequested = Clock.getTimestamp();
                                             break;
@@ -515,11 +476,6 @@ namespace DLT
                         CoreProtocolMessage.broadcastGetTransactions(tx_list, 0, endpoint);
 
                         foreach (var sig_list in sig_lists)
-                        {
-                            SignatureProtocolMessages.broadcastGetSignatures(sig_list.Key, sig_list.Value, endpoint);
-                        }
-
-                        foreach (var sig_list in sig_lists2)
                         {
                             SignatureProtocolMessages.broadcastGetSignatures3(sig_list.Key, sig_list.Value, endpoint);
                         }

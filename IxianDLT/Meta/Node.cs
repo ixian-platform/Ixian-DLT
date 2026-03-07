@@ -835,7 +835,6 @@ namespace DLT.Meta
                     BlockSignature blockSig = b.applySignature(signerPowMiner.GetBestSolution(0, b.blockNum));
                     if (blockSig != null)
                     {
-                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum));
                         InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(blockSig.powSolution.solution, b.blockChecksum));
                         SignatureProtocolMessages.broadcastBlockSignature(blockSig, b.blockNum, b.blockChecksum, null, null);
                     }

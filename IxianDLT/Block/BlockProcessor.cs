@@ -1490,7 +1490,6 @@ namespace DLT
                                 {
                                     foreach (var sig in added_signatures)
                                     {
-                                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum));
                                         InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(sig.powSolution.solution, b.blockChecksum));
                                         SignatureProtocolMessages.broadcastBlockSignature(sig, b.blockNum, b.blockChecksum, endpoint, null);
                                     }
@@ -1866,7 +1865,6 @@ namespace DLT
                         {
                             foreach (var sig in added_signatures)
                             {
-                                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, block.blockChecksum));
                                 InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(sig.powSolution.solution, block.blockChecksum));
                                 SignatureProtocolMessages.broadcastBlockSignature(sig, block.blockNum, block.blockChecksum, endpoint, null);
                             }
@@ -2151,11 +2149,10 @@ namespace DLT
                             {
                                 foreach (var sig in localNewBlock.signatures)
                                 {
-                                    if (!InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(sig.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum)))
+                                    if (!InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(sig.powSolution.solution, localNewBlock.blockChecksum)))
                                     {
                                         continue;
                                     }
-                                    InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(sig.powSolution.solution, localNewBlock.blockChecksum));
                                     SignatureProtocolMessages.broadcastBlockSignature(sig, localNewBlock.blockNum, localNewBlock.blockChecksum, null, null);
                                 }
                                 BlockProtocolMessages.broadcastNewBlock(localNewBlock, null, null);
@@ -3191,7 +3188,6 @@ namespace DLT
                     BlockSignature signature_data = localNewBlock.applySignature(Node.signerPowMiner.GetBestSolution(0, localNewBlock.blockNum));
                     if (signature_data != null)
                     {
-                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(signature_data.recipientPubKeyOrAddress.addressNoChecksum, localNewBlock.blockChecksum));
                         if (signature_data.powSolution != null)
                         {
                             InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(signature_data.powSolution.solution, localNewBlock.blockChecksum));
@@ -4061,7 +4057,6 @@ namespace DLT
                     BlockSignature blockSig = b.applySignature(Node.signerPowMiner.GetBestSolution(0, b.blockNum));
                     if (blockSig != null)
                     {
-                        InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature, InventoryItemSignature.getHash(blockSig.recipientPubKeyOrAddress.addressNoChecksum, b.blockChecksum));
                         InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(blockSig.powSolution.solution, b.blockChecksum));
                         SignatureProtocolMessages.broadcastBlockSignature(blockSig, b.blockNum, b.blockChecksum, null, null);
                     }
