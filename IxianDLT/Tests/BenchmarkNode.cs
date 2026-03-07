@@ -211,5 +211,10 @@ namespace DLTNode
         {
             throw new NotImplementedException();
         }
+
+        public override bool addIncomingTransaction(Transaction tx)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

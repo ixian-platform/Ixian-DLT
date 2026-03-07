@@ -740,10 +740,6 @@ namespace DLT
                         }
                     }
 
-                    // Send transaction events to all subscribed clients
-                    // TODO: optimize this further to decrease cpu time in the current thread
-                    broadcastAddTransactionEvent(t);
-
                     return true;
                 }
             }
@@ -912,82 +908,6 @@ namespace DLT
             return getRelatedMultisigTransactions(txid, block, false).Count();
         }
 
-        public static void addTransactionToActivityStorage(Transaction transaction)
-        {
-            ActivityObject activity = null;
-            ActivityType type;
-            IxiNumber value = transaction.amount;
-            Dictionary<byte[], List<byte[]>> wallet_list = null;
-            Address wallet = null;
-            Address primary_address = transaction.pubKey;
-
-            ActivityStatus status = ActivityStatus.Pending;
-            if (transaction.applied > 0)
-            {
-                status = ActivityStatus.Final;
-            }
-
-            if (IxianHandler.isMyAddress(primary_address))
-            {
-                // We are the sender
-                wallet = primary_address;
-                type = ActivityType.TransactionSent;
-                if (transaction.type == (int)Transaction.Type.PoWSolution)
-                {
-                    type = ActivityType.MiningReward;
-                    value = ConsensusConfig.calculateMiningRewardForBlock(transaction.powSolution.blockNum);
-                }
-                else if (transaction.type == (int)Transaction.Type.RegName)
-                {
-                    type = ActivityType.IxiName;
-                }
-
-                activity = new ActivityObject(IxianHandler.getWalletStorageBySecondaryAddress(primary_address).getSeedHash(),
-                                wallet,
-                                transaction.id,
-                                transaction.toList.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.amount),
-                                type,
-                                null,
-                                value,
-                                transaction.timeStamp,
-                                status,
-                                transaction.applied);
-                Node.activityStorage.insertActivity(activity);
-            }
-            else
-            {
-                wallet_list = IxianHandler.extractMyAddressesFromAddressList(transaction.toList);
-                if (wallet_list != null)
-                {
-                    // We are the recipient
-                    type = ActivityType.TransactionReceived;
-                    if (transaction.type == (int)Transaction.Type.StakingReward)
-                    {
-                        type = ActivityType.StakingReward;
-                    }
-
-                    foreach (var extractedWallet in wallet_list)
-                    {
-                        foreach (var addressBytes in extractedWallet.Value)
-                        {
-                            Address address = new Address(addressBytes);
-                            activity = new ActivityObject(extractedWallet.Key,
-                                                          address,
-                                                          transaction.id,
-                                                          transaction.fromList.ToDictionary(kvp => new Address(transaction.pubKey.addressNoChecksum, kvp.Key), kvp => kvp.Value),
-                                                          type,
-                                                          null,
-                                                          transaction.toList[address].amount,
-                                                          transaction.timeStamp,
-                                                          status,
-                                                          transaction.applied);
-                            Node.activityStorage.insertActivity(activity);
-                        }
-                    }
-                }
-            }
-        }
-
         public static void addTxId(byte[] txid)
         {
             if (!Node.blockSync.synchronizing)
@@ -1068,7 +988,7 @@ namespace DLT
                     {
                         transaction.timeStamp = Clock.getTimestamp();
                     }
-                    addTransactionToActivityStorage(transaction);
+                    IxianHandler.addTransactionToActivityStorage(Node.activityStorage, transaction);
                 }
             }
 
@@ -1093,33 +1013,7 @@ namespace DLT
                 }
             }
 
-            // Send transaction events to all subscribed clients
-            // TODO: optimize this further to decrease cpu time in the current thread
-            broadcastAddTransactionEvent(transaction);
-
-
             return true;
-        }
-
-        // Send transaction events to all subscribed clients
-        public static void broadcastAddTransactionEvent(Transaction transaction)
-        {
-            if(Node.blockSync.synchronizing)
-            {
-                return;
-            }
-
-            // Send transaction FROM event
-            byte[] from_addr = transaction.pubKey.addressNoChecksum;
-            CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.transactionFrom, from_addr, ProtocolMessageCode.transactionData2, transaction.getBytes(true, true), Encoding.UTF8.GetBytes(transaction.getTxIdString()));
-
-            // Send transaction TO event
-            foreach (var entry in transaction.toList)
-            {
-                byte[] addr = new byte[entry.Key.addressNoChecksum.Length];
-                Array.Copy(entry.Key.addressNoChecksum, addr, addr.Length);
-                CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.transactionTo, addr, ProtocolMessageCode.transactionData2, transaction.getBytes(true, true), Encoding.UTF8.GetBytes(transaction.getTxIdString()));
-            }
         }
 
         public static bool hasAppliedTransaction(byte[] txid)

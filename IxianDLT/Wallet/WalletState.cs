@@ -347,9 +347,6 @@ namespace DLT
 #if TRACE_MEMSTREAM_SIZES
                             Logging.info(String.Format("WalletState::setWalletBalance: {0}", mw.Length));
 #endif
-
-                            // Send balance message to all subscribed clients
-                            CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.balance, id, ProtocolMessageCode.balance2, mw.ToArray(), id, null);
                         }
                     }
                 }

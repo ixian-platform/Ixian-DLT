@@ -95,8 +95,6 @@ namespace DLT
                                             i--;
                                             break;
                                         }
-
-                                        broadcastBlockHeaderTransactions(block, endpoint);
                                     }
                                 }
                                 if (!found)
@@ -271,42 +269,6 @@ namespace DLT
                     endpoint.sendData(ProtocolMessageCode.pitData2, mOut.ToArray());
                 }
             }
-
-            private static void broadcastBlockHeaderTransactions(Block b, RemoteEndpoint endpoint)
-            {
-                if (!endpoint.isConnected())
-                {
-                    return;
-                }
-
-                foreach (var txid in b.transactions)
-                {
-                    Transaction t = TransactionPool.getAppliedTransaction(txid, b.blockNum);
-
-                    if (t == null)
-                    {
-                        Logging.warn("Transaction {0} missing from storage.", txid);
-                        continue;
-                    }
-
-                    if (endpoint.isSubscribedToAddress(NetworkEvents.Type.transactionFrom, t.pubKey.addressNoChecksum))
-                    {
-                        endpoint.sendData(ProtocolMessageCode.transactionData2, t.getBytes(true, true), null);
-                    }
-                    else
-                    {
-                        foreach (var entry in t.toList)
-                        {
-                            if (endpoint.isSubscribedToAddress(NetworkEvents.Type.transactionTo, entry.Key.addressNoChecksum))
-                            {
-                                endpoint.sendData(ProtocolMessageCode.transactionData2, t.getBytes(true, true), null);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
 
             private static void broadcastRelevantTransactions(Block b, RemoteEndpoint endpoint, Cuckoo filter)
             {

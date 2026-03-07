@@ -1348,6 +1348,20 @@ namespace DLT.Meta
                 return totalRAM / 5;
             }
         }
+
+        public override bool addIncomingTransaction(Transaction tx)
+        {
+            if (TransactionPool.addTransaction(tx))
+            {
+                if (tx.timeStamp == 0)
+                {
+                    tx.timeStamp = Clock.getTimestamp();
+                }
+                IxianHandler.addTransactionToActivityStorage(activityStorage, tx);
+                return true;
+            }
+            return false;
+        }
     }
 
     class dataPoint

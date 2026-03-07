@@ -72,7 +72,7 @@ namespace DLTNode.Meta
                         {
                             tx.timeStamp = b.timestamp;
                         }
-                        TransactionPool.addTransactionToActivityStorage(tx);
+                        IxianHandler.addTransactionToActivityStorage(Node.activityStorage, tx);
                     }
 
                     lastBlockNum++;
