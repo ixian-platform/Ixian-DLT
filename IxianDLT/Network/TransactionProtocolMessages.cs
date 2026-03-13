@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2017-2025 Ixian
+﻿// Copyright (C) 2017-2026 Ixian
 // This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
@@ -15,11 +15,6 @@ using IXICore;
 using IXICore.Meta;
 using IXICore.Network;
 using IXICore.Utils;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading;
 
 namespace DLT
 {
@@ -27,6 +22,82 @@ namespace DLT
     {
         public class TransactionProtocolMessages
         {
+            private static bool isFilteredTransaction(Transaction t, Cuckoo filter)
+            {
+
+                if (filter.Contains(t.pubKey.addressNoChecksum))
+                {
+                    return true;
+                }
+                else
+                {
+                    foreach (var entry in t.toList)
+                    {
+                        if (filter.Contains(entry.Key.addressNoChecksum))
+                        {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            public static Cuckoo? broadcastRelevantTransactions(Block b, RemoteEndpoint endpoint, Cuckoo filter, byte[] relayIndex)
+            {
+                if (!endpoint.isConnected())
+                {
+                    return null;
+                }
+                int maxTxPerChunk = CoreConfig.maximumTransactionsPerChunk;
+                Cuckoo txFilter = new(b.transactions.Count);
+                bool found = false;
+                using (MemoryStream ms = new())
+                using (BinaryWriter writer = new(ms))
+                {
+                    int chunkTxCount = 0;
+                    if (endpoint.presenceAddress.type == 'R')
+                    {
+                        writer.WriteIxiBytes(relayIndex);
+                    }
+                    writer.WriteIxiVarInt(b.blockNum);
+                    writer.WriteIxiVarInt(maxTxPerChunk);
+                    foreach (var txid in b.transactions)
+                    {
+                        Transaction t = TransactionPool.getAppliedTransaction(txid, b.blockNum);
+                        if (t == null)
+                        {
+                            Logging.warn("Transaction {0} missing from storage.", txid);
+                            continue;
+                        }
+                        if (isFilteredTransaction(t, filter))
+                        {
+                            found = true;
+                            txFilter.Add(t.id);
+                            var txBytes = t.getBytes(true, true);
+                            if (writer.BaseStream.Position + txBytes.Length > CoreConfig.maxMessageSize)
+                            {
+                                endpoint.sendData(ProtocolMessageCode.transactionsChunk3, ms.ToArray(), null);
+                                writer.BaseStream.SetLength(0);
+                                chunkTxCount = 0;
+                                writer.WriteIxiVarInt(b.blockNum);
+                                writer.WriteIxiVarInt(maxTxPerChunk);
+                            }
+                            writer.WriteIxiBytes(txBytes);
+                            chunkTxCount++;
+                        }
+                    }
+                    if (found)
+                    {
+                        if (ms.Position > 0)
+                        {
+                            endpoint.sendData(ProtocolMessageCode.transactionsChunk3, ms.ToArray(), null);
+                        }
+                        return txFilter;
+                    }
+                    return null;
+                }
+            }
+
             // Handle the getBlockTransactions message
             // This is called from NetworkProtocol
             public static void handleGetBlockTransactions3(ulong blockNum, bool requestAllTransactions, RemoteEndpoint endpoint)
@@ -266,6 +337,7 @@ namespace DLT
                             ulong blockNum = (ulong)-msg_id;
                             if (!Node.blockProcessor.isBlockWaitingForTransactions(blockNum))
                             {
+                                Logging.warn("Received transactions chunk for block #{0} but I'm not waiting for transactions for this block.", blockNum);
                                 return;
                             }
                         }

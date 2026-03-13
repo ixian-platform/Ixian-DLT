@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2017-2025 Ixian
+﻿// Copyright (C) 2017-2026 Ixian
 // This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
@@ -11,7 +11,6 @@
 // MIT License for more details.
 
 using DLT.Meta;
-using DLTNode;
 using IXICore;
 using IXICore.Activity;
 using IXICore.Inventory;
@@ -20,9 +19,6 @@ using IXICore.Network;
 using IXICore.Network.Messages;
 using IXICore.RegNames;
 using IXICore.Utils;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using static IXICore.Transaction;
 
@@ -2670,7 +2666,7 @@ namespace DLT
                 lock (PendingTransactions.pendingTransactions)
                 {
                     long cur_time = Clock.getTimestamp();
-                    List<PendingTransaction> tmp_pending_transactions = new(PendingTransactions.pendingTransactions);
+                    List<PendingTransaction> tmp_pending_transactions = new(PendingTransactions.pendingTransactions.Values);
                     foreach (var entry in tmp_pending_transactions)
                     {
                         Transaction t = entry.transaction;
@@ -2678,7 +2674,7 @@ namespace DLT
 
                         if (t.applied != 0)
                         {
-                            PendingTransactions.pendingTransactions.RemoveAll(x => x.transaction.id.SequenceEqual(t.id));
+                            PendingTransactions.remove(t.id);
                             continue;
                         }
 
@@ -2688,7 +2684,7 @@ namespace DLT
                         {
                             Logging.error("Error sending the transaction {0}, expired", t.getTxIdString());
                             Node.activityStorage.updateStatus(t.id, ActivityStatus.Error, 0);
-                            PendingTransactions.pendingTransactions.RemoveAll(x => x.transaction.id.SequenceEqual(t.id));
+                            PendingTransactions.remove(t.id);
                             continue;
                         }
 
@@ -2701,7 +2697,7 @@ namespace DLT
                             if (tmpBlock == null || tmpBlock.powField != null)
                             {
                                 Node.activityStorage.updateStatus(t.id, ActivityStatus.Error, 0);
-                                PendingTransactions.pendingTransactions.RemoveAll(x => x.transaction.id.SequenceEqual(t.id));
+                                PendingTransactions.remove(t.id);
                                 continue;
                             }
                         }
@@ -2711,7 +2707,7 @@ namespace DLT
                             if (getUnappliedTransaction(t.id) == null && !verifyTransaction(t, null, out _, false))
                             {
                                 Node.activityStorage.updateStatus(t.id, ActivityStatus.Error, 0);
-                                PendingTransactions.pendingTransactions.RemoveAll(x => x.transaction.id.SequenceEqual(t.id));
+                                PendingTransactions.remove(t.id);
                                 continue;
                             }
                         }

@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2017-2025 Ixian
+﻿// Copyright (C) 2017-2026 Ixian
 // This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
@@ -16,12 +16,7 @@ using IXICore.Inventory;
 using IXICore.Meta;
 using IXICore.Network;
 using IXICore.Utils;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading;
 
 namespace DLT
 {
@@ -85,7 +80,7 @@ namespace DLT
                                         long rollback_len = mOut.Length;
 
                                         found = true;
-                                        byte[] headerBytes = block.getBytes(true, true, true, true);
+                                        byte[] headerBytes = block.getBytes(true, true, true, false, true, false);
                                         writer.WriteIxiVarInt(headerBytes.Length);
                                         writer.Write(headerBytes);
 
@@ -108,7 +103,6 @@ namespace DLT
                 }
             }
 
-
             public static void handleGetRelevantBlockTransactions(byte[] data, RemoteEndpoint endpoint)
             {
                 using (MemoryStream m = new MemoryStream(data))
@@ -118,9 +112,19 @@ namespace DLT
                         ulong from = reader.ReadIxiVarUInt();
                         ulong totalCount = reader.ReadIxiVarUInt();
 
-                        int filterLen = (int)reader.ReadIxiVarUInt();
-                        byte[] filterBytes = reader.ReadBytes(filterLen);
-                        
+                        byte[] filterBytes = reader.ReadIxiBytes()!;
+
+                        byte[] prKey = new byte[reader.BaseStream.Position];
+                        Buffer.BlockCopy(data, 0, prKey, 0, prKey.Length);
+
+                        bool verificationModeSet = false;
+                        TIVBlockVerificationMode requestedVerificationMode = TIVBlockVerificationMode.Minimal;
+                        if (reader.BaseStream.Position != reader.BaseStream.Length)
+                        {
+                            requestedVerificationMode = (TIVBlockVerificationMode)reader.ReadIxiVarInt();
+                            verificationModeSet = true;
+                        }
+
                         Cuckoo filter = new Cuckoo(filterBytes);
 
                         if (totalCount < 1)
@@ -152,8 +156,8 @@ namespace DLT
                             return;
                         }
 
-                        // TODO TODO TODO block headers should be read from a separate storage and every node should keep a full copy
                         bool found = false;
+                        Dictionary<ulong, Cuckoo> txFilters = new Dictionary<ulong, Cuckoo>();
                         using (MemoryStream mOut = new MemoryStream())
                         {
                             using (BinaryWriter writer = new BinaryWriter(mOut))
@@ -168,13 +172,57 @@ namespace DLT
                                     long rollback_len = mOut.Length;
 
                                     found = true;
-                                    Block tmpBlock = new Block(block);
-                                    tmpBlock.signatureCount = tmpBlock.getFrozenSignatureCount();
-                                    tmpBlock.totalSignerDifficulty = tmpBlock.getTotalSignerDifficulty();
-                                    tmpBlock.signatures.Clear();
-                                    tmpBlock.setFrozenSignatures(null);
+                                    byte[] headerBytes;
+                                    TIVBlockVerificationMode mode = requestedVerificationMode;
+                                    if (block.lastSuperBlockChecksum != null)
+                                    {
+                                        mode = TIVBlockVerificationMode.Transactions;
+                                    }
+                                    switch (mode)
+                                    {
+                                        case TIVBlockVerificationMode.Minimal:
+                                            Block tmpBlock = new Block(block);
+                                            tmpBlock.signatureCount = tmpBlock.getFrozenSignatureCount();
+                                            tmpBlock.totalSignerDifficulty = tmpBlock.getTotalSignerDifficulty();
+                                            tmpBlock.signatures.Clear();
+                                            tmpBlock.setFrozenSignatures(null);
 
-                                    byte[] headerBytes = tmpBlock.getBytes(true, true, true, true);
+                                            headerBytes = tmpBlock.getBytes(include_sb_segments: true,
+                                                                            frozen_sigs_only: true,
+                                                                            force_v10_structure: true,
+                                                                            for_checksum: true,
+                                                                            compacted_signatures: true,
+                                                                            include_transactions: false,
+                                                                            full_signer_difficulty: verificationModeSet);
+                                            break;
+                                        case TIVBlockVerificationMode.PoCW:
+                                            headerBytes = block.getBytes(include_sb_segments: true,
+                                                                         frozen_sigs_only: true,
+                                                                         force_v10_structure: true,
+                                                                         for_checksum: false,
+                                                                         compacted_signatures: true,
+                                                                         include_transactions: false);
+                                            break;
+                                        case TIVBlockVerificationMode.Signatures:
+                                            headerBytes = block.getBytes(include_sb_segments: true,
+                                                                         frozen_sigs_only: true,
+                                                                         force_v10_structure: true,
+                                                                         for_checksum: false,
+                                                                         compacted_signatures: false,
+                                                                         include_transactions: false);
+                                            break;
+                                        case TIVBlockVerificationMode.Transactions:
+                                            headerBytes = block.getBytes(include_sb_segments: true,
+                                                                         frozen_sigs_only: true,
+                                                                         force_v10_structure: true,
+                                                                         for_checksum: false,
+                                                                         compacted_signatures: false,
+                                                                         include_transactions: true);
+                                            break;
+                                        default:
+                                            Logging.warn("Unknown TIVBlockVerificationMode {0} in handleGetRelevantBlockTransactions.", mode);
+                                            return;
+                                    }
                                     writer.WriteIxiVarInt(headerBytes.Length);
                                     writer.Write(headerBytes);
 
@@ -184,12 +232,25 @@ namespace DLT
                                         break;
                                     }
 
-                                    broadcastRelevantTransactions(block, endpoint, filter);
+                                    Cuckoo? txFilter = TransactionProtocolMessages.broadcastRelevantTransactions(block, endpoint, filter, prKey);
+                                    if (txFilter != null)
+                                    {
+                                        txFilters.Add(block.blockNum, txFilter);
+                                    }
                                 }
                             }
                             if (!found)
                             {
                                 return;
+                            }
+                            foreach(var txFilter in txFilters)
+                            {
+                                byte[]? relayIndex = null;
+                                if (PresenceList.myPresenceType == 'R')
+                                {
+                                    relayIndex = prKey;
+                                }
+                                handleGetPIT2(txFilter.Key, txFilter.Value, relayIndex, endpoint);
                             }
                             endpoint.sendData(ProtocolMessageCode.compactBlockHeaders1, mOut.ToArray());
                         }
@@ -199,7 +260,7 @@ namespace DLT
 
             public static void handleGetPIT2(byte[] data, RemoteEndpoint endpoint)
             {
-                MemoryStream ms = new MemoryStream(data);
+                using (MemoryStream ms = new MemoryStream(data))
                 using (BinaryReader r = new BinaryReader(ms))
                 {
                     ulong block_num = r.ReadIxiVarUInt();
@@ -215,93 +276,65 @@ namespace DLT
                         Logging.warn("The Cuckoo filter in the getPIT message was invalid or corrupted!");
                         return;
                     }
-                    Block b = Node.blockChain.getBlock(block_num, true, true);
-                    if (b is null)
+                    byte[]? relayIndex = null;
+                    if (PresenceList.myPresenceType == 'R')
                     {
-                        return;
+                        relayIndex = cf.getFilterBytes();
                     }
-                    if (b.version < BlockVer.v6)
-                    {
-                        Logging.warn("Neighbor {0} requested PIT information for block {0}, which was below the minimal PIT version.", endpoint.fullAddress, block_num);
-                        return;
-                    }
-                    PrefixInclusionTree pit = new PrefixInclusionTree(44, 3);
-                    List<byte[]> interesting_transactions = new List<byte[]>();
-                    foreach (var tx in b.transactions)
-                    {
-                        if (b.version < BlockVer.v8)
-                        {
-                            pit.add(UTF8Encoding.UTF8.GetBytes(Transaction.getTxIdString(tx)));
-                            if (cf.Contains(tx))
-                            {
-                                interesting_transactions.Add(UTF8Encoding.UTF8.GetBytes(Transaction.getTxIdString(tx)));
-                            }
-                        }
-                        else
-                        {
-                            pit.add(tx);
-                            if (cf.Contains(tx))
-                            {
-                                interesting_transactions.Add(tx);
-                            }
-                        }
-                    }
-                    // make sure we ended up with the correct PIT
-                    if (!b.pitChecksum.SequenceEqual(pit.calculateTreeHash()))
-                    {
-                        // This is a serious error, but I am not sure how to respond to it right now.
-                        Logging.error("Reconstructed PIT for block {0} does not match the checksum in block header!", block_num);
-                        return;
-                    }
-                    byte[] minimal_pit = pit.getMinimumTreeTXList(interesting_transactions);
-                    MemoryStream mOut = new MemoryStream(minimal_pit.Length + 12);
-                    using (BinaryWriter w = new BinaryWriter(mOut, Encoding.UTF8, true))
-                    {
-                        if (endpoint.presenceAddress.type == 'R')
-                        {
-                            w.WriteIxiVarInt(filter.Length);
-                            w.Write(filter);
-                        }
-                        w.WriteIxiVarInt(block_num);
-                        w.WriteIxiVarInt(minimal_pit.Length);
-                        w.Write(minimal_pit);
-                    }
-                    endpoint.sendData(ProtocolMessageCode.pitData2, mOut.ToArray());
+                    handleGetPIT2(block_num, cf, relayIndex, endpoint);
                 }
             }
 
-            private static void broadcastRelevantTransactions(Block b, RemoteEndpoint endpoint, Cuckoo filter)
+            public static void handleGetPIT2(ulong blockNum, Cuckoo cf, byte[]? relayIndex, RemoteEndpoint endpoint)
             {
-                if (!endpoint.isConnected())
+                Block b = Node.blockChain.getBlock(blockNum, true, true);
+                if (b is null)
                 {
                     return;
                 }
-
-                foreach (var txid in b.transactions)
+                if (b.version < BlockVer.v6)
                 {
-                    Transaction t = TransactionPool.getAppliedTransaction(txid, b.blockNum);
-
-                    if (t == null)
+                    Logging.warn("Neighbor {0} requested PIT information for block {0}, which was below the minimal PIT version.", endpoint.fullAddress, blockNum);
+                    return;
+                }
+                PrefixInclusionTree pit = new PrefixInclusionTree(44, 3);
+                List<byte[]> interesting_transactions = new List<byte[]>();
+                foreach (var tx in b.transactions)
+                {
+                    if (b.version < BlockVer.v8)
                     {
-                        Logging.warn("Transaction {0} missing from storage.", txid);
-                        continue;
-                    }
-
-                    if (filter.Contains(t.pubKey.addressNoChecksum))
-                    {
-                        endpoint.sendData(ProtocolMessageCode.transactionData2, t.getBytes(true, true), null);
+                        pit.add(UTF8Encoding.UTF8.GetBytes(Transaction.getTxIdString(tx)));
+                        if (cf.Contains(tx))
+                        {
+                            interesting_transactions.Add(UTF8Encoding.UTF8.GetBytes(Transaction.getTxIdString(tx)));
+                        }
                     }
                     else
                     {
-                        foreach (var entry in t.toList)
+                        pit.add(tx);
+                        if (cf.Contains(tx))
                         {
-                            if (filter.Contains(entry.Key.addressNoChecksum))
-                            {
-                                endpoint.sendData(ProtocolMessageCode.transactionData2, t.getBytes(true, true), null);
-                                break;
-                            }
+                            interesting_transactions.Add(tx);
                         }
                     }
+                }
+                // make sure we ended up with the correct PIT
+                if (!b.pitChecksum.SequenceEqual(pit.calculateTreeHash()))
+                {
+                    Logging.error("Reconstructed PIT for block {0} does not match the checksum in block header!", blockNum);
+                    return;
+                }
+                byte[] minimalPit = pit.getMinimumTreeTXList(interesting_transactions);
+                using (MemoryStream mOut = new MemoryStream(minimalPit.Length + 12))
+                using (BinaryWriter w = new BinaryWriter(mOut))
+                {
+                    if (relayIndex != null)
+                    {
+                        w.WriteIxiBytes(relayIndex);
+                    }
+                    w.WriteIxiVarInt(blockNum);
+                    w.WriteIxiBytes(minimalPit);
+                    endpoint.sendData(ProtocolMessageCode.pitData2, mOut.ToArray());
                 }
             }
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2017-2025 Ixian
+// Copyright (C) 2017-2026 Ixian
 // This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
@@ -16,10 +16,6 @@ using IXICore.Meta;
 using IXICore.Storage;
 using IXICore.Utils;
 using SQLite;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Numerics;
 
 namespace DLT
@@ -833,7 +829,7 @@ namespace DLT
                 return block;
             }
 
-            public override Block getBlock(ulong blocknum)
+            public override Block? getBlock(ulong blocknum)
             {
                 var sw = new System.Diagnostics.Stopwatch();
                 sw.Start();
@@ -881,12 +877,12 @@ namespace DLT
                 return getBlockFromStorageBlock(_storage_block[0]);
             }
 
-            public override byte[] getBlockBytes(ulong blocknum, bool asBlockHeader)
+            public override byte[]? getBlockBytes(ulong blocknum, bool compactedSignatures, bool includeTransactions)
             {
-                return getBlock(blocknum)?.getBytes(true, true, true, asBlockHeader);
+                return getBlock(blocknum)?.getBytes(true, true, true, false, compactedSignatures, includeTransactions);
             }
 
-            public override (byte[] blockChecksum, IxiNumber totalSignerDifficulty) getBlockTotalSignerDifficulty(ulong blocknum)
+            public override (byte[]? blockHash, IxiNumber? totalSignerDifficulty) getBlockTotalSignerDifficulty(ulong blocknum)
             {
                 if (blocknum < 1)
                 {
@@ -934,7 +930,7 @@ namespace DLT
                 }
             }
 
-            private Transaction getTransactionFromStorageTransaction(_storage_Transaction tx)
+            private Transaction? getTransactionFromStorageTransaction(_storage_Transaction tx)
             {
                 Transaction transaction = new Transaction(tx.type, tx.version)
                 {
@@ -1041,9 +1037,9 @@ namespace DLT
             }
 
             // Retrieve a transaction from the sql database
-            public override Transaction getTransaction(byte[] txid, ulong block_num)
+            public override Transaction? getTransaction(byte[] txid, ulong block_num)
             {
-                List<_storage_Transaction> _storage_tx = null;
+                List<_storage_Transaction>? _storage_tx = null;
 
                 string sql = "select * from transactions where `id` = ? LIMIT 1";
 
@@ -1162,7 +1158,7 @@ namespace DLT
                 return getTransactionFromStorageTransaction(tx);
             }
 
-            public override byte[] getTransactionBytes(byte[] txid, ulong block_num)
+            public override byte[]? getTransactionBytes(byte[] txid, ulong block_num)
             {
                 return getTransaction(txid, block_num)?.getBytes(true, true);
             }
@@ -1461,11 +1457,11 @@ namespace DLT
                 throw new NotImplementedException();
             }
 
-            public override IEnumerable<Transaction> getTransactionsInBlock(ulong block_num, short tx_type = -1)
+            public override IEnumerable<Transaction>? getTransactionsInBlock(ulong block_num, short tx_type = -1)
             {
                 List<Transaction> transactions = new List<Transaction>();
 
-                List<_storage_Transaction> _storage_tx = null;
+                List<_storage_Transaction>? _storage_tx = null;
 
                 string sql = "select * from transactions where `applied` = ?";
 
@@ -1533,7 +1529,7 @@ namespace DLT
                 return transactions;
             }
 
-            public override IEnumerable<byte[]> getTransactionsBytesInBlock(ulong block_num, short tx_type = -1)
+            public override IEnumerable<byte[]>? getTransactionsBytesInBlock(ulong block_num, short tx_type = -1)
             {
                 throw new NotImplementedException();
             }

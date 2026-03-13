@@ -294,9 +294,9 @@ namespace DLT
                     return bh.totalSignerDifficulty;
                 }
                 var hashAndSignerDiffs = Node.storage.getBlockTotalSignerDifficulty(blockNum);
-                if (hashAndSignerDiffs.blockChecksum != null && hashAndSignerDiffs.totalSignerDifficulty != null)
+                if (hashAndSignerDiffs.blockHash != null && hashAndSignerDiffs.totalSignerDifficulty != null)
                 {
-                    cacheBlockSignerDifficulty(blockNum, hashAndSignerDiffs.blockChecksum, new IxiNumber(hashAndSignerDiffs.totalSignerDifficulty));
+                    cacheBlockSignerDifficulty(blockNum, hashAndSignerDiffs.blockHash, new IxiNumber(hashAndSignerDiffs.totalSignerDifficulty));
                     return hashAndSignerDiffs.totalSignerDifficulty;
                 }
             }
@@ -325,10 +325,10 @@ namespace DLT
                     return bh.hash;
                 }
                 var hashAndTotalSignerDiff = Node.storage.getBlockTotalSignerDifficulty(blockNum);
-                if (hashAndTotalSignerDiff.blockChecksum != null)
+                if (hashAndTotalSignerDiff.blockHash != null)
                 {
-                    cacheBlockSignerDifficulty(blockNum, hashAndTotalSignerDiff.blockChecksum, hashAndTotalSignerDiff.totalSignerDifficulty);
-                    return hashAndTotalSignerDiff.blockChecksum;
+                    cacheBlockSignerDifficulty(blockNum, hashAndTotalSignerDiff.blockHash, hashAndTotalSignerDiff.totalSignerDifficulty);
+                    return hashAndTotalSignerDiff.blockHash;
                 }
             }
 

@@ -1128,7 +1128,7 @@ namespace DLT.Meta
 
         public override bool addTransaction(Transaction transaction, List<Address> relayNodeAddresses, List<ExtendedAddress>? extendedAddresses, byte[]? requestId, bool force_broadcast)
         {
-            if (PendingTransactions.addPendingLocalTransaction(transaction, relayNodeAddresses))
+            if (PendingTransactions.addOutgoingTransaction(transaction, relayNodeAddresses))
             {
                 return TransactionPool.addTransaction(transaction, false, null, true, force_broadcast);
             }
