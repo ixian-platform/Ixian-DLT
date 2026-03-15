@@ -246,7 +246,7 @@ namespace DLT
                             foreach(var txFilter in txFilters)
                             {
                                 byte[]? relayIndex = null;
-                                if (PresenceList.myPresenceType == 'R')
+                                if (endpoint.presenceAddress.type == 'R')
                                 {
                                     relayIndex = prKey;
                                 }
@@ -277,7 +277,7 @@ namespace DLT
                         return;
                     }
                     byte[]? relayIndex = null;
-                    if (PresenceList.myPresenceType == 'R')
+                    if (endpoint.presenceAddress.type == 'R')
                     {
                         relayIndex = cf.getFilterBytes();
                     }
