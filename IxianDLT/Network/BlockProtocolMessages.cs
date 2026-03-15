@@ -162,7 +162,7 @@ namespace DLT
                         {
                             using (BinaryWriter writer = new BinaryWriter(mOut))
                             {
-                                writer.Write(data);
+                                writer.Write(prKey);
                                 for (uint j = 0; j < totalCount; j++)
                                 {
                                     Block block = Node.blockChain.getBlock(from + j, true, true);
