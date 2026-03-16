@@ -1,4 +1,4 @@
-// Copyright (C) 2017-2025 Ixian
+// Copyright (C) 2017-2026 Ixian
 // This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
@@ -14,10 +14,6 @@ using Fclp;
 using IXICore;
 using IXICore.Meta;
 using IXICore.Network;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Text;
 
 namespace DLT
@@ -111,7 +107,7 @@ namespace DLT
 
             public static readonly ulong maxBlocksPerDatabase = 1000; // number of blocks to store in a single database file
             
-            public static readonly ulong nodeDeprecationBlock = 6100000 + (ulong)(new Random()).Next(50); // block height on which this version of Ixian DLT stops working on
+            public static readonly ulong nodeDeprecationBlock = 6200000 + (ulong)(new Random()).Next(50); // block height on which this version of Ixian DLT stops working on
 
             public static readonly ulong saveWalletStateEveryBlock = ConsensusConfig.superblockInterval; // Saves wallet state every 1000 blocks
 

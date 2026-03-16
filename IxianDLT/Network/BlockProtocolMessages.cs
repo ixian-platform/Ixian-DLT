@@ -243,14 +243,17 @@ namespace DLT
                             {
                                 return;
                             }
-                            foreach(var txFilter in txFilters)
+                            if (requestedVerificationMode != TIVBlockVerificationMode.Transactions)
                             {
-                                byte[]? relayIndex = null;
-                                if (endpoint.presenceAddress.type == 'R')
+                                foreach (var txFilter in txFilters)
                                 {
-                                    relayIndex = prKey;
+                                    byte[]? relayIndex = null;
+                                    if (endpoint.presenceAddress.type == 'R')
+                                    {
+                                        relayIndex = prKey;
+                                    }
+                                    handleGetPIT2(txFilter.Key, txFilter.Value, relayIndex, endpoint);
                                 }
-                                handleGetPIT2(txFilter.Key, txFilter.Value, relayIndex, endpoint);
                             }
                             endpoint.sendData(ProtocolMessageCode.compactBlockHeaders1, mOut.ToArray());
                         }
