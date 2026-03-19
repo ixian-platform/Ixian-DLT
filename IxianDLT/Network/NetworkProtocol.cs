@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2017-2025 Ixian
+﻿// Copyright (C) 2017-2026 Ixian
 // This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
@@ -17,9 +17,6 @@ using IXICore.Meta;
 using IXICore.Network;
 using IXICore.RegNames;
 using IXICore.Utils;
-using System;
-using System.Collections.Generic;
-using System.IO;
 
 namespace DLT
 {
@@ -141,8 +138,8 @@ namespace DLT
                             BlockProtocolMessages.handleGetBlockHeaders3(data, endpoint);
                             break;
 
-                        case ProtocolMessageCode.getRelevantBlockTransactions:
-                            BlockProtocolMessages.handleGetRelevantBlockTransactions(data, endpoint);
+                        case ProtocolMessageCode.getBlockHeaders4:
+                            BlockProtocolMessages.handleGetBlockHeaders4(data, endpoint);
                             break;
 
                         case ProtocolMessageCode.getPIT2:

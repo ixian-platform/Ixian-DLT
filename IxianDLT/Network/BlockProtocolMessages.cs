@@ -103,7 +103,7 @@ namespace DLT
                 }
             }
 
-            public static void handleGetRelevantBlockTransactions(byte[] data, RemoteEndpoint endpoint)
+            public static void handleGetBlockHeaders4(byte[] data, RemoteEndpoint endpoint)
             {
                 using (MemoryStream m = new MemoryStream(data))
                 {
@@ -113,6 +113,12 @@ namespace DLT
                         ulong totalCount = reader.ReadIxiVarUInt();
 
                         byte[] filterBytes = reader.ReadIxiBytes()!;
+                        Cuckoo? addressFilter = null;
+                        if (filterBytes != null
+                            && filterBytes.Length > 0)
+                        {
+                            addressFilter = new Cuckoo(filterBytes);
+                        }
 
                         byte[] prKey = new byte[reader.BaseStream.Position];
                         Buffer.BlockCopy(data, 0, prKey, 0, prKey.Length);
@@ -124,8 +130,6 @@ namespace DLT
                             requestedVerificationMode = (TIVBlockVerificationMode)reader.ReadIxiVarInt();
                             verificationModeSet = true;
                         }
-
-                        Cuckoo filter = new Cuckoo(filterBytes);
 
                         if (totalCount < 1)
                             return;
@@ -232,10 +236,13 @@ namespace DLT
                                         break;
                                     }
 
-                                    Cuckoo? txFilter = TransactionProtocolMessages.broadcastRelevantTransactions(block, endpoint, filter, prKey);
-                                    if (txFilter != null)
+                                    if (addressFilter != null)
                                     {
-                                        txFilters.Add(block.blockNum, txFilter);
+                                        Cuckoo? txFilter = TransactionProtocolMessages.broadcastRelevantTransactions(block, endpoint, addressFilter, prKey);
+                                        if (txFilter != null)
+                                        {
+                                            txFilters.Add(block.blockNum, txFilter);
+                                        }
                                     }
                                 }
                             }
@@ -255,7 +262,7 @@ namespace DLT
                                     handleGetPIT2(txFilter.Key, txFilter.Value, relayIndex, endpoint);
                                 }
                             }
-                            endpoint.sendData(ProtocolMessageCode.compactBlockHeaders1, mOut.ToArray());
+                            endpoint.sendData(ProtocolMessageCode.blockHeaders4, mOut.ToArray());
                         }
                     }
                 }
