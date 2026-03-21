@@ -708,20 +708,16 @@ namespace DLT
 
                     appliedTransactions.Add(txid, t);
 
-                    if (!t.fromLocalStorage)
+                    if (IxianHandler.isMyAddress(t.pubKey) || IxianHandler.extractMyAddressesFromAddressList(t.toList) != null)
                     {
-                        if (IxianHandler.isMyAddress(t.pubKey) || IxianHandler.extractMyAddressesFromAddressList(t.toList) != null)
+                        long txTimestamp = 0;
+                        if (blockTimestamp < t.timeStamp || t.timeStamp == 0)
                         {
-                            long txTimestamp = 0;
-                            if (blockTimestamp < t.timeStamp || t.timeStamp == 0)
-                            {
-                                txTimestamp = blockTimestamp;
-                            }
-                            Node.activityStorage.updateStatus(t.id, ActivityStatus.Final, t.applied, txTimestamp);
+                            txTimestamp = blockTimestamp;
                         }
+                        Node.activityStorage.updateStatus(t.id, ActivityStatus.Final, t.applied, txTimestamp);
+                        PendingTransactions.remove(t.id);
                     }
-
-                    PendingTransactions.remove(t.id);
 
                     if (add_to_storage)
                     {
@@ -2671,12 +2667,6 @@ namespace DLT
                     {
                         Transaction t = entry.transaction;
                         long tx_time = entry.addedTimestamp;
-
-                        if (t.applied != 0)
-                        {
-                            PendingTransactions.remove(t.id);
-                            continue;
-                        }
 
                         // if transaction expired, remove it from pending transactions
                         if (last_block_height > ConsensusConfig.getRedactedWindowSize()
