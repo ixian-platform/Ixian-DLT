@@ -1,11 +1,29 @@
 #!/bin/sh -e
 echo Rebuilding Ixian DLT...
+
+echo Checking .NET SDK Version
+# Get the current active SDK version
+DOTNET_VER=$(dotnet --version 2>/dev/null)
+
+if [ -z "$DOTNET_VER" ]; then
+    echo ".NET is not installed."
+    exit 1
+fi
+
+# Extract the major version (everything before the first dot)
+MAJOR_VER=$(echo "$DOTNET_VER" | cut -d. -f1)
+
+if [ "$MAJOR_VER" -lt 10 ]; then
+    echo "Found .NET $MAJOR_VER. Version is too old."
+    exit 1
+fi
+
 echo Cleaning previous build
 dotnet clean --configuration Release
 echo Restoring packages
 dotnet restore
 echo Building DLT
-dotnet build --configuration Release
+dotnet build --configuration Release -p WarningLevel=0
 echo Cleaning Argon2
 cd Argon2_C
 make clean
