@@ -355,6 +355,12 @@ namespace DLT
                             byte[] item_bytes = reader.ReadBytes((int)len);
                             InventoryItem item = InventoryCache.decodeInventoryItem(item_bytes);
 
+                            if (item == null)
+                            {
+                                Logging.warn("Failed to decode inventory item, skipping. Endpoint: {0}", endpoint.getFullAddress());
+                                continue;
+                            }
+
                             // First update endpoint blockheights and pending transactions
                             switch (item.type)
                             {
