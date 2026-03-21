@@ -412,6 +412,32 @@ namespace DLT
                                         pii.lastRequested = Clock.getTimestamp();
                                         break;
 
+                                    case InventoryItemTypes.blockSignature:
+                                        {
+                                            var iis = (InventoryItemSignature)item;
+                                            InventoryCache.Instance.setProcessedFlag(iis.type, iis.hash);
+                                            if (iis.blockNum + 4 < last_accepted_block_height)
+                                            {
+                                                continue;
+                                            }
+
+                                            if (iis.blockNum + 4 < network_block_height)
+                                            {
+                                                requestNextBlock(iis.blockNum, iis.blockHash, endpoint);
+                                                continue;
+                                            }
+
+                                            if (iis.blockNum > last_block_height)
+                                            {
+                                                pii.lastRequested = Clock.getTimestamp();
+                                                requestNextBlock(iis.blockNum, iis.blockHash, endpoint);
+                                                continue;
+                                            }
+
+                                            SignatureProtocolMessages.broadcastGetBlockSignatures(iis.blockNum, iis.blockHash, endpoint);
+                                            break;
+                                        }
+
                                     case InventoryItemTypes.blockSignature2:
                                         {
                                             var iis = (InventoryItemSignature)item;

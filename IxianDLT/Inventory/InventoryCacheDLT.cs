@@ -38,6 +38,8 @@ namespace DLTNode.Inventory
             {
                 case InventoryItemTypes.block:
                     return handleBlock(item, endpoint);
+                case InventoryItemTypes.blockSignature:
+                    return true;
                 case InventoryItemTypes.blockSignature2:
                     return handleSignature2(item, endpoint);
                 case InventoryItemTypes.keepAlive:
