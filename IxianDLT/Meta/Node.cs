@@ -170,7 +170,7 @@ namespace DLT.Meta
 
             // Default to RocksDB
             Logging.info("Using RocksDB.");
-            return new RocksDBStorage(dataFolderBlocks, maxDatabaseCache, maxBlocksPerDatabase, maxOpenDatabases);
+            return new RocksDBStorage(dataFolderBlocks, maxDatabaseCache, maxBlocksPerDatabase, maxOpenDatabases, RocksDBOptimizations.Servers);
         }
 
         // instantiation for the proper implementation class
@@ -183,7 +183,7 @@ namespace DLT.Meta
                 case "SQLite":
                     Logging.warn("Using SQLite. Please upgrade to RocksDB.");
                     return new SQLiteStorage(dataFolderBlocks);
-                case "RocksDB": return new RocksDBStorage(dataFolderBlocks, maxDatabaseCache, maxBlocksPerDatabase, maxOpenDatabases);
+                case "RocksDB": return new RocksDBStorage(dataFolderBlocks, maxDatabaseCache, maxBlocksPerDatabase, maxOpenDatabases, RocksDBOptimizations.Servers);
                 default: throw new Exception(String.Format("Unknown blocks storage provider: {0}", name));
             }
         }

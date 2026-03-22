@@ -429,7 +429,6 @@ namespace DLT
 
                                             if (iis.blockNum > last_block_height)
                                             {
-                                                pii.lastRequested = Clock.getTimestamp();
                                                 requestNextBlock(iis.blockNum, iis.blockHash, endpoint);
                                                 continue;
                                             }

@@ -1572,6 +1572,16 @@ namespace DLT
             {
                 throw new NotImplementedException();
             }
+
+            public override void pruneBlocks(ulong pruneBlocksBelow, BlockSigPruningType pruningType, bool pruneSuperblocks)
+            {
+                throw new NotImplementedException();
+            }
+
+            public override void pruneTxIDs(ulong pruneBlocksBelow)
+            {
+                throw new NotImplementedException();
+            }
         }
     }
 }
