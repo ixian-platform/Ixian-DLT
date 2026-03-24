@@ -154,7 +154,8 @@ namespace DLT
 
             public static int maxCachedBlockHashes = 1000000;
 
-            public static ulong maxDatabaseCache = 0;
+            public static ulong blocksDbCacheSize = 0;
+            public static ulong activityDbCacheSize = 128 << 20;
 
             private Config()
             {
@@ -206,11 +207,12 @@ namespace DLT
                 Console.WriteLine("    --maxIncomingMasterNodes\t Max incoming masternode connections.");
                 Console.WriteLine("    --maxIncomingClientNodes\t Max incoming client connections.");
                 Console.WriteLine("    --forceSyncToBlock\t\t Force sync to specified block height.");
-                Console.WriteLine("    --networkType\t\t mainnet, testnet or regtest.");
-                Console.WriteLine("    --dataFolderPath\t\t location where to store block and transaction data.");
-                Console.WriteLine("    --logFolderPath\t\t location where to store log files.");
-                Console.WriteLine("    --activityFolderPath\t location where to store activity files.");
-                Console.WriteLine("    --maxDatabaseCache\t\t max RAM in bytes to use for RocksDB Cache.");
+                Console.WriteLine("    --networkType\t\t Network type - mainnet, testnet or regtest.");
+                Console.WriteLine("    --dataFolderPath\t\t Location where to store block and transaction data.");
+                Console.WriteLine("    --logFolderPath\t\t Location where to store log files.");
+                Console.WriteLine("    --activityFolderPath\t Location where to store activity files.");
+                Console.WriteLine("    --blocksDbCache\t\t Max RAM in bytes to use for RocksDB Blocks Cache.");
+                Console.WriteLine("    --activityDbCache\t\t Max RAM in bytes to use for Activity Cache.");
                 Console.WriteLine("");
                 Console.WriteLine("----------- Developer CLI flags -----------");
                 Console.WriteLine("    --genesis\t\t\t Start node in genesis mode (to be used only when setting up your own private network)");
@@ -251,10 +253,11 @@ namespace DLT
                 Console.WriteLine("    disableWebStart\t\t 1 to disable running http://localhost:8081 on startup (same as --disableWebStart CLI)");
                 Console.WriteLine("    blockStorage\t\t Specify storage provider for block and transaction (same as --blockStorage CLI)");
                 Console.WriteLine("    blockNotify\t\t\t Execute command when the block changes");
-                Console.WriteLine("    dataFolderPath\t\t location where to store block and transaction data.");
-                Console.WriteLine("    logFolderPath\t\t location where to store log files.");
-                Console.WriteLine("    activityFolderPath\t\t location where to store activity files.");
-                Console.WriteLine("    maxDatabaseCache\t\t max RAM in bytes to use for RocksDB Cache.");
+                Console.WriteLine("    dataFolderPath\t\t Location where to store block and transaction data.");
+                Console.WriteLine("    logFolderPath\t\t Location where to store log files.");
+                Console.WriteLine("    activityFolderPath\t\t Location where to store activity files.");
+                Console.WriteLine("    blocksDbCache\t\t Max RAM in bytes to use for RocksDB Blocks Cache.");
+                Console.WriteLine("    activityDbCache\t\t Max RAM in bytes to use for Activity Cache.");
                 Console.WriteLine("    wallet\t\t\t Specify location of the ixian.wal file");
                 Console.WriteLine("    walletPassword\t\t Specify the password for the wallet.");
 
@@ -389,9 +392,15 @@ namespace DLT
                             break;
                         case "activityFolderPath":
                             activityFolderPath = value;
-                            break;                            
+                            break;
                         case "maxDatabaseCache":
-                            maxDatabaseCache = ulong.Parse(value);
+                            blocksDbCacheSize = ulong.Parse(value);
+                            break;
+                        case "blocksDbCache":
+                            blocksDbCacheSize = ulong.Parse(value);
+                            break;
+                        case "activityDbCache":
+                            activityDbCacheSize = ulong.Parse(value);
                             break;
                         case "wallet":
                             walletFile = value;
@@ -607,7 +616,10 @@ namespace DLT
 
                 cmd_parser.Setup<long>("forceSyncToBlock").Callback(value => forceSyncToBlock = (ulong)value);
 
-                cmd_parser.Setup<long>("maxDatabaseCache").Callback(value => maxDatabaseCache = (ulong)value);
+                cmd_parser.Setup<long>("maxDatabaseCache").Callback(value => blocksDbCacheSize = (ulong)value);
+                cmd_parser.Setup<long>("blocksDbCache").Callback(value => blocksDbCacheSize = (ulong)value);
+
+                cmd_parser.Setup<long>("activityDbCache").Callback(value => activityDbCacheSize = (ulong)value);
 
                 cmd_parser.Parse(args);
 

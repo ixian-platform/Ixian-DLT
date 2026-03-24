@@ -85,9 +85,9 @@ namespace DLT.Meta
             var total_ram = memoryInfoProvider.GetTotalRAM();
             if (total_ram == 0)
             {
-                if (Config.maxDatabaseCache == 0)
+                if (Config.blocksDbCacheSize == 0)
                 {
-                    Logging.error("Could not determine total RAM and maxDatabaseCache is not specified. Please set --maxDatabaseCache CLI parameter.");
+                    Logging.error("Could not determine total RAM and maxDatabaseCache is not specified. Please set --blocksDbCache CLI parameter.");
                     Program.noStart = true;
                     return;
                 }
@@ -104,27 +104,27 @@ namespace DLT.Meta
                 return;
             }
 
-            if (Config.maxDatabaseCache == 0)
+            if (Config.blocksDbCacheSize == 0)
             {
-                Config.maxDatabaseCache = estimateDBBlockCacheSize((ulong)total_ram);
+                Config.blocksDbCacheSize = estimateDBBlockCacheSize((ulong)total_ram);
 
                 ulong database_cache_cap = 8L << 30;
-                if (Config.maxDatabaseCache > database_cache_cap)
+                if (Config.blocksDbCacheSize > database_cache_cap)
                 {
-                    Config.maxDatabaseCache = database_cache_cap;
+                    Config.blocksDbCacheSize = database_cache_cap;
                 }
             }
 
             if (Config.networkType == NetworkType.main
-                && Config.maxDatabaseCache < 2L << 30)
+                && Config.blocksDbCacheSize < 2L << 30)
             {
-                Logging.error("Insufficient maxDatabaseCache: at least 2GiB required, but only {0}B available", Config.maxDatabaseCache);
+                Logging.error("Insufficient blocksDbCache: at least 2GiB required, but only {0}B available", Config.blocksDbCacheSize);
                 Program.noStart = true;
                 return;
             }
 
             Logging.info("Total RAM: {0}GiB", total_ram >> 30);
-            Logging.info("Using Max Database Cache: {0}MiB", Config.maxDatabaseCache >> 20);
+            Logging.info("Using Max Database Cache: {0}MiB", Config.blocksDbCacheSize >> 20);
 
             CoreConfig.device_id = [0];
 
@@ -213,7 +213,7 @@ namespace DLT.Meta
             // Initialize storage
             if (storage is null)
             {
-                storage = createStorageProvider(Config.blockStorageProvider, Config.dataFolderBlocks, Config.maxDatabaseCache, Config.maxBlocksPerDatabase, 50);
+                storage = createStorageProvider(Config.blockStorageProvider, Config.dataFolderBlocks, Config.blocksDbCacheSize, Config.maxBlocksPerDatabase, 50);
             }
 
             if (storage is RocksDBStorage)
@@ -419,7 +419,7 @@ namespace DLT.Meta
             // Generate presence list
             PresenceList.init(IxianHandler.publicIP, Config.serverPort, node_type, CoreConfig.serverKeepAliveInterval, signerPowMiner);
 
-            activityStorage = new ActivityStorage(Config.activityFolderPath, 32 << 20, 0, RocksDBOptimizations.Servers);
+            activityStorage = new ActivityStorage(Config.activityFolderPath, Config.activityDbCacheSize, 0, RocksDBOptimizations.Servers);
             activityStorage.prepareStorage(true);
 
             // Initialize the block chain
@@ -889,7 +889,7 @@ namespace DLT.Meta
         {
             if (activityStorage is null)
             {
-                activityStorage = new ActivityStorage(Config.activityFolderPath, 32 << 20, 0, RocksDBOptimizations.Servers);
+                activityStorage = new ActivityStorage(Config.activityFolderPath, Config.activityDbCacheSize, 0, RocksDBOptimizations.Servers);
             }
             activityStorage.stopStorage();
             activityStorage.deleteData();
@@ -899,7 +899,7 @@ namespace DLT.Meta
             // we have to instantiate whatever implementation we are using and remove its data files
             if (storage is null)
             {
-                storage = createStorageProvider(Config.blockStorageProvider, Config.dataFolderBlocks, Config.maxDatabaseCache, Config.maxBlocksPerDatabase, 50);
+                storage = createStorageProvider(Config.blockStorageProvider, Config.dataFolderBlocks, Config.blocksDbCacheSize, Config.maxBlocksPerDatabase, 50);
             }
             storage.stopStorage();
             storage.deleteData();
