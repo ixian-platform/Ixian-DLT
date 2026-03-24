@@ -419,7 +419,7 @@ namespace DLT.Meta
             // Generate presence list
             PresenceList.init(IxianHandler.publicIP, Config.serverPort, node_type, CoreConfig.serverKeepAliveInterval, signerPowMiner);
 
-            activityStorage = new ActivityStorage(Config.activityFolderPath, 32 << 20, 0);
+            activityStorage = new ActivityStorage(Config.activityFolderPath, 32 << 20, 0, RocksDBOptimizations.Servers);
             activityStorage.prepareStorage(true);
 
             // Initialize the block chain
@@ -889,7 +889,7 @@ namespace DLT.Meta
         {
             if (activityStorage is null)
             {
-                activityStorage = new ActivityStorage(Config.activityFolderPath, 32 << 20, 0);
+                activityStorage = new ActivityStorage(Config.activityFolderPath, 32 << 20, 0, RocksDBOptimizations.Servers);
             }
             activityStorage.stopStorage();
             activityStorage.deleteData();
