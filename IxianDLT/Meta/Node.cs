@@ -832,7 +832,7 @@ namespace DLT.Meta
                 if (blockNum + 5 >= IxianHandler.getHighestKnownNetworkBlockHeight())
                 {
                     Block b = blockChain.getBlock(blockNum);
-                    BlockSignature blockSig = b.applySignature(signerPowMiner.GetBestSolution(0, b.blockNum));
+                    BlockSignature blockSig = b.applySignature(signerPowMiner.GetBestSolution(0, b.blockNum), IxianHandler.getMinSignerPowDifficulty(b.blockNum, b.version, b.timestamp));
                     if (blockSig != null)
                     {
                         InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(blockSig.powSolution.solution, b.blockChecksum));

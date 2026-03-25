@@ -244,7 +244,6 @@ namespace DLT
                         tmp_block.compact();
                     }
                 }
-                compactBlockSigs(b);
             }
 
             // Cleanup transaction pool
@@ -969,7 +968,7 @@ namespace DLT
                     byte[] beforeSigsChecksum = block.calculateSignatureChecksum();
                     beforeSigs = block.getFrozenSignatureCount();
 
-                    var added_sigs = block.addSignaturesFrom(b, false);
+                    var added_sigs = block.addSignaturesFrom(b, IxianHandler.getMinSignerPowDifficulty(block.blockNum, block.version, block.timestamp), false);
 
                     if (added_sigs != null && Node.isMasterNode())
                     {
@@ -1163,50 +1162,6 @@ namespace DLT
             }
         }
 
-        // this function prunes un-needed sigs from blocks
-        private void compactBlockSigs(Block last_block)
-        {
-            return; // TODO enable after enabling sig pruning
-
-            if(last_block.version < BlockVer.v5)
-            {
-                return;
-            }
-
-            if (last_block.lastSuperBlockChecksum == null)
-            {
-                return;
-            }
-
-            // superblock was just generated, prune all block sigs, except sigs within the superblock window
-
-            ulong prev_superblock_num = last_block.lastSuperBlockNum;
-
-            for(ulong block_num = prev_superblock_num; block_num > 1; block_num--)
-            {
-                Block block = getBlock(block_num, true, true);
-
-                if (block == null)
-                {
-                    Logging.error("Block {0} was null while compacting sigs", block_num);
-                    break;
-                }
-
-                if (block.version < BlockVer.v4)
-                {
-                    break;
-                }
-
-                if (block.compactedSigs == true)
-                {
-                    break;
-                }
-
-                block.pruneSignatures();
-                updateBlock(block);
-            }
-        }
-
         public void updateBlock(Block block, bool update_storage = true)
         {
             // TODO TODO Omega prevent updating block older than sigfreezed block
@@ -1216,7 +1171,6 @@ namespace DLT
             }
 
             bool compacted = false;
-            bool compacted_sigs = false;
 
             lock (blocks)
             {
@@ -1226,16 +1180,7 @@ namespace DLT
                     {
                         compacted = true;
                     }
-                    if (old_block.compactedSigs)
-                    {
-                        compacted_sigs = true;
-                    }
                 }
-            }
-
-            if (compacted_sigs)
-            {
-                block.pruneSignatures();
             }
 
             if(update_storage)

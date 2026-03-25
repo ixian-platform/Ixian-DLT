@@ -409,7 +409,7 @@ namespace DLT
                     if (sigFreezeChecksum.SequenceEqual(b.calculateSignatureChecksum()) && b.verifyBlockProposer())
                     {
                         Logging.warn("Received block #{0} ({1}) which was sigFreezed with correct checksum, force updating signatures locally!", b.blockNum, Crypto.hashToString(b.blockChecksum));
-                        targetBlock.addSignaturesFrom(b, verifySigs);
+                        targetBlock.addSignaturesFrom(b, IxianHandler.getMinSignerPowDifficulty(targetBlock.blockNum, targetBlock.version, targetBlock.timestamp), verifySigs);
                         if (verifyBlockSignatures(b, endpoint))
                         {
                             // this is likely the correct block, update and broadcast to others
@@ -896,7 +896,7 @@ namespace DLT
                     localBlock = Node.blockChain.getBlock(b.blockNum, true, true);
                 }
                 // Verify signatures
-                if (!b.verifySignatures(localBlock, skip_sig_verification))
+                if (!b.verifySignatures(localBlock, IxianHandler.getMinSignerPowDifficulty(b.blockNum, b.version, b.timestamp), skip_sig_verification))
                 {
                     Logging.warn("Block #{0} failed while verifying signatures. There are no valid signatures on the block.", b.blockNum);
                     return BlockVerifyStatus.Indeterminate;
@@ -1476,7 +1476,7 @@ namespace DLT
                     if(localNewBlock.blockChecksum.SequenceEqual(b.blockChecksum))
                     {
                         Logging.info("Block #{0} ({1} sigs) received from the network is the block we are currently working on. Merging signatures  ({2} sigs).", b.blockNum, b.signatures.Count(), localNewBlock.signatures.Count());
-                        List<BlockSignature> added_signatures = localNewBlock.addSignaturesFrom(b, false);
+                        List<BlockSignature> added_signatures = localNewBlock.addSignaturesFrom(b, IxianHandler.getMinSignerPowDifficulty(localNewBlock.blockNum, localNewBlock.version, localNewBlock.timestamp), false);
                         if (added_signatures != null || localNewBlock.getFrozenSignatureCount() >= Node.blockChain.getRequiredConsensus())
                         {
                             // if addSignaturesFrom returns true, that means signatures were increased, so we re-transmit
@@ -1856,7 +1856,7 @@ namespace DLT
 
                     Block local_block = new Block(Node.blockChain.getBlock(block.blockNum));
 
-                    List<BlockSignature> added_signatures = local_block.addSignaturesFrom(block, false);
+                    List<BlockSignature> added_signatures = local_block.addSignaturesFrom(block, IxianHandler.getMinSignerPowDifficulty(local_block.blockNum, local_block.version, local_block.timestamp), false);
 
                     if(added_signatures != null && added_signatures.Count > 0)
                     {
@@ -2144,7 +2144,7 @@ namespace DLT
                     {
                         if (Node.isMasterNode() && localNewBlock.blockNum > 7)
                         {
-                            BlockSignature signature_data = localNewBlock.applySignature(Node.signerPowMiner.GetBestSolution(0, localNewBlock.blockNum)); // applySignature() will return signature_data, if signature was applied and null, if signature was already present from before
+                            BlockSignature signature_data = localNewBlock.applySignature(Node.signerPowMiner.GetBestSolution(0, localNewBlock.blockNum), IxianHandler.getMinSignerPowDifficulty(localNewBlock.blockNum, localNewBlock.version, localNewBlock.timestamp)); // applySignature() will return signature_data, if signature was applied and null, if signature was already present from before
                             if (signature_data != null) 
                             {
                                 foreach (var sig in localNewBlock.signatures)
@@ -3185,7 +3185,7 @@ namespace DLT
 
                     removeBlockBlacklist(localNewBlock);
 
-                    BlockSignature signature_data = localNewBlock.applySignature(Node.signerPowMiner.GetBestSolution(0, localNewBlock.blockNum));
+                    BlockSignature signature_data = localNewBlock.applySignature(Node.signerPowMiner.GetBestSolution(0, localNewBlock.blockNum), IxianHandler.getMinSignerPowDifficulty(localNewBlock.blockNum, localNewBlock.version, localNewBlock.timestamp));
                     if (signature_data != null)
                     {
                         if (signature_data.powSolution != null)
@@ -3941,7 +3941,7 @@ namespace DLT
                 Block b = Node.blockChain.getBlock(block_num, false, false);
                 if (b != null && b.blockChecksum.SequenceEqual(checksum))
                 {
-                    return b.addSignature(blockSig);
+                    return b.addSignature(blockSig, IxianHandler.getMinSignerPowDifficulty(b.blockNum, b.version, b.timestamp));
                 }else
                 {
                     BlockProtocolMessages.broadcastGetBlock(block_num, null, endpoint);
@@ -3954,7 +3954,7 @@ namespace DLT
                     Block b = Node.blockProcessor.getLocalBlock();
                     if (b != null && b.blockChecksum.SequenceEqual(checksum))
                     {
-                        bool sig_added = b.addSignature(blockSig);
+                        bool sig_added = b.addSignature(blockSig, IxianHandler.getMinSignerPowDifficulty(b.blockNum, b.version, b.timestamp));
                         if (sig_added)
                         {
                             currentBlockStartTime = DateTime.UtcNow;
@@ -4054,7 +4054,7 @@ namespace DLT
                 for (uint i = 0; i < 5; i++)
                 {
                     Block b = Node.blockChain.getBlock(lastBlockHeight - i);
-                    BlockSignature blockSig = b.applySignature(Node.signerPowMiner.GetBestSolution(0, b.blockNum));
+                    BlockSignature blockSig = b.applySignature(Node.signerPowMiner.GetBestSolution(0, b.blockNum), IxianHandler.getMinSignerPowDifficulty(b.blockNum, b.version, b.timestamp));
                     if (blockSig != null)
                     {
                         InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.blockSignature2, InventoryItemSignature.getHash(blockSig.powSolution.solution, b.blockChecksum));

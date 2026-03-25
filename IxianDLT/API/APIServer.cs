@@ -203,7 +203,6 @@ namespace DLTNode
             blockData.Add("Timestamp", block.timestamp.ToString());
             blockData.Add("Difficulty", block.difficulty.ToString());
             blockData.Add("Hashrate", (MiningUtils.getTargetHashcountPerBlock(block.difficulty) / 60).ToString());
-            blockData.Add("Compacted Sigs", block.compactedSigs.ToString());
             blockData.Add("Signature count", block.signatures.Count.ToString());
             blockData.Add("Required Signature count", Node.blockChain.getRequiredConsensusFromStorage(block.blockNum).ToString());
 
