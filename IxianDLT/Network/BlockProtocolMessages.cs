@@ -186,15 +186,15 @@ namespace DLT
                                     {
                                         case TIVBlockVerificationMode.Minimal:
                                             Block tmpBlock = new Block(block);
-                                            tmpBlock.signatureCount = tmpBlock.getFrozenSignatureCount();
-                                            tmpBlock.totalSignerDifficulty = tmpBlock.getTotalSignerDifficulty();
+                                            //tmpBlock.signatureCount = tmpBlock.getFrozenSignatureCount();
+                                            //tmpBlock.totalSignerDifficulty = tmpBlock.getTotalSignerDifficulty();
                                             tmpBlock.signatures.Clear();
                                             tmpBlock.setFrozenSignatures(null);
 
                                             headerBytes = tmpBlock.getBytes(include_sb_segments: true,
                                                                             frozen_sigs_only: true,
                                                                             force_v10_structure: true,
-                                                                            for_checksum: true,
+                                                                            for_checksum: false,
                                                                             compacted_signatures: true,
                                                                             include_transactions: false,
                                                                             full_signer_difficulty: verificationModeSet);

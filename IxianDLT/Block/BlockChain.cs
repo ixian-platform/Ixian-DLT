@@ -1032,7 +1032,7 @@ namespace DLT
             return false;
         }
 
-        public bool setFrozenSignatures(Block b, List<BlockSignature> signatures)
+        public bool setFrozenSignatures(Block b, List<BlockSignature>? signatures)
         {
             Block localNewBlock = Node.blockProcessor.localNewBlock;
             if(localNewBlock != null 
