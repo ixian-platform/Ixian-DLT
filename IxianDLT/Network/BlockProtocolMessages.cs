@@ -178,7 +178,8 @@ namespace DLT
                                     found = true;
                                     byte[] headerBytes;
                                     TIVBlockVerificationMode mode = requestedVerificationMode;
-                                    if (block.lastSuperBlockChecksum != null)
+                                    if (block.lastSuperBlockChecksum != null
+                                        || block.version < BlockVer.v6)
                                     {
                                         mode = TIVBlockVerificationMode.Transactions;
                                     }
@@ -239,7 +240,8 @@ namespace DLT
                                     if (addressFilter != null)
                                     {
                                         Cuckoo? txFilter = TransactionProtocolMessages.broadcastRelevantTransactions(block, endpoint, addressFilter, prKey);
-                                        if (txFilter != null)
+                                        if (txFilter != null
+                                            && block.version >= BlockVer.v6)
                                         {
                                             txFilters.Add(block.blockNum, txFilter);
                                         }
