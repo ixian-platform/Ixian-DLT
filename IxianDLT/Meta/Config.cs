@@ -170,9 +170,9 @@ namespace DLT
                 Console.WriteLine("");
                 Console.WriteLine(" IxianDLT.exe [-h] [-v] [-t] [-x] [-c] [-p 10234] [-a 8081] [-i ip] [-w ixian.wal] [-n seed1.ixian.io:10234]");
                 Console.WriteLine("   [--worker] [--threads 1] [--config ixian.cfg] [--maxLogSize 50] [--maxLogCount 10] [--logVerbosity 14]");
-                Console.WriteLine("   [--lastGoodBlock 110234] [--disableWebStart] [--onlyShowAddresses] [--walletPassword] [--blockStorage SQLite]");
-                Console.WriteLine("   [--maxTxPerBlock 19980] [--disableSetTitle] [--disableFastBlockLoading] [--checksumLock Ixian] [--verboseOutput]");
-                Console.WriteLine("   [--maxOutgoingConnections] [--maxIncomingMasterNodes] [--maxIncomingClientNodes]");
+                Console.WriteLine("   [--lastGoodBlock 110234] [--disableWebStart] [--onlyShowAddresses] [--blockStorage RocksDB]");
+                Console.WriteLine("   [--maxTxPerBlock 70200] [--disableSetTitle] [--disableFastBlockLoading] [--checksumLock Ixian] [--verboseOutput]");
+                Console.WriteLine("   [--maxOutgoingConnections 12] [--maxIncomingMasterNodes 500] [--maxIncomingClientNodes 5000]");
                 Console.WriteLine("   [--forceSyncToBlock]");
                 Console.WriteLine("   [--genesis] [--netdump dumpfile] [--benchmark type] [--recover] [--verifyStorage] [--generateWallet]");
                 Console.WriteLine("   [--optimizeDBStorage] [--offline] [--disableChainReorg] [--chainReorgTest]");
@@ -196,7 +196,6 @@ namespace DLT
                 Console.WriteLine("    --lastGoodBlock\t\t Specify the last block height that should be read from storage");
                 Console.WriteLine("    --disableWebStart\t\t Disable running http://localhost:8081 on startup");
                 Console.WriteLine("    --onlyShowAddresses\t\t Shows address list and exits");
-                Console.WriteLine("    --walletPassword\t\t Specify the password for the wallet (be careful with this)");
                 Console.WriteLine("    --blockStorage\t\t Specify storage provider for block and transaction storage (SQLite or RocksDB)");
                 Console.WriteLine("    --maxTxPerBlock\t\t Number of transactions that the node will include in the block");
                 Console.WriteLine("    --disableSetTitle\t\t Disables automatic title setting for Windows Console");
@@ -221,6 +220,7 @@ namespace DLT
                 Console.WriteLine("    --recover\t\t\t Recovers from file (to be used only by developers when cold-starting the network)");
                 Console.WriteLine("    --verifyStorage\t\t Start node with full local storage blocks and transactions verification");
                 Console.WriteLine("    --generateWallet\t\t Generates a wallet file and exits, printing the public address. [TESTNET ONLY!]");
+                Console.WriteLine("    --walletPassword\t\t Specify the password for the wallet (be careful with this)");
                 Console.WriteLine("    --optimizeDBStorage\t\t Manually compacts all databases before starting the node. MAY TAKE SOME TIME!");
                 Console.WriteLine("    --offline\t\t\t Offline mode - does not connect to other nodes or accepts any connections from other nodes");
                 Console.WriteLine("    --disableChainReorg\t\t Disables blockchain reorganization");

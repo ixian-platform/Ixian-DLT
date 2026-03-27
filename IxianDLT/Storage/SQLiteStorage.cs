@@ -1581,6 +1581,11 @@ namespace DLT
             {
                 throw new NotImplementedException();
             }
+
+            public override void sleep()
+            {
+                throw new NotImplementedException();
+            }
         }
     }
 }
