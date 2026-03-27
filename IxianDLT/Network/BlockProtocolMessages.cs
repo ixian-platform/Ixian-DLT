@@ -187,8 +187,8 @@ namespace DLT
                                     {
                                         case TIVBlockVerificationMode.Minimal:
                                             Block tmpBlock = new Block(block);
-                                            //tmpBlock.signatureCount = tmpBlock.getFrozenSignatureCount();
-                                            //tmpBlock.totalSignerDifficulty = tmpBlock.getTotalSignerDifficulty();
+                                            tmpBlock.signatureCount = tmpBlock.getFrozenSignatureCount();
+                                            tmpBlock.totalSignerDifficulty = tmpBlock.getTotalSignerDifficulty();
                                             tmpBlock.signatures.Clear();
                                             tmpBlock.setFrozenSignatures(null);
 
