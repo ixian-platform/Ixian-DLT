@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2017-2025 Ixian
+﻿// Copyright (C) 2017-2026 Ixian
 // This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
@@ -24,14 +24,10 @@ using IXICore.Miner;
 using IXICore.Network;
 using IXICore.RegNames;
 using IXICore.Storage;
+using IXICore.Streaming;
 using IXICore.Utils;
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Threading;
 
 namespace DLT.Meta
 {
@@ -1093,7 +1089,6 @@ namespace DLT.Meta
                 Directory.CreateDirectory(Config.dataFolderPath + Path.DirectorySeparatorChar + "names" + Path.DirectorySeparatorChar + "0000");
             }
 
-
             if (!Directory.Exists(Config.activityFolderPath))
             {
                 Directory.CreateDirectory(Config.activityFolderPath);
@@ -1126,11 +1121,18 @@ namespace DLT.Meta
             return false;
         }
 
-        public override bool addTransaction(Transaction transaction, List<Address> relayNodeAddresses, List<ExtendedAddress>? extendedAddresses, byte[]? requestId, bool force_broadcast)
+        public override bool addTransaction(Transaction tx, List<Address> relayNodeAddresses, List<ExtendedAddress>? extendedAddresses, byte[]? requestId, bool force_broadcast)
         {
-            if (PendingTransactions.addOutgoingTransaction(transaction, relayNodeAddresses))
+            if (TransactionPool.addTransaction(tx, false, null, true, force_broadcast))
             {
-                return TransactionPool.addTransaction(transaction, false, null, true, force_broadcast);
+                if (PendingTransactions.addOutgoingTransaction(tx, relayNodeAddresses))
+                {
+                    if (extendedAddresses != null)
+                    {
+                        CoreStreamProcessor.transactionSend(tx, extendedAddresses, requestId);
+                    }
+                    return true;
+                }
             }
             return false;
         }
@@ -1352,12 +1354,7 @@ namespace DLT.Meta
         {
             if (TransactionPool.addTransaction(tx))
             {
-                if (tx.timeStamp == 0)
-                {
-                    tx.timeStamp = Clock.getTimestamp();
-                }
-                IxianHandler.addTransactionToActivityStorage(activityStorage, tx);
-                return true;
+                return PendingTransactions.addIncomingTransaction(tx);
             }
             return false;
         }

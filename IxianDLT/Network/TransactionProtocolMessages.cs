@@ -51,6 +51,7 @@ namespace DLT
                 int maxTxPerChunk = CoreConfig.maximumTransactionsPerChunk;
                 Cuckoo txFilter = new(b.transactions.Count);
                 bool found = false;
+                bool foundNextBatch = false;
                 using (MemoryStream ms = new())
                 using (BinaryWriter writer = new(ms))
                 {
@@ -72,10 +73,12 @@ namespace DLT
                         if (isFilteredTransaction(t, filter))
                         {
                             found = true;
+                            foundNextBatch = true;
                             txFilter.Add(t.id);
                             var txBytes = t.getBytes(true, true);
                             if (writer.BaseStream.Position + txBytes.Length > CoreConfig.maxMessageSize)
                             {
+                                foundNextBatch = false;
                                 endpoint.sendData(ProtocolMessageCode.transactionsChunk3, ms.ToArray(), null);
                                 writer.BaseStream.SetLength(0);
                                 chunkTxCount = 0;
@@ -88,7 +91,7 @@ namespace DLT
                     }
                     if (found)
                     {
-                        if (ms.Position > 0)
+                        if (foundNextBatch)
                         {
                             endpoint.sendData(ProtocolMessageCode.transactionsChunk3, ms.ToArray(), null);
                         }

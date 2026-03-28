@@ -53,7 +53,7 @@ namespace DLT
             public static uint cpuThreads = (uint)Environment.ProcessorCount;
 
             public static string dataFolderPath = "data";
-            public static string activityFolderPath = "activity";
+            public static string activityFolderPath = "";
             public static string logFolderPath = Environment.CurrentDirectory;
             public static string blockStorageProvider = "Auto";
             public static string dataFolderBlocks
@@ -641,6 +641,18 @@ namespace DLT
                                 new string[2] { seedNode, null }
                             };
                             break;
+                    }
+                }
+
+                if (activityFolderPath == "")
+                {
+                    if (networkType == NetworkType.main)
+                    {
+                        activityFolderPath = "activity";
+                    }
+                    else
+                    {
+                        activityFolderPath = "testnet-activity";
                     }
                 }
             }
