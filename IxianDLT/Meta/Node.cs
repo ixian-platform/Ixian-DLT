@@ -418,6 +418,19 @@ namespace DLT.Meta
             activityStorage = new ActivityStorage(Config.activityFolderPath, Config.activityDbCacheSize, 0, RocksDBOptimizations.Servers);
             activityStorage.prepareStorage(true);
 
+            var pending_txs = activityStorage.getActivitiesByStatus(ActivityStatus.Pending, true);
+            pending_txs.AddRange(activityStorage.getActivitiesByStatus(ActivityStatus.Reverted, true));
+            // Load pending transactions
+            foreach (var pending_tx in pending_txs)
+            {
+                if (pending_tx.type == ActivityType.TransactionReceived
+                    || pending_tx.type == ActivityType.TransactionSent
+                    || pending_tx.type == ActivityType.IxiName)
+                {
+                    PendingTransactions.addOutgoingTransaction(pending_tx.transaction, null);
+                }
+            }
+
             // Initialize the block chain
             blockChain = new BlockChain();
 
@@ -1125,7 +1138,7 @@ namespace DLT.Meta
         {
             if (TransactionPool.addTransaction(tx, false, null, true, force_broadcast))
             {
-                if (PendingTransactions.addOutgoingTransaction(tx, relayNodeAddresses))
+                if (PendingTransactions.addOutgoingTransaction(tx, null))
                 {
                     if (extendedAddresses != null)
                     {

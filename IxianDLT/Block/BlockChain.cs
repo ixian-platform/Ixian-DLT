@@ -1345,6 +1345,7 @@ namespace DLT
                 if (IxianHandler.isMyAddress(tx.pubKey) || IxianHandler.extractMyAddressesFromAddressList(tx.toList) != null)
                 {
                     Node.activityStorage.updateStatus(tx.id, ActivityStatus.Reverted, block.blockNum);
+                    PendingTransactions.addOutgoingTransaction(tx, null);
                     tx.fromLocalStorage = false;
                 }
                 if (tx.type == (int)Transaction.Type.StakingReward)
