@@ -267,15 +267,19 @@ namespace DLT
                         char node_type = endpoint.presenceAddress.type;
                         if (node_type != 'M' && node_type != 'H')
                         {
-                            if (node_type != 'R'
-                                || NetworkClientManager.getConnectedClients(true).Length > 1)
+                            // Allow connecting to a non-master node only in Streaming context.
+                            if (!StreamClientManager.isConnectedTo(endpoint))
                             {
-                                CoreProtocolMessage.sendBye(endpoint, ProtocolByeCode.expectingMaster, string.Format("Expecting master node."), "", true);
+                                if (node_type != 'R'
+                                    || NetworkClientManager.getConnectedClients(true).Length > 1)
+                                {
+                                    CoreProtocolMessage.sendBye(endpoint, ProtocolByeCode.expectingMaster, string.Format("Expecting master node."), "", true);
+                                    return;
+                                }
+                                endpoint.sendData(ProtocolMessageCode.getRandomPresences, new byte[1] { (byte)'M' });
+                                endpoint.sendData(ProtocolMessageCode.getRandomPresences, new byte[1] { (byte)'H' });
                                 return;
                             }
-                            endpoint.sendData(ProtocolMessageCode.getRandomPresences, new byte[1] { (byte)'M' });
-                            endpoint.sendData(ProtocolMessageCode.getRandomPresences, new byte[1] { (byte)'H' });
-                            return;
                         }
 
                         ulong last_block_num = reader.ReadIxiVarUInt();
