@@ -15,6 +15,7 @@ using IXICore;
 using IXICore.Inventory;
 using IXICore.Meta;
 using IXICore.Network;
+using IXICore.Streaming;
 using IXICore.Utils;
 using System;
 using System.Collections.Generic;
@@ -117,10 +118,31 @@ namespace DLT
                 bool updated = PresenceList.receiveKeepAlive(data, out address, out last_seen, out device_id, out node_type, endpoint);
 
                 // If a presence entry was updated, broadcast this message again
-                if (updated && Node.isMasterNode() && !Node.blockSync.synchronizing)
+                if (!updated
+                    || !Node.isMasterNode()
+                    || Node.blockSync.synchronizing)
                 {
-                    forwardKeepAlivePresence(data, hash, address, last_seen, device_id, node_type, endpoint);
+                    return;
                 }
+
+                Presence p = PresenceList.getPresenceByAddress(address);
+                if (p == null)
+                    return;
+
+                Friend f = FriendList.getFriend(p.wallet);
+                if (f != null)
+                {
+                    var pa = p.addresses[0];
+                    if (f.lastSeenTime < pa.lastSeenTime)
+                    {
+                        // TODO use actual wallet address once Presence hostname contains such address
+                        f.relayNode = new Peer(pa.address, null, pa.lastSeenTime, 0, 0, 0);
+                        f.updatedStreamingNodes = pa.lastSeenTime;
+                        f.lastSeenTime = pa.lastSeenTime;
+                    }
+                }
+
+                forwardKeepAlivePresence(data, hash, address, last_seen, device_id, node_type, endpoint);
             }
 
             public static void handleGetRandomPresences(byte[] data, RemoteEndpoint endpoint)
@@ -159,31 +181,49 @@ namespace DLT
             public static void handleUpdatePresence(byte[] data, RemoteEndpoint endpoint)
             {
                 // Parse the data and update entries in the presence list
-                Presence updated_presence = PresenceList.updateFromBytes(data, Node.blockChain.getMinSignerPowDifficulty(IxianHandler.getLastBlockHeight(), IxianHandler.getLastBlockVersion(), 0));
+                Presence updatedPresence = PresenceList.updateFromBytes(data, Node.blockChain.getMinSignerPowDifficulty(IxianHandler.getLastBlockHeight(), IxianHandler.getLastBlockVersion(), 0));
+                if (updatedPresence == null)
+                {
+                    return;
+                }
+
+                Friend f = FriendList.getFriend(updatedPresence.wallet);
+                if (f != null)
+                {
+                    if (f.publicKey == null)
+                    {
+                        f.setPublicKey(updatedPresence.pubkey);
+                    }
+                    var pa = updatedPresence.addresses[0];
+                    if (f.lastSeenTime < pa.lastSeenTime)
+                    {
+                        // TODO use actual wallet address once Presence hostname contains such address
+                        f.relayNode = new Peer(pa.address, null, pa.lastSeenTime, 0, 0, 0);
+                        f.updatedStreamingNodes = pa.lastSeenTime;
+                        f.lastSeenTime = pa.lastSeenTime;
+                    }
+                }
 
                 // If a presence entry was updated, broadcast this message again
-                if (updated_presence != null)
+                foreach (var pa in updatedPresence.addresses)
                 {
-                    foreach (var pa in updated_presence.addresses)
+                    byte[] hash = CryptoManager.lib.sha3_512sqTrunc(pa.getBytes());
+                    var iika = new InventoryItemKeepAlive(hash, pa.lastSeenTime, updatedPresence.wallet, pa.device);
+
+                    if (pa.type == 'M' || pa.type == 'H')
                     {
-                        byte[] hash = CryptoManager.lib.sha3_512sqTrunc(pa.getBytes());
-                        var iika = new InventoryItemKeepAlive(hash, pa.lastSeenTime, updated_presence.wallet, pa.device);
-
-                        if (pa.type == 'M' || pa.type == 'H')
-                        {
-                            // Send this keepalive to all connected clients
-                            CoreProtocolMessage.addToInventory(['M', 'H', 'W', 'R'], iika, endpoint);
-                        }
-                        else
-                        {
-                            // Send this keepalive to all connected non-clients
-                            CoreProtocolMessage.addToInventory(['M', 'H', 'W'], iika, endpoint);
-                        }
+                        // Send this keepalive to all connected clients
+                        CoreProtocolMessage.addToInventory(['M', 'H', 'W', 'R'], iika, endpoint);
                     }
-
-                    // Send this keepalive message to all subscribed clients
-                    CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.keepAlive, updated_presence.wallet.addressNoChecksum, ProtocolMessageCode.updatePresence, data, updated_presence.wallet.addressNoChecksum, endpoint);
+                    else
+                    {
+                        // Send this keepalive to all connected non-clients
+                        CoreProtocolMessage.addToInventory(['M', 'H', 'W'], iika, endpoint);
+                    }
                 }
+
+                // Send this keepalive message to all subscribed clients
+                CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.keepAlive, updatedPresence.wallet.addressNoChecksum, ProtocolMessageCode.updatePresence, data, updatedPresence.wallet.addressNoChecksum, endpoint);
             }
         }
     }

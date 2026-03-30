@@ -10,11 +10,12 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // MIT License for more details.
 
+using DLT.Inventory;
 using DLT.Network;
 using DLT.RegNames;
 using DLT.Storage;
+using DLT.Streaming;
 using DLTNode;
-using DLTNode.Inventory;
 using DLTNode.Meta;
 using IXICore;
 using IXICore.Activity;
@@ -26,7 +27,6 @@ using IXICore.RegNames;
 using IXICore.Storage;
 using IXICore.Streaming;
 using IXICore.Utils;
-using Newtonsoft.Json;
 using System.Diagnostics;
 
 namespace DLT.Meta
@@ -73,6 +73,7 @@ namespace DLT.Meta
         private static MemoryInfoProvider memoryInfoProvider = new MemoryInfoProvider();
 
         public static IActivityStorage activityStorage;
+        public static StreamProcessor streamProcessor = null;
 
         public Node()
         {
@@ -203,8 +204,13 @@ namespace DLT.Meta
             {
                 NetDump.Instance.start(Config.networkDumpFile);
             }
+            
+            FriendList.init(Config.dataFolderPath, false);
 
             UpdateVerify.init(Config.checkVersionUrl, Config.checkVersionSeconds);
+
+            // Prepare the stream processor
+            streamProcessor = new StreamProcessor(new ICPendingMessageProcessor(Config.dataFolderPath, false), StreamCapabilities.Incoming, new DLTSectorProvider());
 
             // Initialize storage
             if (storage is null)
@@ -242,6 +248,11 @@ namespace DLT.Meta
             // Initialize the wallet state
             walletState = new WalletState();
             regNameState = new RegisteredNames(regNamesMemoryStorage);
+
+            Logging.info("Initing local storage");
+
+            // Prepare the local storage
+            IxianHandler.localStorage = new LocalStorage(Config.dataFolderPath, new ICLocalStorageCallbacks());
 
             InventoryCache.init(new InventoryCacheDLT());
 
@@ -407,6 +418,11 @@ namespace DLT.Meta
                 NetworkClientManager.setSimultaneousConnectedNeighbors(Config.maxOutgoingConnections / 2);
             }
 
+            // Start local storage
+            IxianHandler.localStorage.start();
+
+            FriendList.loadContacts();
+
             UpdateVerify.start();
 
             signerPowMiner = new SignerPowMiner();
@@ -441,15 +457,6 @@ namespace DLT.Meta
             blockProcessor = new BlockProcessor();
             blockSync = new BlockSync();
 
-
-            if (Config.devInsertFromJson)
-            {
-                Console.WriteLine("Inserting from JSON");
-                devInsertFromJson();
-                Program.noStart = true;
-                return;
-            }
-
             if (Config.apiBinds.Count == 0)
             {
                 Config.apiBinds.Add("http://localhost:" + Config.apiPort + "/");
@@ -468,6 +475,8 @@ namespace DLT.Meta
 
             // Start the network queue
             NetworkQueue.start();
+
+            streamProcessor.start();
 
             // prepare stats screen
             ConsoleHelpers.verboseConsoleOutput = verboseConsoleOutput;
@@ -585,6 +594,9 @@ namespace DLT.Meta
                     NetworkClientManager.start(1);
                 }
             }
+            
+            // Start the s2 client manager
+            StreamClientManager.start(Config.maxConnectedStreamingNodes, false);
 
             PresenceList.startKeepAlive();
 
@@ -689,6 +701,11 @@ namespace DLT.Meta
 
             UpdateVerify.stop();
 
+            // Stop the stream processor
+            streamProcessor.stop();
+
+            IxianHandler.localStorage.stop();
+
             // Stop the keepalive thread
             PresenceList.stopKeepAlive();
 
@@ -737,6 +754,8 @@ namespace DLT.Meta
             // Stop all network clients
             NetworkClientManager.stop();
             
+            StreamClientManager.stop();
+
             // Stop the network server
             NetworkServer.stopNetworkOperations();
 
@@ -940,6 +959,9 @@ namespace DLT.Meta
                     try
                     {
                         PeerStorage.savePeersFile();
+                        
+                        // Update the friendlist
+                        updateFriendStatuses();
 
                         TransactionPool.processPendingTransactions();
 
@@ -982,6 +1004,45 @@ namespace DLT.Meta
             catch (Exception e)
             {
                 Console.WriteLine("PerformMaintenance exception: {0}", e);
+            }
+        }
+
+        static public void updateFriendStatuses()
+        {
+            lock (FriendList.friends)
+            {
+                // Go through each friend and check for the pubkey in the PL
+                foreach (Friend friend in FriendList.friends)
+                {
+                    Presence? presence = null;
+
+                    try
+                    {
+                        presence = PresenceList.getPresenceByAddress(friend.walletAddress);
+                    }
+                    catch (Exception e)
+                    {
+                        Logging.error("Presence Error {0}", e.Message);
+                        presence = null;
+                    }
+
+                    if (presence != null)
+                    {
+                        if (friend.online == false
+                            && friend.relayNode != null)
+                        {
+                            friend.online = true;
+                        }
+                    }
+                    else
+                    {
+                        if (friend.online == true
+                            && Clock.getNetworkTimestamp() - friend.updatedStreamingNodes > CoreConfig.requestPresenceTimeout)
+                        {
+                            friend.online = false;
+                        }
+                    }
+                }
             }
         }
 
@@ -1317,18 +1378,6 @@ namespace DLT.Meta
             Logging.info("Test done, you can open chart.html now");
         }*/
 
-        private void devInsertFromJson()
-        {
-            string json_file = "block.txt";
-
-            Dictionary<string, string> response = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(json_file));
-            ulong blockNum = ulong.Parse(response["Block Number"]);
-            List<BlockSignature> signatures = JsonConvert.DeserializeObject<List<BlockSignature>>(response["Signatures"]);
-            Block b = storage.getBlock(blockNum);
-            b.signatures = signatures;
-            storage.insertBlock(b);
-        }
-
         public override IxiNumber getMinSignerPowDifficulty(ulong blockNum, int curBlockVersion, long curBlockTimestamp)
         {
             return blockChain.getMinSignerPowDifficulty(blockNum, curBlockVersion, curBlockTimestamp);
@@ -1371,14 +1420,5 @@ namespace DLT.Meta
             }
             return false;
         }
-    }
-
-    class dataPoint
-    {
-        [JsonProperty(PropertyName = "diff")]
-        public ulong diff { get; set; }
-
-        [JsonProperty(PropertyName = "solved")]
-        public string solved { get; set; }
     }
 }

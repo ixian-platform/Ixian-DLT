@@ -1,6 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<DefineConstants>$(DefineConstants);__ROCKS_DB_SHARP__</DefineConstants>
 		<TargetFramework>net10.0</TargetFramework>
 		<RootNamespace>UnitTests</RootNamespace>
 		<ImplicitUsings>enable</ImplicitUsings>

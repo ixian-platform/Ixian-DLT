@@ -17,10 +17,8 @@ using IXICore.Inventory;
 using IXICore.Meta;
 using IXICore.Network;
 using IXICore.Utils;
-using System;
-using System.Linq;
 
-namespace DLTNode.Inventory
+namespace DLT.Inventory
 {
     class InventoryCacheDLT : InventoryCache
     {

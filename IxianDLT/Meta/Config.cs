@@ -123,8 +123,6 @@ namespace DLT
             public static bool generateWalletOnly = false;
             public static string dangerCommandlinePasswordCleartextUnsafe = "";
 
-            public static bool devInsertFromJson = false;
-
             public static bool enableChainReorgTest = false;
 
             // internal
@@ -153,6 +151,8 @@ namespace DLT
             public static int maxIncomingClientNodes = 5000;
 
             public static int maxCachedBlockHashes = 1000000;
+
+            public static int maxConnectedStreamingNodes = 6;
 
             public static ulong blocksDbCacheSize = 0;
             public static ulong activityDbCacheSize = 128 << 20;
@@ -593,8 +593,6 @@ namespace DLT
                 cmd_parser.Setup<string>("walletPassword").Callback(value => dangerCommandlinePasswordCleartextUnsafe = value).SetDefault("");
 
                 cmd_parser.Setup<bool>("noNetworkSync").Callback(value => noNetworkSync = true).Required();
-
-                cmd_parser.Setup<bool>("devInsertFromJson").Callback(value => devInsertFromJson = true).Required();
 
                 cmd_parser.Setup<bool>("offline").Callback(value => CoreConfig.preventNetworkOperations = true).Required();
 

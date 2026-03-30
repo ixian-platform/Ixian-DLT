@@ -183,6 +183,10 @@ namespace DLT
                             handleGetSectorNodes(data, endpoint);
                             break;
 
+                        case ProtocolMessageCode.s2data:
+                            Node.streamProcessor.receiveData(data, endpoint);
+                            break;
+
                         default:
                             Logging.warn("Unknown protocol message: {0}, from {1} ({2})", code, endpoint.getFullAddress(), endpoint.serverWalletAddress);
                             break;
