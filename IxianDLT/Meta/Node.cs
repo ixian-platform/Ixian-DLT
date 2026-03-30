@@ -596,7 +596,7 @@ namespace DLT.Meta
             }
             
             // Start the s2 client manager
-            StreamClientManager.start(Config.maxConnectedStreamingNodes, false);
+            StreamClientManager.start(Config.maxConnectedStreamingNodes, false, false);
 
             PresenceList.startKeepAlive();
 
