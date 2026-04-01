@@ -2632,7 +2632,7 @@ namespace DLT
                         {
                             if (IxianHandler.isMyAddress(entry.pubKey))
                             {
-                                Node.activityStorage.updateStatus(entry.id, ActivityStatus.Error, 0);
+                                Node.activityStorage.updateStatus(entry.id, ActivityStatus.Rejected, 0);
                             }
                             unappliedTransactions.Remove(entry.id);
                         }
@@ -2673,7 +2673,7 @@ namespace DLT
                             && t.blockHeight < last_block_height - ConsensusConfig.getRedactedWindowSize())
                         {
                             Logging.error("Error sending the transaction {0}, expired", t.getTxIdString());
-                            Node.activityStorage.updateStatus(t.id, ActivityStatus.Error, 0);
+                            Node.activityStorage.updateStatus(t.id, ActivityStatus.Expired, 0);
                             PendingTransactions.remove(t.id);
                             continue;
                         }
@@ -2686,7 +2686,7 @@ namespace DLT
                             Block tmpBlock = Node.blockChain.getBlock(pow_block_num, false, false);
                             if (tmpBlock == null || tmpBlock.powField != null)
                             {
-                                Node.activityStorage.updateStatus(t.id, ActivityStatus.Error, 0);
+                                Node.activityStorage.updateStatus(t.id, ActivityStatus.Rejected, 0);
                                 PendingTransactions.remove(t.id);
                                 continue;
                             }
@@ -2696,7 +2696,7 @@ namespace DLT
                             // check if transaction is still valid
                             if (getUnappliedTransaction(t.id) == null && !verifyTransaction(t, null, out _, false))
                             {
-                                Node.activityStorage.updateStatus(t.id, ActivityStatus.Error, 0);
+                                Node.activityStorage.updateStatus(t.id, ActivityStatus.Rejected, 0);
                                 PendingTransactions.remove(t.id);
                                 continue;
                             }
