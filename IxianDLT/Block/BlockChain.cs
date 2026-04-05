@@ -1295,7 +1295,7 @@ namespace DLT
                     if (!wsDeltaChecksum.SequenceEqual(lastBlock.walletStateChecksum))
                     {
                         Logging.error("Fatal error occurred: Delta Wallet state is incorrect after reverting block #{0} - Block's WS Checksum: {1}, WS Checksum: {2}, Wallets: {3}", block_num_to_revert, Crypto.hashToString(lastBlock.walletStateChecksum), Crypto.hashToString(wsDeltaChecksum), Node.walletState.numWallets);
-                        Node.stop();
+                        IxianHandler.shutdown();
                         return false;
                     }
                 }else if(legacy_dual_revert)
@@ -1310,7 +1310,7 @@ namespace DLT
                 if (!wsChecksum.SequenceEqual(lastBlock.walletStateChecksum))
                 {
                     Logging.error("Fatal error occurred: Wallet state is incorrect after reverting block #{0} - Block's WS Checksum: {1}, WS Checksum: {2}, Wallets: {3}", block_num_to_revert, Crypto.hashToString(lastBlock.walletStateChecksum), Crypto.hashToString(wsChecksum), Node.walletState.numWallets);
-                    Node.stop();
+                    IxianHandler.shutdown();
                     return false;
                 }
             }
@@ -1321,7 +1321,7 @@ namespace DLT
                 if (!curRegNameStateChecksum.SequenceEqual(lastBlock.regNameStateChecksum))
                 {
                     Logging.error("Fatal error occurred: RegName state is incorrect after reverting block #{0} - Block's RN Checksum: {1}, RN Checksum: {2}, Names: {3}", block_num_to_revert, Crypto.hashToString(lastBlock.regNameStateChecksum), Crypto.hashToString(curRegNameStateChecksum), Node.regNameState.count());
-                    Node.stop();
+                    IxianHandler.shutdown();
                     return false;
                 }
                 clearCachedRequiredSignerDifficulty();

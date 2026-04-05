@@ -1096,7 +1096,7 @@ namespace DLT
             {
                 Logging.info("Data verification successfully completed.");
 
-                IxianHandler.forceShutdown = true;
+                IxianHandler.shutdown();
 
                 syncDone = true;
                 synchronizing = false;

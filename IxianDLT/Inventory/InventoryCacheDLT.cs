@@ -107,7 +107,7 @@ namespace DLT.Inventory
                     Array.Copy(address, 0, data, 1 + address_len_bytes.Length, address.Length);
                     Array.Copy(device_len_bytes, 0, data, 1 + address_len_bytes.Length + address.Length, device_len_bytes.Length);
                     Array.Copy(iika.deviceId, 0, data, 1 + address_len_bytes.Length + address.Length + device_len_bytes.Length, iika.deviceId.Length);
-                    endpoint.sendData(ProtocolMessageCode.getKeepAlives, data, null);
+                    endpoint.sendData(ProtocolMessageCode.getKeepAlives, data);
                     return true;
                 }
             }
@@ -161,7 +161,7 @@ namespace DLT.Inventory
                 }
                 else
                 {
-                    endpoint.sendData(ProtocolMessageCode.getSignatures3, data, null);
+                    endpoint.sendData(ProtocolMessageCode.getSignatures3, data);
                 }
                 return true;
             }

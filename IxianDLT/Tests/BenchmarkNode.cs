@@ -132,11 +132,6 @@ namespace DLTNode
             return true;
         }
 
-        static public void stop()
-        {
-            IxianHandler.forceShutdown = true;
-        }
-
         public void start()
         {
 
@@ -184,7 +179,6 @@ namespace DLTNode
 
         public override void shutdown()
         {
-            IxianHandler.forceShutdown = true;
         }
 
         public override void parseProtocolMessage(ProtocolMessageCode code, byte[] data, RemoteEndpoint endpoint)

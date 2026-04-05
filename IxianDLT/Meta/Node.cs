@@ -56,7 +56,7 @@ namespace DLT.Meta
         // Private
         private static Thread maintenanceThread;
 
-        private static bool running = false;
+        public static bool running { get; private set; } = false;
 
 
         private static bool floodPause = false;
@@ -198,13 +198,7 @@ namespace DLT.Meta
             {
                 cleanCacheAndLogs();
             }
-
-            // debug
-            if (Config.networkDumpFile != "")
-            {
-                NetDump.Instance.start(Config.networkDumpFile);
-            }
-            
+                        
             FriendList.init(Config.dataFolderPath, false);
 
             UpdateVerify.init(Config.checkVersionUrl, Config.checkVersionSeconds);
@@ -213,10 +207,7 @@ namespace DLT.Meta
             streamProcessor = new StreamProcessor(new ICPendingMessageProcessor(Config.dataFolderPath, false), StreamCapabilities.Incoming, new DLTSectorProvider());
 
             // Initialize storage
-            if (storage is null)
-            {
-                storage = createStorageProvider(Config.blockStorageProvider, Config.dataFolderBlocks, Config.blocksDbCacheSize, Config.maxBlocksPerDatabase, 50);
-            }
+            storage = createStorageProvider(Config.blockStorageProvider, Config.dataFolderBlocks, Config.blocksDbCacheSize, Config.maxBlocksPerDatabase, 50);
 
             if (storage is RocksDBStorage)
             {
@@ -239,9 +230,7 @@ namespace DLT.Meta
             // Load or Generate the wallet
             if (!initWallet())
             {
-                storage.stopStorage();
-                running = false;
-                Program.noStart = true;
+                IxianHandler.shutdown();
                 return;
             }
 
@@ -257,6 +246,8 @@ namespace DLT.Meta
             InventoryCache.init(new InventoryCacheDLT());
 
             NetworkClientManager.init(new NetworkClientManagerRandomized(Config.maxOutgoingConnections / 2, Config.dltBind));
+
+            StreamClientManager.init(Config.maxConnectedStreamingNodes, false);
 
             RelaySectors.init(CoreConfig.relaySectorLevels, null);
 
@@ -315,7 +306,7 @@ namespace DLT.Meta
                         Console.Write("Enter wallet password: ");
                         password = ConsoleHelpers.getPasswordInput();
                     }
-                    if (IxianHandler.forceShutdown)
+                    if (password == "" || IxianHandler.forceShutdown)
                     {
                         return false;
                     }
@@ -478,6 +469,11 @@ namespace DLT.Meta
 
             streamProcessor.start();
 
+            // Start the s2 client manager
+            StreamClientManager.start();
+
+            PresenceList.startKeepAlive();
+
             // prepare stats screen
             ConsoleHelpers.verboseConsoleOutput = verboseConsoleOutput;
             Logging.consoleOutput = verboseConsoleOutput;
@@ -594,11 +590,6 @@ namespace DLT.Meta
                     NetworkClientManager.start(1);
                 }
             }
-            
-            // Start the s2 client manager
-            StreamClientManager.start(Config.maxConnectedStreamingNodes, false, false);
-
-            PresenceList.startKeepAlive();
 
             TLC = new ThreadLiveCheck();
             // Start the maintenance thread
@@ -636,7 +627,6 @@ namespace DLT.Meta
                 Logging.consoleOutput = true;
                 shutdownMessage = string.Format("Your DLT node can only handle blocks up to #{0}. Please update to the latest version from www.ixian.io", Config.nodeDeprecationBlock);
                 Logging.error(shutdownMessage);
-                IxianHandler.forceShutdown = true;
                 running = false;
                 return running;
             }
@@ -688,32 +678,32 @@ namespace DLT.Meta
                 floodPause = false;
             }
 
-
             return running;
         }
 
-        static public void stop()
+        static private void stop()
         {
             running = false;
 
             Program.noStart = true;
-            IxianHandler.forceShutdown = true;
 
             UpdateVerify.stop();
 
-            // Stop the stream processor
-            streamProcessor.stop();
+            // First stop localStorage, to flush any pending chat messages to storage
+            // The Node is currently in shutting down state, so no incoming messages will be processed by the message processors
+            IxianHandler.localStorage?.stop();
 
-            IxianHandler.localStorage.stop();
+            // Stop the stream processor, it includes pending messages
+            streamProcessor?.stop();
 
             // Stop the keepalive thread
             PresenceList.stopKeepAlive();
 
             // Stop the block processor
-            blockProcessor.stopOperation();
+            blockProcessor?.stopOperation();
 
             // Stop the block sync
-            blockSync.stop();
+            blockSync?.stop();
 
             // Stop the API server
             if (apiServer != null)
@@ -746,7 +736,7 @@ namespace DLT.Meta
             ActivityScanner.stop();
 
             // Stop activity storage
-            activityStorage.stopStorage();
+            activityStorage?.stopStorage();
 
             // Stop the network queue
             NetworkQueue.stop();
@@ -761,12 +751,11 @@ namespace DLT.Meta
 
             // Stop the console stats screen
             // Console screen has a thread running even if we are in verbose mode
-            statsConsoleScreen.stop();
+            statsConsoleScreen?.stop();
 
-            NetDump.Instance.shutdown();
 
             // Stop the block storage
-            storage.stopStorage();
+            storage?.stopStorage();
         }
 
         // Checks to see if this node can handle the block number
@@ -972,7 +961,8 @@ namespace DLT.Meta
 
                         if (update() == false)
                         {
-                            IxianHandler.forceShutdown = true;
+                            running = false;
+                            return;
                         }
 
                         // Remove expired peers from blacklist
@@ -1223,7 +1213,7 @@ namespace DLT.Meta
 
         public override void shutdown()
         {
-            IxianHandler.forceShutdown = true;
+            stop();
         }
 
         public override void parseProtocolMessage(ProtocolMessageCode code, byte[] data, RemoteEndpoint endpoint)

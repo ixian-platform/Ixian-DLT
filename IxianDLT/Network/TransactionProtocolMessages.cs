@@ -79,7 +79,7 @@ namespace DLT
                             if (writer.BaseStream.Position + txBytes.Length > CoreConfig.maxMessageSize)
                             {
                                 foundNextBatch = false;
-                                endpoint.sendData(ProtocolMessageCode.transactionsChunk3, ms.ToArray(), null);
+                                endpoint.sendData(ProtocolMessageCode.transactionsChunk3, ms.ToArray());
                                 writer.BaseStream.SetLength(0);
                                 chunkTxCount = 0;
                                 writer.WriteIxiVarInt(b.blockNum);
@@ -93,7 +93,7 @@ namespace DLT
                     {
                         if (foundNextBatch)
                         {
-                            endpoint.sendData(ProtocolMessageCode.transactionsChunk3, ms.ToArray(), null);
+                            endpoint.sendData(ProtocolMessageCode.transactionsChunk3, ms.ToArray());
                         }
                         return txFilter;
                     }
@@ -227,7 +227,7 @@ namespace DLT
                         if (txs_in_chunk > 0)
                         {
                             // Send a chunk
-                            endpoint.sendData(ProtocolMessageCode.transactionsChunk3, mOut.ToArray(), null, 0, MessagePriority.high);
+                            endpoint.sendData(ProtocolMessageCode.transactionsChunk3, mOut.ToArray(), 0, MessagePriority.high);
                         }
                     }
                 }
@@ -320,7 +320,7 @@ namespace DLT
                                         }
                                     }
                                 }
-                                endpoint.sendData(ProtocolMessageCode.transactionsChunk3, mOut.ToArray(), null, 0, MessagePriority.high);
+                                endpoint.sendData(ProtocolMessageCode.transactionsChunk3, mOut.ToArray(), 0, MessagePriority.high);
                             }
                         }
                     }

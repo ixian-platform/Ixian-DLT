@@ -167,7 +167,6 @@ namespace DLTNode
             // Start logging
             if (!Logging.start(Config.logFolderPath, Config.logVerbosity))
             {
-                IxianHandler.forceShutdown = true;
                 Logging.info("Press ENTER to exit.");
                 Console.ReadLine();
                 return;
@@ -177,7 +176,7 @@ namespace DLTNode
                 ConsoleHelpers.verboseConsoleOutput = true;
                 Logging.consoleOutput = ConsoleHelpers.verboseConsoleOutput;
                 e.Cancel = true;
-                IxianHandler.forceShutdown = true;
+                IxianHandler.shutdown();
             };
 
             // For testing only. Run any experiments here as to not affect the infrastructure.
@@ -191,7 +190,8 @@ namespace DLTNode
 
             if(Node.apiServer != null)
             { 
-                while (IxianHandler.forceShutdown == false)
+                while (IxianHandler.forceShutdown == false
+                    && Node.running)
                 {
                     Thread.Sleep(1000);
                 }
@@ -297,7 +297,7 @@ namespace DLTNode
 
             if (noStart)
             {
-                Node.stop();
+                IxianHandler.shutdown();
                 Thread.Sleep(1000);
                 return;
             }
@@ -343,7 +343,7 @@ namespace DLTNode
                             {
                                 ConsoleHelpers.verboseConsoleOutput = true;
                                 Logging.consoleOutput = ConsoleHelpers.verboseConsoleOutput;
-                                IxianHandler.forceShutdown = true;
+                                IxianHandler.shutdown();
                             }
                         }
                     }
@@ -371,7 +371,7 @@ namespace DLTNode
             if (noStart == false)
             {
                 // Stop the DLT
-                Node.stop();
+                IxianHandler.shutdown();
             }
 
             // Stop logging

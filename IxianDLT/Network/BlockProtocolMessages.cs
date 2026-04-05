@@ -372,11 +372,11 @@ namespace DLT
                         {
                             if (endpoint.isConnected())
                             {
-                                endpoint.sendData(ProtocolMessageCode.getBlock3, mw.ToArray(), BitConverter.GetBytes(block_num), (long)block_num);
+                                endpoint.sendData(ProtocolMessageCode.getBlock3, mw.ToArray(), (long)block_num);
                                 return true;
                             }
                         }
-                        return CoreProtocolMessage.broadcastProtocolMessageToSingleRandomNode(new char[] { 'M', 'H' }, ProtocolMessageCode.getBlock3, mw.ToArray(), block_num, skipEndpoint, BitConverter.GetBytes(block_num), (long)block_num);
+                        return CoreProtocolMessage.broadcastProtocolMessageToSingleRandomNode(new char[] { 'M', 'H' }, ProtocolMessageCode.getBlock3, mw.ToArray(), block_num, skipEndpoint, (long)block_num);
                     }
                 }
             }
@@ -398,7 +398,7 @@ namespace DLT
                 {
                     if (endpoint.isConnected())
                     {
-                        endpoint.sendData(ProtocolMessageCode.blockData2, b.getBytes(false, true, true), BitConverter.GetBytes(b.blockNum));
+                        endpoint.sendData(ProtocolMessageCode.blockData2, b.getBytes(false, true, true));
                         return true;
                     }
                     return false;
@@ -407,7 +407,7 @@ namespace DLT
                 {
                     if (force_broadcast)
                     {
-                        return CoreProtocolMessage.broadcastProtocolMessage(new char[] { 'M', 'H' }, ProtocolMessageCode.blockData2, b.getBytes(false, true, true), BitConverter.GetBytes(b.blockNum), skipEndpoint);
+                        return CoreProtocolMessage.broadcastProtocolMessage(new char[] { 'M', 'H' }, ProtocolMessageCode.blockData2, b.getBytes(false, true, true), skipEndpoint);
                     }
                     else
                     {
@@ -520,7 +520,7 @@ namespace DLT
                             frozen_sigs_only = false;
                         }
 
-                        endpoint.sendData(ProtocolMessageCode.blockData2, block.getBytes(full_header, frozen_sigs_only, true), BitConverter.GetBytes(block.blockNum), 0, MessagePriority.high);
+                        endpoint.sendData(ProtocolMessageCode.blockData2, block.getBytes(full_header, frozen_sigs_only, true), 0, MessagePriority.high);
                     }
                 }
             }

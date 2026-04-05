@@ -2234,7 +2234,7 @@ namespace DLT
                                     localNewBlock.version, Crypto.hashToString(localNewBlock.walletStateChecksum), Crypto.hashToString(ws_checksum));
                                 // TODO TODO perhaps try reverting the block
                                 operating = false;
-                                Node.stop();
+                                IxianHandler.shutdown();
                                 return false;
                             } else if (!rn_checksum_ok)
                             {
@@ -2242,7 +2242,7 @@ namespace DLT
                                     localNewBlock.version, Crypto.hashToString(localNewBlock.regNameStateChecksum), Crypto.hashToString(rn_checksum));
                                 // TODO TODO perhaps try reverting the block
                                 operating = false;
-                                Node.stop();
+                                IxianHandler.shutdown();
                                 return false;
                             }
                             else

@@ -42,7 +42,7 @@ namespace DLT
                 }
 
                 // Send this keepalive message to all subscribed clients
-                CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.keepAlive, address.addressNoChecksum, ProtocolMessageCode.keepAlivePresence, ka_bytes, address.addressNoChecksum, endpoint);
+                CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.keepAlive, address.addressNoChecksum, ProtocolMessageCode.keepAlivePresence, ka_bytes, endpoint);
             }
 
             public static void handleKeepAlivesChunk(byte[] data, RemoteEndpoint endpoint)
@@ -91,7 +91,7 @@ namespace DLT
                                 byte[][] presence_chunks = p.getByteChunks();
                                 foreach (byte[] presence_chunk in presence_chunks)
                                 {
-                                    endpoint.sendData(ProtocolMessageCode.updatePresence, presence_chunk, null);
+                                    endpoint.sendData(ProtocolMessageCode.updatePresence, presence_chunk);
                                 }
                             }
                         }
@@ -171,7 +171,7 @@ namespace DLT
                             byte[][] presence_chunks = presence.getByteChunks();
                             foreach (byte[] presence_chunk in presence_chunks)
                             {
-                                endpoint.sendData(ProtocolMessageCode.updatePresence, presence_chunk, null);
+                                endpoint.sendData(ProtocolMessageCode.updatePresence, presence_chunk);
                             }
                         }
                     }
@@ -223,7 +223,7 @@ namespace DLT
                 }
 
                 // Send this keepalive message to all subscribed clients
-                CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.keepAlive, updatedPresence.wallet.addressNoChecksum, ProtocolMessageCode.updatePresence, data, updatedPresence.wallet.addressNoChecksum, endpoint);
+                CoreProtocolMessage.broadcastEventDataMessage(NetworkEvents.Type.keepAlive, updatedPresence.wallet.addressNoChecksum, ProtocolMessageCode.updatePresence, data, endpoint);
             }
         }
     }

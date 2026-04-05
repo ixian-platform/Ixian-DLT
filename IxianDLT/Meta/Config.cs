@@ -114,7 +114,6 @@ namespace DLT
             public static readonly int floodDisableMaxQueuedMessages = 5000; // Max queued messages in NetworkQueue before disabling flood prevention
 
             // Debugging values
-            public static string networkDumpFile = "";
             public static string benchmarkMode = "";
             public static bool fullBlockLogging = false; // use with care - it will explode the log files
 
@@ -173,7 +172,7 @@ namespace DLT
                 Console.WriteLine("   [--maxTxPerBlock 70200] [--disableSetTitle] [--disableFastBlockLoading] [--checksumLock Ixian] [--verboseOutput]");
                 Console.WriteLine("   [--maxOutgoingConnections 12] [--maxIncomingMasterNodes 500] [--maxIncomingClientNodes 5000]");
                 Console.WriteLine("   [--forceSyncToBlock]");
-                Console.WriteLine("   [--genesis] [--netdump dumpfile] [--benchmark type] [--recover] [--verifyStorage] [--generateWallet]");
+                Console.WriteLine("   [--genesis] [--benchmark type] [--recover] [--verifyStorage] [--generateWallet]");
                 Console.WriteLine("   [--optimizeDBStorage] [--offline] [--disableChainReorg] [--chainReorgTest]");
                 Console.WriteLine("");
                 Console.WriteLine("    -h\t\t\t\t Displays this help");
@@ -214,7 +213,6 @@ namespace DLT
                 Console.WriteLine("");
                 Console.WriteLine("----------- Developer CLI flags -----------");
                 Console.WriteLine("    --genesis\t\t\t Start node in genesis mode (to be used only when setting up your own private network)");
-                Console.WriteLine("    --netdump\t\t\t Enable netdump for debugging purposes");
                 Console.WriteLine("    --benchmark\t\t\t Performs specified benchmark then exits (argon2id, sha, rsa, keys1024, keys2048, keys4096");
                 Console.WriteLine("    --recover\t\t\t Recovers from file (to be used only by developers when cold-starting the network)");
                 Console.WriteLine("    --verifyStorage\t\t Start node with full local storage blocks and transactions verification");
@@ -583,7 +581,6 @@ namespace DLT
                 cmd_parser.Setup<string>("checksumLock").Callback(value => checksumLock = Encoding.UTF8.GetBytes(value)).Required();
 
                 // Debug
-                cmd_parser.Setup<string>("netdump").Callback(value => networkDumpFile = value).SetDefault("");
 
                 cmd_parser.Setup<string>("benchmark").Callback(value => benchmarkMode = value).SetDefault("");
 

@@ -383,8 +383,7 @@ namespace DLTNode
         // Sends data over the network
         public static void sendData(ProtocolMessageCode code, byte[] data)
         {
-            byte[] ba = RemoteEndpoint.prepareProtocolMessage(code, data, CoreConfig.protocolVersion, 0);
-            NetDump.Instance.appendSent(tcpClient.Client, ba, ba.Length);
+            byte[] ba = RemoteEndpoint.prepareProtocolMessage(code, data, CoreConfig.protocolVersion, 0).ToArray();
             try
             {
                 tcpClient.Client.Send(ba, SocketFlags.None);

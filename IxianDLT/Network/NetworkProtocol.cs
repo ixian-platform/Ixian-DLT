@@ -27,12 +27,6 @@ namespace DLT
             // Unified protocol message parsing
             public static void parseProtocolMessage(ProtocolMessageCode code, byte[] data, RemoteEndpoint endpoint)
             {
-                if (endpoint == null)
-                {
-                    Logging.error("Endpoint was null. parseProtocolMessage");
-                    return;
-                }
-
                 try
                 {
                     switch (code)

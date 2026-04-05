@@ -188,11 +188,11 @@ namespace DLT
                             {
                                 return;
                             }
-                            endpoint.sendData(ProtocolMessageCode.signaturesChunk2, mOut.ToArray(), BitConverter.GetBytes(block_num));
+                            endpoint.sendData(ProtocolMessageCode.signaturesChunk2, mOut.ToArray());
                         }
                         else
                         {
-                            CoreProtocolMessage.broadcastProtocolMessage(new char[] { 'M', 'H' }, ProtocolMessageCode.signaturesChunk2, mOut.ToArray(), BitConverter.GetBytes(block_num), skip_endpoint);
+                            CoreProtocolMessage.broadcastProtocolMessage(new char[] { 'M', 'H' }, ProtocolMessageCode.signaturesChunk2, mOut.ToArray(), skip_endpoint);
                         }
                     }
                 }
@@ -240,7 +240,7 @@ namespace DLT
                                 }
                             }
                         }
-                        endpoint.sendData(ProtocolMessageCode.getSignatures3, mOut.ToArray(), null);
+                        endpoint.sendData(ProtocolMessageCode.getSignatures3, mOut.ToArray());
                     }
                 }
             }
@@ -355,7 +355,7 @@ namespace DLT
                                         writer.Write(sig_bytes);
                                     }
                                 }
-                                endpoint.sendData(ProtocolMessageCode.signaturesChunk2, mOut.ToArray(), null);
+                                endpoint.sendData(ProtocolMessageCode.signaturesChunk2, mOut.ToArray());
                             }
                         }
                     }
