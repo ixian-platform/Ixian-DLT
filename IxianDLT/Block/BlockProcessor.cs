@@ -1213,9 +1213,9 @@ namespace DLT
 
                     tFeeAmount += t.fee;
 
-                    if(b.blockNum >= ConsensusConfig.miningExpirationBlockHeight && t.type == (int)Transaction.Type.PoWSolution)
+                    if(b.blockNum >= ConsensusConfig.argon2ExpirationBlockHeight && t.type == (int)Transaction.Type.PoWSolution)
                     {
-                        Logging.error("Block #{0} includes a PoW transaction {1}. Mining has stopped after block #{2}.", b.blockNum, t.getTxIdString(), ConsensusConfig.miningExpirationBlockHeight);
+                        Logging.error("Block #{0} includes a PoW transaction {1}. Mining has stopped after block #{2}.", b.blockNum, t.getTxIdString(), ConsensusConfig.argon2ExpirationBlockHeight);
                         return BlockVerifyStatus.Invalid;
                     }
                     if (t.blockHeight > b.blockNum)

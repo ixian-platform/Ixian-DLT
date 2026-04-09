@@ -1142,9 +1142,9 @@ namespace DLT
             if (tx.type != (int)Transaction.Type.PoWSolution)
                 return false;
 
-            if (Node.blockChain.getLastBlockNum() >= ConsensusConfig.miningExpirationBlockHeight)
+            if (Node.blockChain.getLastBlockNum() >= ConsensusConfig.argon2ExpirationBlockHeight)
             {
-                Logging.warn("Received a PoW transaction {0}. Mining has stopped after block #{1} but current block height is #{2}.", tx.getTxIdString(), ConsensusConfig.miningExpirationBlockHeight, Node.blockChain.getLastBlockNum());
+                Logging.warn("Received a PoW transaction {0}. Mining has stopped after block #{1} but current block height is #{2}.", tx.getTxIdString(), ConsensusConfig.argon2ExpirationBlockHeight, Node.blockChain.getLastBlockNum());
                 return false;
             }
 
@@ -2626,7 +2626,7 @@ namespace DLT
 
                         Block block = null;
                         
-                        if (Node.blockChain.getLastBlockNum() < ConsensusConfig.miningExpirationBlockHeight)
+                        if (Node.blockChain.getLastBlockNum() < ConsensusConfig.argon2ExpirationBlockHeight)
                         {
                             block = Node.blockChain.getBlock(blocknum, false, false);
                         }

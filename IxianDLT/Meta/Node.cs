@@ -985,6 +985,10 @@ namespace DLT.Meta
                                 blockSync.paused = false;
                             }
                         }
+                        else
+                        {
+                            blockProcessor.applyUpdatedSolutionSignature();
+                        }
                     }
                     catch (Exception e)
                     {
