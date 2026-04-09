@@ -18,7 +18,10 @@ using IXICore.Inventory;
 using IXICore.Meta;
 using IXICore.Network;
 using IXICore.Utils;
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace DLT
 {
@@ -69,8 +72,8 @@ namespace DLT
             lock (blocks)
             {
                 // redaction
-                int begin_size = blocks.Count();
-                while ((ulong)blocks.Count() > ConsensusConfig.redactedWindowSize)
+                int begin_size = blocks.Count;
+                while ((ulong)blocks.Count > ConsensusConfig.redactedWindowSize)
                 {
                     Block block = getBlock(blocks.First().Value.blockNum);
 
@@ -116,20 +119,20 @@ namespace DLT
             lock(blocks)
             {
                 int redacted_window_size = (int)ConsensusConfig.getRedactedWindowSize(getLastBlockVersion());
-                if (blocks.Count() == redacted_window_size)
+                if (blocks.Count == redacted_window_size)
                 {
                     Logging.warn("Won't unredact chain, block count is already correct.");
                     return false;
                 }
 
-                while(blocks.Count() < redacted_window_size)
+                while(blocks.Count < redacted_window_size)
                 {
                     if (lastBlockNum < (ulong)redacted_window_size)
                     {
                         return false;
                     }
 
-                    ulong block_num_to_unredact = lastBlockNum - (ulong)blocks.Count();
+                    ulong block_num_to_unredact = lastBlockNum - (ulong)blocks.Count;
 
                     Block b = getBlock(block_num_to_unredact, true, true);
 

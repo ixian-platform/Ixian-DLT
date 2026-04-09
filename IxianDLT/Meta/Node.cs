@@ -27,7 +27,12 @@ using IXICore.RegNames;
 using IXICore.Storage;
 using IXICore.Streaming;
 using IXICore.Utils;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Threading;
 
 namespace DLT.Meta
 {
@@ -167,7 +172,7 @@ namespace DLT.Meta
 
             // Default to RocksDB
             Logging.info("Using RocksDB.");
-            return new RocksDBStorage(dataFolderBlocks, maxDatabaseCache, maxBlocksPerDatabase, maxOpenDatabases, RocksDBOptimizations.Servers);
+            return new RocksDBStorage(dataFolderBlocks, maxDatabaseCache, maxBlocksPerDatabase, maxOpenDatabases, RocksDBOptimizations.Servers, Config.minRequiredDiskSpace);
         }
 
         // instantiation for the proper implementation class
@@ -180,7 +185,7 @@ namespace DLT.Meta
                 case "SQLite":
                     Logging.warn("Using SQLite. Please upgrade to RocksDB.");
                     return new SQLiteStorage(dataFolderBlocks);
-                case "RocksDB": return new RocksDBStorage(dataFolderBlocks, maxDatabaseCache, maxBlocksPerDatabase, maxOpenDatabases, RocksDBOptimizations.Servers);
+                case "RocksDB": return new RocksDBStorage(dataFolderBlocks, maxDatabaseCache, maxBlocksPerDatabase, maxOpenDatabases, RocksDBOptimizations.Servers, Config.minRequiredDiskSpace);
                 default: throw new Exception(String.Format("Unknown blocks storage provider: {0}", name));
             }
         }
@@ -422,7 +427,7 @@ namespace DLT.Meta
             // Generate presence list
             PresenceList.init(IxianHandler.publicIP, Config.serverPort, node_type, CoreConfig.serverKeepAliveInterval, signerPowMiner);
 
-            activityStorage = new ActivityStorage(Config.activityFolderPath, Config.activityDbCacheSize, 0, RocksDBOptimizations.Servers);
+            activityStorage = new ActivityStorage(Config.activityFolderPath, Config.activityDbCacheSize, 0, RocksDBOptimizations.Servers, Config.minRequiredDiskSpace);
             activityStorage.prepareStorage(true);
 
             var pending_txs = activityStorage.getActivitiesByStatus(ActivityStatus.Pending, true);
@@ -906,7 +911,7 @@ namespace DLT.Meta
         {
             if (activityStorage is null)
             {
-                activityStorage = new ActivityStorage(Config.activityFolderPath, Config.activityDbCacheSize, 0, RocksDBOptimizations.Servers);
+                activityStorage = new ActivityStorage(Config.activityFolderPath, Config.activityDbCacheSize, 0, RocksDBOptimizations.Servers, Config.minRequiredDiskSpace);
             }
             activityStorage.stopStorage();
             activityStorage.deleteData();

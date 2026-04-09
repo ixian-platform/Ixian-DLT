@@ -332,7 +332,7 @@ namespace DLTNode
         private static void storageThreadLoop()
         {
             // Initialize storage
-            IStorage storage = new RocksDBStorage("benchmark", 10UL << 20, 1000, 50, RocksDBOptimizations.Servers);
+            IStorage storage = new RocksDBStorage("benchmark", 10UL << 20, 1000, 50, RocksDBOptimizations.Servers, Config.minRequiredDiskSpace);
             if (!storage.prepareStorage(Config.optimizeDBStorage))
             {
                 Logging.error("Error while preparing block storage! Aborting.");

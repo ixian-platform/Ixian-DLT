@@ -159,7 +159,7 @@ namespace DLT
                         char type = reader.ReadChar();
 
                         List<Presence> presences = PresenceList.getPresencesByType(type, 20);
-                        int presence_count = presences.Count();
+                        int presence_count = presences.Count;
                         if (presence_count > 10)
                         {
                             Random rnd = new Random();

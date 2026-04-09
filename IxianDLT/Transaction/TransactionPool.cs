@@ -19,6 +19,9 @@ using IXICore.Network;
 using IXICore.Network.Messages;
 using IXICore.RegNames;
 using IXICore.Utils;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using static IXICore.Transaction;
 

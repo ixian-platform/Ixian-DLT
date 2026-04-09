@@ -262,12 +262,12 @@ namespace DLT
 
 
                 // whatever is left in missingBlocks is what we need to request
-                if (missingBlocks.Count() == 0)
+                if (missingBlocks.Count == 0)
                 {
                     return false;
                 }
 
-                if (pendingBlocks.Count() > maxBlockRequests * 2)
+                if (pendingBlocks.Count > maxBlockRequests * 2)
                 {
                     return false;
                 }

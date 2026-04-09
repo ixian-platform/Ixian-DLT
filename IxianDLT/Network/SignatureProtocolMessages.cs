@@ -134,7 +134,7 @@ namespace DLT
             {
                 int max_sigs_per_chunk = ConsensusConfig.maximumBlockSigners;
 
-                int sig_count = signatures.Count();
+                int sig_count = signatures.Count;
 
                 if (sig_count == 0)
                 {

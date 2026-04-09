@@ -254,7 +254,7 @@ namespace DLT
                                 {
                                     if (Node.isMasterNode())
                                     {
-                                        if ((DateTime.UtcNow - currentBlockStartTime).TotalSeconds > (ConsensusConfig.blockGenerationInterval / 2) && localNewBlock.signatures.Count() < Node.blockChain.getRequiredConsensus())
+                                        if ((DateTime.UtcNow - currentBlockStartTime).TotalSeconds > (ConsensusConfig.blockGenerationInterval / 2) && localNewBlock.signatures.Count < Node.blockChain.getRequiredConsensus())
                                         {
                                             if (last_block_num < 10)
                                             {
@@ -878,7 +878,7 @@ namespace DLT
             if (b.blockNum <= lastBlockNum + 1 && verify_sig)
             {
                 bool skip_sig_verification = false;
-                if(pendingSuperBlocks.Count() > 0 && pendingSuperBlocks.OrderBy(x=> x.Key).Last().Key > b.blockNum)
+                if(pendingSuperBlocks.Count > 0 && pendingSuperBlocks.OrderBy(x=> x.Key).Last().Key > b.blockNum)
                 {
                     //skip_sig_verification = true; // TODO TODO TODO TODO TODO enable this and add additional hardening by verifying block's checksum against the SB segments when fully activating superblocks
                 }
@@ -1475,7 +1475,7 @@ namespace DLT
                 {
                     if(localNewBlock.blockChecksum.SequenceEqual(b.blockChecksum))
                     {
-                        Logging.info("Block #{0} ({1} sigs) received from the network is the block we are currently working on. Merging signatures  ({2} sigs).", b.blockNum, b.signatures.Count(), localNewBlock.signatures.Count());
+                        Logging.info("Block #{0} ({1} sigs) received from the network is the block we are currently working on. Merging signatures  ({2} sigs).", b.blockNum, b.signatures.Count, localNewBlock.signatures.Count);
                         List<BlockSignature> added_signatures = localNewBlock.addSignaturesFrom(b, IxianHandler.getMinSignerPowDifficulty(localNewBlock.blockNum, localNewBlock.version, localNewBlock.timestamp), false);
                         if (added_signatures != null || localNewBlock.getFrozenSignatureCount() >= Node.blockChain.getRequiredConsensus())
                         {
@@ -1610,7 +1610,7 @@ namespace DLT
                         if ((DateTime.UtcNow - dt).TotalSeconds > expiration_time)
                         {
                             blockBlacklist[b.blockNum].Remove(b.blockChecksum);
-                            if (blockBlacklist[b.blockNum].Count() == 0)
+                            if (blockBlacklist[b.blockNum].Count == 0)
                             {
                                 blockBlacklist.Remove(b.blockNum);
                             }
@@ -1633,7 +1633,7 @@ namespace DLT
                     if (bbl.ContainsKey(b.blockChecksum))
                     {
                         blockBlacklist[b.blockNum].Remove(b.blockChecksum);
-                        if (blockBlacklist[b.blockNum].Count() == 0)
+                        if (blockBlacklist[b.blockNum].Count == 0)
                         {
                             blockBlacklist.Remove(b.blockNum);
                         }
@@ -1817,7 +1817,7 @@ namespace DLT
                     if (required_sigs.Count < required_consensus_count_adj
                         && !handleBlockchainRecoveryMode(block, required_sigs.Count, frozen_sig_count, frozen_sig_difficulty, required_signer_difficulty))
                     {
-                        Logging.warn("Block {0} has less than 50% + 1 required signers from previous block {1} < {2}.", block.blockNum, required_sigs.Count(), (required_consensus_count / 2) + 1);
+                        Logging.warn("Block {0} has less than 50% + 1 required signers from previous block {1} < {2}.", block.blockNum, required_sigs.Count, (required_consensus_count / 2) + 1);
                         return false;
                     }
                 }
@@ -2675,7 +2675,7 @@ namespace DLT
                 target_block_sigs = targetBlock.signatures;
             }
 
-            ulong numSigs = (ulong)target_block_sigs.Count();
+            ulong numSigs = (ulong)target_block_sigs.Count;
             if(numSigs < 1)
             {
                 // Something is not right, there are no signers on this block
@@ -2744,7 +2744,7 @@ namespace DLT
             Address address = new Address(transaction.pubKey.addressNoChecksum, transaction.fromList.Keys.First());
             Wallet from_w = Node.walletState.getWallet(address);
             List<byte[]> related_tx_ids = TransactionPool.getRelatedMultisigTransactions(orig_txid, null);
-            int num_valid_multisigs = related_tx_ids.Count() + 1;
+            int num_valid_multisigs = related_tx_ids.Count + 1;
             if (num_valid_multisigs >= from_w.requiredSigs)
             {
                 localNewBlock.addTransaction(orig_txid);
@@ -2761,7 +2761,7 @@ namespace DLT
                     localNewBlock.addTransaction(txid);
                 }
                 // include the multisig transaction
-                return (ulong)related_tx_ids.Count() + 1;
+                return (ulong)related_tx_ids.Count + 1;
             } else
             {
                 // skip the multisig transaction

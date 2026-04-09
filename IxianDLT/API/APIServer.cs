@@ -1207,7 +1207,7 @@ namespace DLTNode
 
             foreach(Transaction tx in unapplied_txs)
             {
-                txouts += tx.toList.Count();
+                txouts += tx.toList.Count;
                 total_amount += tx.amount + tx.fee;
             }
 

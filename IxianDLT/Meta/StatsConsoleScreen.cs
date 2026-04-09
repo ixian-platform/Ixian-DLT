@@ -170,7 +170,7 @@ namespace DLT.Meta
             if (b != null)
             {
                 lastBlockNum = b.blockNum;
-                sigCount = b.signatures.Count();
+                sigCount = b.signatures.Count;
                 lastBlockChecksum = Crypto.hashToString(b.blockChecksum).Substring(0, 6);
             }
 

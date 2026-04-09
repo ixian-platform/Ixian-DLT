@@ -14,6 +14,10 @@ using Fclp;
 using IXICore;
 using IXICore.Meta;
 using IXICore.Network;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace DLT
@@ -154,6 +158,8 @@ namespace DLT
 
             public static ulong blocksDbCacheSize = 0;
             public static ulong activityDbCacheSize = 128 << 20;
+
+            public static long minRequiredDiskSpace = 1 << 30; // 1GB
 
             private Config()
             {

@@ -17,6 +17,9 @@ using IXICore.Meta;
 using IXICore.Network;
 using IXICore.RegNames;
 using IXICore.Utils;
+using System;
+using System.Collections.Generic;
+using System.IO;
 
 namespace DLT
 {
@@ -267,7 +270,7 @@ namespace DLT
                                 if (node_type != 'R'
                                     || NetworkClientManager.getConnectedClients(true).Length > 1)
                                 {
-                                    CoreProtocolMessage.sendBye(endpoint, ProtocolByeCode.expectingMaster, string.Format("Expecting master node."), "", true);
+                                    CoreProtocolMessage.sendBye(endpoint, ProtocolByeCode.expectingMaster, string.Format("Expecting master node."), "");
                                     return;
                                 }
                                 endpoint.sendData(ProtocolMessageCode.getRandomPresences, new byte[1] { (byte)'M' });

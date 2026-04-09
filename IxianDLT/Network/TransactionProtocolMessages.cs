@@ -15,6 +15,11 @@ using IXICore;
 using IXICore.Meta;
 using IXICore.Network;
 using IXICore.Utils;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
 
 namespace DLT
 {
@@ -156,7 +161,7 @@ namespace DLT
                 if (txIdArr == null)
                     return;
 
-                int tx_count = txIdArr.Count();
+                int tx_count = txIdArr.Count;
 
                 if (tx_count == 0)
                     return;
@@ -399,7 +404,7 @@ namespace DLT
             public static void handleGetUnappliedTransactions(byte[] data, RemoteEndpoint endpoint)
             {
                 Transaction[] txIdArr = TransactionPool.getUnappliedTransactions();
-                int tx_count = txIdArr.Count();
+                int tx_count = txIdArr.Length;
 
                 if (tx_count == 0)
                     return;
