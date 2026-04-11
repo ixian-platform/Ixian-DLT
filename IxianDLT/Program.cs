@@ -176,7 +176,7 @@ namespace DLTNode
                 ConsoleHelpers.verboseConsoleOutput = true;
                 Logging.consoleOutput = ConsoleHelpers.verboseConsoleOutput;
                 e.Cancel = true;
-                IxianHandler.shutdown();
+                IxianHandler.requestShutdown();
             };
 
             // For testing only. Run any experiments here as to not affect the infrastructure.
@@ -343,7 +343,7 @@ namespace DLTNode
                             {
                                 ConsoleHelpers.verboseConsoleOutput = true;
                                 Logging.consoleOutput = ConsoleHelpers.verboseConsoleOutput;
-                                IxianHandler.shutdown();
+                                IxianHandler.requestShutdown();
                             }
                         }
                     }
@@ -375,7 +375,6 @@ namespace DLTNode
             }
 
             // Stop logging
-            Logging.flush();
             Logging.stop();
 
             if (noStart == false)

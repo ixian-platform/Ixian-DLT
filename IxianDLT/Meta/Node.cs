@@ -151,6 +151,7 @@ namespace DLT.Meta
             }
             CoreConfig.maximumServerClients = Config.maxIncomingClientNodes;
 
+            CoreConfig.defaultPaymentAddressMode = AddressPaymentFlag.Primary;
             IxianHandler.init(Config.version, this, Config.networkType, !Config.disableSetTitle, Config.checksumLock);
             init();
         }
@@ -235,7 +236,7 @@ namespace DLT.Meta
             // Load or Generate the wallet
             if (!initWallet())
             {
-                IxianHandler.shutdown();
+                IxianHandler.requestShutdown();
                 return;
             }
 
@@ -758,9 +759,12 @@ namespace DLT.Meta
             // Console screen has a thread running even if we are in verbose mode
             statsConsoleScreen?.stop();
 
-
             // Stop the block storage
             storage?.stopStorage();
+
+            // Stop logging
+            Logging.flush();
+            Logging.stop();
         }
 
         // Checks to see if this node can handle the block number
