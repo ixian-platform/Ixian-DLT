@@ -11,6 +11,7 @@
 // MIT License for more details.
 
 using DLT.Meta;
+using DLTNode.Meta;
 using IXICore;
 using IXICore.Activity;
 using IXICore.Inventory;
@@ -983,7 +984,10 @@ namespace DLT
                     {
                         transaction.timeStamp = Clock.getTimestamp();
                     }
-                    IxianHandler.addTransactionToActivityStorage(Node.activityStorage, transaction);
+                    if (!ActivityScanner.isActive())
+                    {
+                        IxianHandler.addTransactionToActivityStorage(Node.activityStorage, transaction);
+                    }
                 }
             }
 
