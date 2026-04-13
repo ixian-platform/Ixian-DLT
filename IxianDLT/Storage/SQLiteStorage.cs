@@ -704,7 +704,7 @@ namespace DLT
                     signatureFreezeChecksum = blk.sigFreezeChecksum,
                     difficulty = (ulong)blk.difficulty,
                     powField = blk.powField,
-                    transactions = new HashSet<byte[]>(new ByteArrayComparer()),
+                    transactions = new LinkedHashSet<byte[]>(new ByteArrayComparer()),
                     signatures = new List<BlockSignature>(),
                     timestamp = blk.timestamp,
                     version = blk.version,

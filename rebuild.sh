@@ -6,7 +6,7 @@ echo Checking .NET SDK Version
 DOTNET_VER=$(dotnet --version 2>/dev/null)
 
 if [ -z "$DOTNET_VER" ]; then
-    echo ".NET is not installed."
+    echo "Error: .NET is not installed. .NET 10 is required to build Ixian DLT from source."
     exit 1
 fi
 
@@ -14,7 +14,7 @@ fi
 MAJOR_VER=$(echo "$DOTNET_VER" | cut -d. -f1)
 
 if [ "$MAJOR_VER" -lt 10 ]; then
-    echo "Found .NET $MAJOR_VER. Version is too old."
+    echo "Error: .NET $MAJOR_VER detected. .NET 10 is required to build Ixian DLT from source."
     exit 1
 fi
 

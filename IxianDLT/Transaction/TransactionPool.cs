@@ -750,7 +750,7 @@ namespace DLT
 
                 List<Transaction> failed_transactions = new List<Transaction>();
                 List<byte[]> signer_addresses = new List<byte[]>();
-                HashSet<byte[]> tmp_transactions = unappliedTransactions.Keys.ToHashSet(new ByteArrayComparer());
+                LinkedHashSet<byte[]> tmp_transactions = new(unappliedTransactions.Keys.ToHashSet(new ByteArrayComparer()), new ByteArrayComparer());
                 if(block != null)
                 {
                     tmp_transactions = block.transactions;
@@ -2770,7 +2770,7 @@ namespace DLT
         public static List<Transaction> getFullBlockTransactions(Block block)
         {
             List<Transaction> tx_list = new List<Transaction>();
-            HashSet<byte[]> tx_ids = block.transactions;
+            LinkedHashSet<byte[]> tx_ids = block.transactions;
             foreach (var tx_id in tx_ids)
             {
                 Transaction t = getAppliedTransaction(tx_id, block.blockNum);
@@ -2788,7 +2788,7 @@ namespace DLT
         public static List<Dictionary<string, object>> getFullBlockTransactionsAsArray(Block block)
         {
             List<Dictionary<string, object>> tx_list = new List<Dictionary<string, object>>();
-            HashSet<byte[]> tx_ids = block.transactions;
+            LinkedHashSet<byte[]> tx_ids = block.transactions;
             foreach (var tx_id in tx_ids)
             {
                 Transaction t = getAppliedTransaction(tx_id, block.blockNum);
@@ -2808,7 +2808,7 @@ namespace DLT
         public static IxiNumber getTotalTransactionsValueInBlock(Block block)
         {
             IxiNumber val = 0;
-            HashSet<byte[]> tx_ids = block.transactions;
+            LinkedHashSet<byte[]> tx_ids = block.transactions;
             foreach (var tx_id in tx_ids)
             {
                 Transaction t = getAppliedTransaction(tx_id, block.blockNum);

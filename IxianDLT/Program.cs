@@ -286,7 +286,8 @@ namespace DLTNode
             // Initialize the node
             node = new Node();
 
-            if (noStart)
+            if (IxianHandler.forceShutdown
+                || noStart)
             {
                 Thread.Sleep(1000);
                 return;
@@ -295,7 +296,8 @@ namespace DLTNode
             // Start the actual DLT node
             node.start(Config.verboseOutput);
 
-            if (noStart)
+            if (IxianHandler.forceShutdown
+                || noStart)
             {
                 IxianHandler.shutdown();
                 Thread.Sleep(1000);

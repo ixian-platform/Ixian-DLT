@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2017-2025 Ixian
+﻿// Copyright (C) 2017-2026 Ixian
 // This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
@@ -21,7 +21,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Text;
 using System.Threading;
 
 namespace DLT
@@ -387,21 +386,21 @@ namespace DLT
                 {
                     sigFreezingBlock = localNewBlock;
                 }
+                Block targetBlock = Node.blockChain.getBlock(b.blockNum);
+                if (targetBlock == null)
+                {
+                    Logging.error("Target block #{0} ({1}) is null, cannot handle sig freeze.", b.blockNum, Crypto.hashToString(b.blockChecksum));
+                    return false;
+                }
                 if (sigFreezingBlock != null)
                 {
                     sigFreezeChecksum = sigFreezingBlock.signatureFreezeChecksum;
                     // this block already has a sigfreeze, don't tamper with the signatures
-                    Block targetBlock = Node.blockChain.getBlock(b.blockNum);
-                    if(targetBlock == null)
-                    {
-                        Logging.error("Target block #{0} ({1}) is null, cannot handle sig freeze.", b.blockNum, Crypto.hashToString(b.blockChecksum));
-                        return false;
-                    }
                     if(b.blockProposer == null && b.version < BlockVer.v10)
                     {
                         b.blockProposer = targetBlock.blockProposer;
                     }
-                    if (targetBlock != null && sigFreezeChecksum.SequenceEqual(targetBlock.calculateSignatureChecksum()) && targetBlock.verifyBlockProposer())
+                    if (sigFreezeChecksum.SequenceEqual(targetBlock.calculateSignatureChecksum()) && targetBlock.verifyBlockProposer())
                     {
                         // we already have the correct block
                         return false;
@@ -2078,8 +2077,8 @@ namespace DLT
                 }
             }
 
-            Logging.warn("Recovery mode activated for block #{0} {1}, missing required sigs:{2}, missing sigs: {3}, cur time: {4}, block time: {5}, total signer difficulty: {6}, requiredSignerDifficultyAdjusted: {7}.",
-                curBlock.blockNum, Crypto.hashToString(curBlock.calculateChecksum()), missingRequiredSigs, missingSigs, Clock.getNetworkTimestamp(), curBlock.timestamp, totalSignerDifficulty, requiredSignerDifficulty);
+            Logging.warn("Recovery mode activated for block #{0} {1}, missing required sigs:{2}, missing sigs: {3}, cur time: {4}, block time: {5}, total signer difficulty: {6}, recoveryRequiredSignerDifficulty: {7}.",
+                curBlock.blockNum, Crypto.hashToString(curBlock.calculateChecksum()), missingRequiredSigs, missingSigs, Clock.getNetworkTimestamp(), curBlock.timestamp, totalSignerDifficulty, recoveryRequiredSignerDifficulty);
 
             return true;
         }
@@ -2234,7 +2233,7 @@ namespace DLT
                                     localNewBlock.version, Crypto.hashToString(localNewBlock.walletStateChecksum), Crypto.hashToString(ws_checksum));
                                 // TODO TODO perhaps try reverting the block
                                 operating = false;
-                                IxianHandler.shutdown();
+                                IxianHandler.requestShutdown();
                                 return false;
                             } else if (!rn_checksum_ok)
                             {
@@ -2242,7 +2241,7 @@ namespace DLT
                                     localNewBlock.version, Crypto.hashToString(localNewBlock.regNameStateChecksum), Crypto.hashToString(rn_checksum));
                                 // TODO TODO perhaps try reverting the block
                                 operating = false;
-                                IxianHandler.shutdown();
+                                IxianHandler.requestShutdown();
                                 return false;
                             }
                             else

@@ -621,15 +621,17 @@ namespace DLT
                         {
                             if (block_debug)
                             {
-                                Logging.info("Delta Checksum: Wallet [{6}] {{ {0} }}: Balance: {7}, Type: {1}, Signers: {2}, Req: {3}, Pubkey: {4} bytes, Data: {5} bytes",
+                                Logging.info("Delta Checksum at #{0}: Wallet [{1}] {{ {2} }}: Balance: {3}, Type: {4}, Signers: {5}, Req: {6}, Pubkey: {7} bytes, Data: {8} bytes",
+                                    transaction_id,
+                                    i,
                                     altered_wallet.id.ToString(),
+                                    altered_wallet.balance.ToString(),
                                     altered_wallet.type,
                                     altered_wallet.countAllowedSigners,
                                     altered_wallet.requiredSigs,
                                     altered_wallet.publicKey != null ? altered_wallet.publicKey.Length : -1,
-                                    altered_wallet.data != null ? altered_wallet.data.Length : -1,
-                                    i,
-                                    altered_wallet.balance.ToString());
+                                    altered_wallet.data != null ? altered_wallet.data.Length : -1
+                                    );
                                 i += 1;
                             }
                             altered_wallet.writeBytes(w);
