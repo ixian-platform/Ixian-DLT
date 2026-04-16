@@ -1,5 +1,5 @@
-﻿// Copyright (C) 2017-2020 Ixian OU
-// This file is part of Ixian DLT - www.github.com/ProjectIxian/Ixian-DLT
+﻿// Copyright (C) 2017-2026 Ixian
+// This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
 // it under the terms of the MIT License as published
@@ -29,6 +29,7 @@ namespace DLT.Inventory
             typeOptions[InventoryItemTypes.blockSignature2].maxItems = 20000;
             typeOptions[InventoryItemTypes.transaction].maxItems = 1000000;
             typeOptions[InventoryItemTypes.keepAlive].maxItems = 1000000;
+            typeOptions[InventoryItemTypes.keepAlive2].maxItems = 1000000;
         }
 
         override protected bool sendInventoryRequest(InventoryItem item, RemoteEndpoint endpoint)
@@ -40,7 +41,9 @@ namespace DLT.Inventory
                 case InventoryItemTypes.blockSignature2:
                     return handleSignature2(item, endpoint);
                 case InventoryItemTypes.keepAlive:
-                    return handleKeepAlive(item, endpoint);
+                    return false;
+                case InventoryItemTypes.keepAlive2:
+                    return handleKeepAlive2(item, endpoint);
                 case InventoryItemTypes.transaction:
                     return CoreProtocolMessage.broadcastGetTransaction(item.hash, 0, endpoint);
                 default:
@@ -79,15 +82,15 @@ namespace DLT.Inventory
             return false;
         }
 
-        private bool handleKeepAlive(InventoryItem item, RemoteEndpoint endpoint)
+        private bool handleKeepAlive2(InventoryItem item, RemoteEndpoint endpoint)
         {
-            if(endpoint == null)
+            if (endpoint == null)
             {
                 return false;
             }
-            InventoryItemKeepAlive iika = (InventoryItemKeepAlive)item;
+            InventoryItemKeepAlive2 iika = (InventoryItemKeepAlive2)item;
             byte[] address = iika.address.addressNoChecksum;
-            Presence p = PresenceList.getPresenceByAddress(iika.address);
+            Presence? p = PresenceList.getPresenceByAddress(iika.address);
             if (p == null)
             {
                 CoreProtocolMessage.broadcastGetPresence(address, endpoint);
@@ -102,10 +105,10 @@ namespace DLT.Inventory
                     byte[] device_len_bytes = ((ulong)iika.deviceId.Length).GetIxiVarIntBytes();
                     byte[] data = new byte[1 + address_len_bytes.Length + address.Length + device_len_bytes.Length + iika.deviceId.Length];
                     data[0] = 1;
-                    Array.Copy(address_len_bytes, 0, data, 1, address_len_bytes.Length);
-                    Array.Copy(address, 0, data, 1 + address_len_bytes.Length, address.Length);
-                    Array.Copy(device_len_bytes, 0, data, 1 + address_len_bytes.Length + address.Length, device_len_bytes.Length);
-                    Array.Copy(iika.deviceId, 0, data, 1 + address_len_bytes.Length + address.Length + device_len_bytes.Length, iika.deviceId.Length);
+                    Buffer.BlockCopy(address_len_bytes, 0, data, 1, address_len_bytes.Length);
+                    Buffer.BlockCopy(address, 0, data, 1 + address_len_bytes.Length, address.Length);
+                    Buffer.BlockCopy(device_len_bytes, 0, data, 1 + address_len_bytes.Length + address.Length, device_len_bytes.Length);
+                    Buffer.BlockCopy(iika.deviceId, 0, data, 1 + address_len_bytes.Length + address.Length + device_len_bytes.Length, iika.deviceId.Length);
                     endpoint.sendData(ProtocolMessageCode.getKeepAlives, data);
                     return true;
                 }

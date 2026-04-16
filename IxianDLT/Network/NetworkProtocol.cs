@@ -337,7 +337,6 @@ namespace DLT
                         if (item_count > (ulong)CoreConfig.maxInventoryItems)
                         {
                             Logging.warn("Received {0} inventory items, max items is {1}", item_count, CoreConfig.maxInventoryItems);
-                            item_count = (ulong)CoreConfig.maxInventoryItems;
                         }
 
                         ulong last_accepted_block_height = IxianHandler.getLastBlockHeight();
@@ -351,14 +350,14 @@ namespace DLT
                         ulong network_block_height = IxianHandler.getHighestKnownNetworkBlockHeight();
 
                         Dictionary<ulong, List<InventoryItemSignature>> sig_lists = new Dictionary<ulong, List<InventoryItemSignature>>();
-                        List<InventoryItemKeepAlive> ka_list = new List<InventoryItemKeepAlive>();
+                        List<InventoryItemKeepAlive2> ka_list = new List<InventoryItemKeepAlive2>();
                         List<byte[]> tx_list = new List<byte[]>();
                         bool updated_block_height = false;
                         for (ulong i = 0; i < item_count; i++)
                         {
                             ulong len = reader.ReadIxiVarUInt();
                             byte[] item_bytes = reader.ReadBytes((int)len);
-                            InventoryItem item = InventoryCache.decodeInventoryItem(item_bytes);
+                            InventoryItem? item = InventoryCache.decodeInventoryItem(item_bytes);
 
                             if (item == null)
                             {
@@ -392,7 +391,12 @@ namespace DLT
                                     break;
                             }
 
-                            PendingInventoryItem pii = InventoryCache.Instance.add(item, endpoint, false);
+                            PendingInventoryItem? pii = InventoryCache.Instance.add(item, endpoint, false);
+                            if (pii == null)
+                            {
+                                Logging.warn("Error adding inventory item {0} to cache. Endpoint: {1}", item.type, endpoint.getFullAddress());
+                                continue;
+                            }
 
                             if (!pii.processed && pii.lastRequested == 0)
                             {
@@ -400,17 +404,33 @@ namespace DLT
                                 switch (item.type)
                                 {
                                     case InventoryItemTypes.keepAlive:
-                                        var iika = (InventoryItemKeepAlive)item;
-                                        if (PresenceList.getPresenceByAddress(iika.address) != null)
                                         {
-                                            ka_list.Add(iika);
-                                            pii.lastRequested = Clock.getTimestamp();
+                                            var iika = (InventoryItemKeepAlive)item;
+                                            if (PresenceList.getPresenceByAddress(iika.address) != null)
+                                            {
+                                                ka_list.Add(new InventoryItemKeepAlive2(iika.lastSeen, iika.address, iika.deviceId));
+                                            }
+                                            else
+                                            {
+                                                CoreProtocolMessage.broadcastGetPresence(iika.address.addressNoChecksum, endpoint);
+                                            }
+                                            break;
                                         }
-                                        else
+
+                                    case InventoryItemTypes.keepAlive2:
                                         {
-                                            InventoryCache.Instance.processInventoryItem(pii);
+                                            var iika = (InventoryItemKeepAlive2)item;
+                                            if (PresenceList.getPresenceByAddress(iika.address) != null)
+                                            {
+                                                ka_list.Add(iika);
+                                                pii.lastRequested = Clock.getTimestamp();
+                                            }
+                                            else
+                                            {
+                                                InventoryCache.Instance.processInventoryItem(pii);
+                                            }
+                                            break;
                                         }
-                                        break;
 
                                     case InventoryItemTypes.transaction:
                                         tx_list.Add(item.hash);

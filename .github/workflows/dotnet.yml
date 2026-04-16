@@ -38,4 +38,4 @@ jobs:
       run: dotnet build
 
     - name: Running Unit Tests
-      run: dotnet test DLTNode.sln --verbosity normal
+      run: dotnet test DLTNode.sln -l "console;verbosity=detailed" -v:m

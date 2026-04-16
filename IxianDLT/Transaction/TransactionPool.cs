@@ -923,7 +923,7 @@ namespace DLT
 
         // Adds a non-applied transaction to the memory pool
         // Returns true if the transaction is added to the pool, false otherwise
-        public static bool addTransaction(Transaction transaction, bool no_broadcast = false, RemoteEndpoint endpoint = null, bool verifyTx = true, bool force_broadcast = false)
+        public static bool addTransaction(Transaction transaction, bool no_broadcast = false, RemoteEndpoint? endpoint = null, bool verifyTx = true, bool force_broadcast = false)
         {
             InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.transaction, transaction.id);
 

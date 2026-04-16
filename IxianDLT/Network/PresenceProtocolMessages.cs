@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2017-2025 Ixian
+﻿// Copyright (C) 2017-2026 Ixian
 // This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
@@ -28,17 +28,17 @@ namespace DLT
     {
         class PresenceProtocolMessages
         {
-            private static void forwardKeepAlivePresence(byte[] ka_bytes, byte[] hash, Address address, long last_seen, byte[] device_id, char node_type, RemoteEndpoint endpoint)
+            private static void forwardKeepAlivePresence(byte[] ka_bytes, Address address, long last_seen, byte[] device_id, char node_type, RemoteEndpoint endpoint)
             {
                 if (node_type == 'M' || node_type == 'H')
                 {
                     // Send this keepalive to all connected clients
-                    CoreProtocolMessage.addToInventory(['M', 'H', 'W', 'R'], new InventoryItemKeepAlive(hash, last_seen, address, device_id), endpoint);
+                    CoreProtocolMessage.addToInventory(['M', 'H', 'W', 'R'], new InventoryItemKeepAlive2(last_seen, address, device_id), endpoint);
                 }
                 else
                 {
                     // Send this keepalive to all connected non-clients
-                    CoreProtocolMessage.addToInventory(['M', 'H', 'W'], new InventoryItemKeepAlive(hash, last_seen, address, device_id), endpoint);
+                    CoreProtocolMessage.addToInventory(['M', 'H', 'W'], new InventoryItemKeepAlive2(last_seen, address, device_id), endpoint);
                 }
 
                 // Send this keepalive message to all subscribed clients
@@ -83,7 +83,7 @@ namespace DLT
                     {
                         int walletLen = (int)reader.ReadIxiVarUInt();
                         Address wallet = new Address(reader.ReadBytes(walletLen));
-                        Presence p = PresenceList.getPresenceByAddress(wallet);
+                        Presence? p = PresenceList.getPresenceByAddress(wallet);
                         if (p != null)
                         {
                             lock (p)
@@ -106,16 +106,14 @@ namespace DLT
 
             public static void handleKeepAlivePresence(byte[] data, RemoteEndpoint endpoint)
             {
-                Address address = null;
+                Address address;
                 long last_seen = 0;
-                byte[] device_id = null;
+                byte[] device_id;
                 char node_type;
 
-                byte[] hash = CryptoManager.lib.sha3_512sqTrunc(data);
-
-                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.keepAlive, hash);
-
                 bool updated = PresenceList.receiveKeepAlive(data, out address, out last_seen, out device_id, out node_type, endpoint);
+
+                InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.keepAlive2, InventoryItemKeepAlive2.getHash(last_seen, address, device_id));
 
                 // If a presence entry was updated, broadcast this message again
                 if (!updated
@@ -125,11 +123,11 @@ namespace DLT
                     return;
                 }
 
-                Presence p = PresenceList.getPresenceByAddress(address);
+                Presence? p = PresenceList.getPresenceByAddress(address);
                 if (p == null)
                     return;
 
-                Friend f = FriendList.getFriend(p.wallet);
+                Friend? f = FriendList.getFriend(p.wallet);
                 if (f != null)
                 {
                     var pa = p.addresses[0];
@@ -142,7 +140,7 @@ namespace DLT
                     }
                 }
 
-                forwardKeepAlivePresence(data, hash, address, last_seen, device_id, node_type, endpoint);
+                forwardKeepAlivePresence(data, address, last_seen, device_id, node_type, endpoint);
             }
 
             public static void handleGetRandomPresences(byte[] data, RemoteEndpoint endpoint)
@@ -181,13 +179,13 @@ namespace DLT
             public static void handleUpdatePresence(byte[] data, RemoteEndpoint endpoint)
             {
                 // Parse the data and update entries in the presence list
-                Presence updatedPresence = PresenceList.updateFromBytes(data, Node.blockChain.getMinSignerPowDifficulty(IxianHandler.getLastBlockHeight(), IxianHandler.getLastBlockVersion(), 0));
+                Presence? updatedPresence = PresenceList.updateFromBytes(data, Node.blockChain.getMinSignerPowDifficulty(IxianHandler.getLastBlockHeight(), IxianHandler.getLastBlockVersion(), 0));
                 if (updatedPresence == null)
                 {
                     return;
                 }
 
-                Friend f = FriendList.getFriend(updatedPresence.wallet);
+                Friend? f = FriendList.getFriend(updatedPresence.wallet);
                 if (f != null)
                 {
                     if (f.publicKey == null)
@@ -207,8 +205,7 @@ namespace DLT
                 // If a presence entry was updated, broadcast this message again
                 foreach (var pa in updatedPresence.addresses)
                 {
-                    byte[] hash = CryptoManager.lib.sha3_512sqTrunc(pa.getBytes());
-                    var iika = new InventoryItemKeepAlive(hash, pa.lastSeenTime, updatedPresence.wallet, pa.device);
+                    var iika = new InventoryItemKeepAlive2(pa.lastSeenTime, updatedPresence.wallet, pa.device);
 
                     if (pa.type == 'M' || pa.type == 'H')
                     {
