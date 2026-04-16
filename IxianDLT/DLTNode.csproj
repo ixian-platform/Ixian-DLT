@@ -40,7 +40,7 @@
     <AssemblyCompany>Ixian</AssemblyCompany>
     <Product>Ixian DLT</Product>
     <Copyright>Copyright © 2026 Ixian</Copyright>
-    <VersionPrefix>0.9.8.1</VersionPrefix>
+    <VersionPrefix>0.9.8.2</VersionPrefix>
     <PackageProjectUrl>https://www.ixian.io</PackageProjectUrl>
     <CLSCompliant>true</CLSCompliant>
     <ComVisible>false</ComVisible>

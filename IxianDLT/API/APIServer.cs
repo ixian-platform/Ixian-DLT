@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2017-2025 Ixian
+﻿// Copyright (C) 2017-2026 Ixian
 // This file is part of Ixian DLT - www.github.com/ixian-platform/Ixian-DLT
 //
 // Ixian DLT is free software: you can redistribute it and/or modify
@@ -168,7 +168,16 @@ namespace DLTNode
             {
                 response = onGetRegNameDataRecords(parameters);
             }
-            
+
+            if (methodName.Equals("submitSigningSolution", StringComparison.OrdinalIgnoreCase))
+            {
+                response = onSubmitSigningSolution(parameters);
+            }
+
+            if (methodName.Equals("getSigningChallenge", StringComparison.OrdinalIgnoreCase))
+            {
+                response = onGetSigningChallenge(parameters);
+            }            
 
             if (response == null)
             {
@@ -183,6 +192,25 @@ namespace DLTNode
             context.Response.Close();
 
             return true;
+        }
+
+        private JsonResponse onGetSigningChallenge(Dictionary<string, object> parameters)
+        {
+            return new JsonResponse { result = Node.signerPowMiner.GetChallenge(), error = null };
+        }
+
+        private JsonResponse onSubmitSigningSolution(Dictionary<string, object> parameters)
+        {
+            // Check that all the required query parameters are sent
+            if (!parameters.ContainsKey("solution"))
+            {
+                JsonError error = new JsonError { code = (int)RPCErrorCode.RPC_INVALID_PARAMETER, message = "Parameter 'solution' is missing" };
+                return new JsonResponse { result = null, error = error };
+            }
+
+            Node.signerPowMiner.ProcessExternalSolution(ulong.Parse((string)parameters["blockHeight"]), Convert.FromBase64String((string)parameters["solution"]));
+
+            return new JsonResponse { result = null, error = null };
         }
 
         private Dictionary<string, string> blockToJsonDictionary(Block block)
