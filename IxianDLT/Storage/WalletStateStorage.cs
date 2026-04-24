@@ -44,12 +44,12 @@ namespace DLT.Meta
         public static ulong restoreWalletState(ulong blockNum = 0)
         {
             if (blockNum == 0)
-                        {
-                            if(Node.storage.getHighestBlockInStorage() <= ConsensusConfig.sigfreezeOffset)
-                            {
-                                return 0;
-                            }
-                            blockNum = Node.storage.getHighestBlockInStorage() - ConsensusConfig.sigfreezeOffset;
+            {
+                if(Node.storage.getHighestBlockInStorage() <= ConsensusConfig.sigfreezeOffset)
+                {
+                    return 0;
+                }
+                blockNum = Node.storage.getHighestBlockInStorage() - ConsensusConfig.sigfreezeOffset;
                 if(blockNum == 0)
                 {
                     return 0;

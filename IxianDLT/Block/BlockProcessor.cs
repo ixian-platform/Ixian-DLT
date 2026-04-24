@@ -3720,13 +3720,16 @@ namespace DLT
             //Console.WriteLine("----STAKING REWARDS for #{0} TOTAL {1} IXIs----", targetBlock.blockNum, newIxis.ToString());
 
             // Retrieve the list of signature wallets
-            var signatureWallets = targetBlock.getSignaturesWalletAddressesWithDifficulty();
+            //var signatureWallets = targetBlock.getSignaturesWalletAddressesWithDifficulty();
+            // Replaced with new function that returns only signers with fine balance.
+            var signatureWallets = targetBlock.getAppliableSignaturesWalletAddresses();
+            if (signatureWallets.Count == 0) return null;
 
             IxiNumber totalIxisStaked = new IxiNumber(0);
             Address[] stakeWallets = new Address[signatureWallets.Count];
             BigInteger[] stakes = new BigInteger[signatureWallets.Count];
             BigInteger[] awards = new BigInteger[signatureWallets.Count];
-            BigInteger[] awardRemainders = new BigInteger[signatureWallets.Count];
+            // BigInteger[] awardRemainders = new BigInteger[signatureWallets.Count];
             // First pass, go through each wallet to find its balance
             int stakers = 0;
             foreach (var wallet_addr_diff in signatureWallets)
@@ -3736,7 +3739,7 @@ namespace DLT
                 if(block_version >= BlockVer.v10)
                 {
                     totalIxisStaked += difficulty;
-                    //Logging.info(String.Format("wallet {0} stakes {1} IXI", Base58Check.Base58CheckEncoding.EncodePlain(wallet_addr), wallet.balance.ToString()));
+                    // Logging.info(String.Format("wallet {0} stakes {1} IXI", Base58Check.Base58CheckEncoding.EncodePlain(wallet_addr), wallet.balance.ToString()));
                     stakes[stakers] = difficulty.getAmount();
                     stakeWallets[stakers] = wallet_addr;
                     stakers += 1;
@@ -3772,18 +3775,25 @@ namespace DLT
 
             // Second pass, determine awards by stake
             //Logging.info("Determining awards");
+            BigInteger totalAmount = newIxis.getAmount();
+            int stakersCount = signatureWallets.Count;
 
-            BigInteger totalAwarded = 0;
+            BigInteger baseReward = totalAmount / stakersCount;
+            BigInteger remainder = totalAmount % stakersCount;
+
+            // BigInteger totalAwarded = 0;
             for (int i = 0; i < stakers; i++)
             {
-                BigInteger p = (newIxis.getAmount() * stakes[i] * 100) / totalIxisStaked.getAmount();
+                BigInteger reward = baseReward + (i < remainder ? 1 : 0);
+                awards[i] = reward;
+                // BigInteger p = (newIxis.getAmount() * stakes[i] * 100) / totalIxisStaked.getAmount();
                 //Logging.info(String.Format("staker[{0}]: p = {1}", i, p.ToString()));
-                awardRemainders[i] = p % 100;
+                // awardRemainders[i] = p % 100;
                 //Logging.info(String.Format("staker[{0}]: awardRemainder = {1}", i, awardRemainders[i].ToString()));
-                p = p / 100;
-                awards[i] = p;
+                // p = p / 100;
+                // awards[i] = p;
                 //Logging.info(String.Format("staker[{0}]: award = {1}", i, awards[i].ToString()));
-                totalAwarded += p;
+                // totalAwarded += p;
             }
             //Logging.info(String.Format("totalAwarded = {0}", totalAwarded.ToString()));
 
@@ -3791,23 +3801,23 @@ namespace DLT
             // This essentially "rounds up" the awards for the stakers closest to the next whole amount,
             // until we bring the award difference down to zero.
             //Logging.info("Determining remainders");
-            BigInteger diffAward = newIxis.getAmount() - totalAwarded;
+            // BigInteger diffAward = newIxis.getAmount() - totalAwarded;
             //Logging.info(String.Format("diffAward = {0}", diffAward.ToString()));
-            if (diffAward > 0)
-            {
-                int[] descRemaindersIndexes = awardRemainders
-                    .Select((v, pos) => new KeyValuePair<BigInteger, int>(v, pos))
-                    .OrderByDescending(x => x.Key)
-                    .Select(x => x.Value).ToArray();
-                int currRemainderAward = 0;
-                while (diffAward > 0)
-                {
-                    awards[descRemaindersIndexes[currRemainderAward]] += 1;
-                    //Logging.info(String.Format("Increasing reward {0} by 1, to: {1}", descRemaindersIndexes[currRemainderAward], awards[descRemaindersIndexes[currRemainderAward]].ToString()));
-                    currRemainderAward += 1;
-                    diffAward -= 1;
-                }
-            }
+            // if (diffAward > 0)
+            // {
+            //     int[] descRemaindersIndexes = awardRemainders
+            //         .Select((v, pos) => new KeyValuePair<BigInteger, int>(v, pos))
+            //         .OrderByDescending(x => x.Key)
+            //         .Select(x => x.Value).ToArray();
+            //     int currRemainderAward = 0;
+            //     while (diffAward > 0)
+            //     {
+            //         awards[descRemaindersIndexes[currRemainderAward]] += 1;
+            //         //Logging.info(String.Format("Increasing reward {0} by 1, to: {1}", descRemaindersIndexes[currRemainderAward], awards[descRemaindersIndexes[currRemainderAward]].ToString()));
+            //         currRemainderAward += 1;
+            //         diffAward -= 1;
+            //     }
+            // }
 
             if (block_version < 2)
             {

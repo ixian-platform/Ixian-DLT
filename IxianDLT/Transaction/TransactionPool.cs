@@ -1867,8 +1867,9 @@ namespace DLT
                 return true;
             }
 
-            var signatureWallets = targetBlock.getSignaturesWalletAddressesWithDifficulty().ToDictionary(new AddressComparer());
-
+            // var signatureWallets = targetBlock.getSignaturesWalletAddressesWithDifficulty().ToDictionary(new AddressComparer());
+            // Replaced with new function that returns only signers with fine balance.
+            var signatureWallets = targetBlock.getAppliableSignaturesWalletAddresses().ToDictionary(new AddressComparer());
             HashSet<Address> blockStakers = new(new AddressComparer());
             foreach (var toEntry in tx.toList)
             {
