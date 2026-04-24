@@ -945,7 +945,7 @@ namespace DLT
                         }
                     }
 
-                    if (Node.blockChain.Count <= ConsensusConfig.sigfreezeOffset || sigFreezeCheck)
+                    if (Node.blockChain.Count <= (int)ConsensusConfig.sigfreezeOffset || sigFreezeCheck)
                     {
                         //Logging.info(String.Format("Appending block #{0} to blockChain.", b.blockNum));
                         if (b.blockNum <= wsSyncConfirmedBlockNum)
@@ -965,7 +965,7 @@ namespace DLT
 
                         Node.blockChain.appendBlock(b, !b.fromLocalStorage);
                     }
-                    else if (Node.blockChain.Count > ConsensusConfig.sigfreezeOffset && !sigFreezeCheck)
+                    else if (Node.blockChain.Count > (int)ConsensusConfig.sigfreezeOffset && !sigFreezeCheck)
                     {
                         if (CoreConfig.preventNetworkOperations || Config.recoverFromFile)
                         {
@@ -999,7 +999,7 @@ namespace DLT
                     {
                         lock (pendingBlocks)
                         {
-                            pendingBlocks.RemoveAll(x => x.blockNum + 6 < b.blockNum);
+                            pendingBlocks.RemoveAll(x => x.blockNum + ConsensusConfig.sigOverlapOffset < b.blockNum);
                         }
                     }
                 }

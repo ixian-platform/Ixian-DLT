@@ -183,7 +183,7 @@ namespace DLT
                         Logging.error("Attempting to add a block #{0} with invalid lastBlockChecksum!", b.blockNum);
                         return false;
                     }
-                    if (b.signatureFreezeChecksum != null && blocks.Count > 5 && !blocks[b.blockNum - 5].calculateSignatureChecksum().SequenceEqual(b.signatureFreezeChecksum))
+                    if (b.signatureFreezeChecksum != null && blocks.Count > (int)ConsensusConfig.sigfreezeOffset && !blocks[b.blockNum - ConsensusConfig.sigfreezeOffset].calculateSignatureChecksum().SequenceEqual(b.signatureFreezeChecksum))
                     {
                         Logging.error("Attempting to add a block #{0} with invalid sigFreezeChecksum!", b.blockNum);
                         return false;
@@ -934,7 +934,7 @@ namespace DLT
             {
                 // we refuse to change sig numbers older than 4 blocks
                 ulong lastBlockNum = getLastBlockNum();
-                ulong sigLockHeight = lastBlockNum > 5 ? lastBlockNum - 4 : 1;
+                ulong sigLockHeight = lastBlockNum > ConsensusConfig.sigfreezeOffset ? lastBlockNum - (ConsensusConfig.sigfreezeOffset - 1) : 1;
                 if (b.blockNum <= sigLockHeight)
                 {
                     Logging.error("Trying to refresh signatures on older block {0} <= {1}", b.blockNum, sigLockHeight);
@@ -945,7 +945,7 @@ namespace DLT
             {
                 // we refuse to force change sig numbers older than 5 blocks
                 ulong lastBlockNum = getLastBlockNum();
-                ulong sigLockHeight = lastBlockNum > 6 ? lastBlockNum - 5 : 1;
+                ulong sigLockHeight = lastBlockNum > ConsensusConfig.sigOverlapOffset ? lastBlockNum - ConsensusConfig.sigfreezeOffset : 1;
                 if (b.blockNum <= sigLockHeight)
                 {
                     Logging.error("Trying to force refresh signatures on older block {0} <= {1}", b.blockNum, sigLockHeight);
@@ -1057,7 +1057,7 @@ namespace DLT
         public List<byte[]> getElectedNodeAddresses(int offset)
         {
             List<byte[]> addresses = new List<byte[]>();
-            Block targetBlock = getBlock(getLastBlockNum() - 6);
+            Block targetBlock = getBlock(getLastBlockNum() - ConsensusConfig.sigOverlapOffset);
             Block curBlock = getBlock(getLastBlockNum());
             if (targetBlock != null && curBlock != null)
             {
