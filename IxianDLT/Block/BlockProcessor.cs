@@ -652,7 +652,7 @@ namespace DLT
                             }
                         }
                     }
-                }else // b.blockNum < Node.blockChain.getLastBlockNum() - 5
+                }else // b.blockNum < Node.blockChain.getLastBlockNum() - 5 MUST BE ALWAYS ConsensusConfig.sigfreezeOffset NOT HARDCODED!!!! 
                 {
                     BlockVerifyStatus past_block_status = verifyBlock(b, true, null);
                     if(past_block_status == BlockVerifyStatus.AlreadyProcessed || past_block_status == BlockVerifyStatus.Valid)
@@ -2106,7 +2106,7 @@ namespace DLT
                 Block target_block = null;
                 if (localNewBlock.blockNum > 11)
                 {
-                    target_block = Node.blockChain.getBlock(localNewBlock.blockNum - 5);
+                    target_block = Node.blockChain.getBlock(localNewBlock.blockNum - ConsensusConfig.sigfreezeOffset);
                     if (target_block.frozenSignatures == null || !verifySignatureFreezeChecksum(localNewBlock, null, false))
                     {
                         freezeSignatures(target_block);
@@ -2276,7 +2276,7 @@ namespace DLT
                                 if (current_block.blockNum > 5)
                                 {
                                     // append sigfreezed block
-                                    Block tmp_block = Node.blockChain.getBlock(current_block.blockNum - 5);
+                                    Block tmp_block = Node.blockChain.getBlock(current_block.blockNum - ConsensusConfig.sigfreezeOffset);
                                     if (tmp_block != null)
                                     {
                                         if (tmp_block.frozenSignatures != null)
@@ -2403,7 +2403,7 @@ namespace DLT
 
         public bool verifySignatureFreezeChecksum(Block b, RemoteEndpoint endpoint, bool fetchMissingBlockOnFail = true)
         {
-            if(Node.blockChain.Count <= 5)
+            if(Node.blockChain.Count <= (int)ConsensusConfig.sigfreezeOffset)
             {
                 return true;
             }
@@ -2416,14 +2416,14 @@ namespace DLT
             
             if (b.signatureFreezeChecksum != null)
             {
-                Block targetBlock = Node.blockChain.getBlock(b.blockNum - 5);
+                Block targetBlock = Node.blockChain.getBlock(b.blockNum - ConsensusConfig.sigfreezeOffset);
                 if (targetBlock == null)
                 {
                     // this shouldn't be possible
-                    Logging.error("Block verification can't be done since we are missing sigfreeze checksum target block {0}.", b.blockNum - 5);
+                    Logging.error("Block verification can't be done since we are missing sigfreeze checksum target block {0}.", b.blockNum - ConsensusConfig.sigfreezeOffset);
                     if(nextBlock && fetchMissingBlockOnFail)
                     {
-                        BlockProtocolMessages.broadcastGetBlock(b.blockNum - 5, null, endpoint);
+                        BlockProtocolMessages.broadcastGetBlock(b.blockNum - ConsensusConfig.sigfreezeOffset, null, endpoint);
                     }
                     return false;
                 }
@@ -2431,10 +2431,10 @@ namespace DLT
                 if (!b.signatureFreezeChecksum.SequenceEqual(sigFreezeChecksum) || !targetBlock.verifyBlockProposer())
                 {
                     Logging.warn("Block sigFreeze verification failed for #{0}. Checksum is {1}, but should be {2}. Requesting block #{3}",
-                        b.blockNum, Crypto.hashToString(b.signatureFreezeChecksum), Crypto.hashToString(sigFreezeChecksum), b.blockNum - 5);
+                        b.blockNum, Crypto.hashToString(b.signatureFreezeChecksum), Crypto.hashToString(sigFreezeChecksum), b.blockNum - ConsensusConfig.sigfreezeOffset);
                     if (nextBlock && fetchMissingBlockOnFail)
                     {
-                        BlockProtocolMessages.broadcastGetBlock(b.blockNum - 5, null, endpoint);
+                        BlockProtocolMessages.broadcastGetBlock(b.blockNum - ConsensusConfig.sigfreezeOffset, null, endpoint);
                     }
                     return false;
                 }
@@ -2442,9 +2442,9 @@ namespace DLT
             else if (b.blockNum > 7)
             {
                 // this shouldn't be possible
-                Block targetBlock = Node.blockChain.getBlock(b.blockNum - 5);
+                Block targetBlock = Node.blockChain.getBlock(b.blockNum - ConsensusConfig.sigfreezeOffset);
                 Logging.error("Block sigFreeze verification failed for #{0}. Checksum is empty but should be {1}. Requesting block #{2}",
-                    b.blockNum, Crypto.hashToString(targetBlock.calculateSignatureChecksum()), b.blockNum - 5);
+                    b.blockNum, Crypto.hashToString(targetBlock.calculateSignatureChecksum()), b.blockNum - ConsensusConfig.sigfreezeOffset);
                 if (nextBlock && fetchMissingBlockOnFail)
                 {
                     BlockProtocolMessages.broadcastGetBlock(b.blockNum, endpoint);
@@ -2989,15 +2989,15 @@ namespace DLT
 
                     if (b.signatureFreezeChecksum != null && i > 5)
                     {
-                        Block target_block = Node.blockChain.getBlock(i - 5, true);
+                        Block target_block = Node.blockChain.getBlock(i - (int)ConsensusConfig.sigfreezeOffset, true);
                         if (target_block == null)
                         {
-                            Logging.error("Unable to find target block {0} while creating superblock {1}.", i - 5, super_block.blockNum);
+                            Logging.error("Unable to find target block {0} while creating superblock {1}.", i - (int)ConsensusConfig.sigfreezeOffset, super_block.blockNum);
                             return false;
                         }
                         else if (!target_block.calculateSignatureChecksum().SequenceEqual(b.signatureFreezeChecksum))
                         {
-                            Logging.error("Target block's {0} signatures don't match sigfreeze, while creating superblock {1}.", i - 5, super_block.blockNum);
+                            Logging.error("Target block's {0} signatures don't match sigfreeze, while creating superblock {1}.", i - (int)ConsensusConfig.sigfreezeOffset, super_block.blockNum);
                             SignatureProtocolMessages.broadcastGetBlockSignatures(target_block.blockNum, target_block.blockChecksum, endpoint);
                             return false;
                         }
@@ -3642,7 +3642,7 @@ namespace DLT
         // Retrieve the signature freeze of the 5th last block
         public byte[] getSignatureFreeze(Block freezing_block, int block_ver)
         {
-            Block target_block = Node.blockChain.getBlock(freezing_block.blockNum - 5);
+            Block target_block = Node.blockChain.getBlock(freezing_block.blockNum - ConsensusConfig.sigfreezeOffset);
             if (target_block == null)
             {
                 BlockProtocolMessages.broadcastGetBlock(target_block.blockNum);
@@ -3935,7 +3935,7 @@ namespace DLT
             ulong last_block_num = Node.blockChain.getLastBlockNum();
             ulong block_num = blockSig.blockNum;
             byte[] checksum = blockSig.blockHash;
-            if (block_num > last_block_num - 5 && block_num <= last_block_num)
+            if (block_num > last_block_num - ConsensusConfig.sigfreezeOffset && block_num <= last_block_num)
             {
                 Block b = Node.blockChain.getBlock(block_num, false, false);
                 if (b != null && b.blockChecksum.SequenceEqual(checksum))

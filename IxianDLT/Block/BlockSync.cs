@@ -523,11 +523,11 @@ namespace DLT
 
             ulong lowestBlockNum = getLowestBlockNum();
 
-            if (Node.blockChain.Count > 5)
+            if (Node.blockChain.Count > (int)ConsensusConfig.sigfreezeOffset)
             {
                 lock (pendingBlocks)
                 {
-                    pendingBlocks.RemoveAll(x => x.blockNum < Node.blockChain.getLastBlockNum() - 5);
+                    pendingBlocks.RemoveAll(x => x.blockNum < Node.blockChain.getLastBlockNum() - ConsensusConfig.sigfreezeOffset);
                 }
             }
 
@@ -604,9 +604,9 @@ namespace DLT
                 }
 
 
-                if (next_to_apply > 5)
+                if (next_to_apply > ConsensusConfig.sigfreezeOffset)
                 {
-                    ulong targetBlock = next_to_apply - 5;
+                    ulong targetBlock = next_to_apply - ConsensusConfig.sigfreezeOffset;
                     Block tb;
                     lock (pendingBlocks)
                     {
@@ -945,7 +945,7 @@ namespace DLT
                         }
                     }
 
-                    if (Node.blockChain.Count <= 5 || sigFreezeCheck)
+                    if (Node.blockChain.Count <= ConsensusConfig.sigfreezeOffset || sigFreezeCheck)
                     {
                         //Logging.info(String.Format("Appending block #{0} to blockChain.", b.blockNum));
                         if (b.blockNum <= wsSyncConfirmedBlockNum)
@@ -965,11 +965,11 @@ namespace DLT
 
                         Node.blockChain.appendBlock(b, !b.fromLocalStorage);
                     }
-                    else if (Node.blockChain.Count > 5 && !sigFreezeCheck)
+                    else if (Node.blockChain.Count > ConsensusConfig.sigfreezeOffset && !sigFreezeCheck)
                     {
                         if (CoreConfig.preventNetworkOperations || Config.recoverFromFile)
                         {
-                            var last_block = lastBlocks.Find(x => x.blockNum == b.blockNum - 5);
+                            var last_block = lastBlocks.Find(x => x.blockNum == b.blockNum - ConsensusConfig.sigfreezeOffset);
                             if (last_block != null)
                             {
                                 lock (pendingBlocks)
@@ -1277,7 +1277,7 @@ namespace DLT
         {
             if (synchronizing == false) return false;
 
-            if (tx.blockHeight > Node.blockChain.getLastBlockNum() + (ulong)maxBlockRequests + 5)
+            if (tx.blockHeight > Node.blockChain.getLastBlockNum() + (ulong)maxBlockRequests + ConsensusConfig.sigfreezeOffset)
             {
                 return false;
             }
