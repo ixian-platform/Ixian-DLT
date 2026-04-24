@@ -2989,15 +2989,15 @@ namespace DLT
 
                     if (b.signatureFreezeChecksum != null && i > 5)
                     {
-                        Block target_block = Node.blockChain.getBlock(i - (int)ConsensusConfig.sigfreezeOffset, true);
+                        Block target_block = Node.blockChain.getBlock(i - ConsensusConfig.sigfreezeOffset, true);
                         if (target_block == null)
                         {
-                            Logging.error("Unable to find target block {0} while creating superblock {1}.", i - (int)ConsensusConfig.sigfreezeOffset, super_block.blockNum);
+                            Logging.error("Unable to find target block {0} while creating superblock {1}.", i - ConsensusConfig.sigfreezeOffset, super_block.blockNum);
                             return false;
                         }
                         else if (!target_block.calculateSignatureChecksum().SequenceEqual(b.signatureFreezeChecksum))
                         {
-                            Logging.error("Target block's {0} signatures don't match sigfreeze, while creating superblock {1}.", i - (int)ConsensusConfig.sigfreezeOffset, super_block.blockNum);
+                            Logging.error("Target block's {0} signatures don't match sigfreeze, while creating superblock {1}.", i - ConsensusConfig.sigfreezeOffset, super_block.blockNum);
                             SignatureProtocolMessages.broadcastGetBlockSignatures(target_block.blockNum, target_block.blockChecksum, endpoint);
                             return false;
                         }
