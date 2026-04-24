@@ -2141,7 +2141,7 @@ namespace DLT
 
                     if (localNewBlock.blockNum + ConsensusConfig.sigfreezeOffset >= IxianHandler.getHighestKnownNetworkBlockHeight())
                     {
-                        if (Node.isMasterNode() && localNewBlock.blockNum > 7)
+                        if (Node.isMasterNode() && localNewBlock.blockNum > ConsensusConfig.requiredConsensusOffset)
                         {
                             BlockSignature signature_data = localNewBlock.applySignature(Node.signerPowMiner.GetBestSolution(0, localNewBlock.blockNum), IxianHandler.getMinSignerPowDifficulty(localNewBlock.blockNum, localNewBlock.version, localNewBlock.timestamp)); // applySignature() will return signature_data, if signature was applied and null, if signature was already present from before
                             if (signature_data != null) 
@@ -4045,12 +4045,12 @@ namespace DLT
             lock (localBlockLock)
             {
                 var lastBlockHeight = IxianHandler.getLastBlockHeight();
-                if (lastBlockHeight < 5)
+                if (lastBlockHeight < ConsensusConfig.sigfreezeOffset)
                 {
                     return;
                 }
 
-                for (uint i = 0; i < 5; i++)
+                for (uint i = 0; i < ConsensusConfig.sigfreezeOffset; i++)
                 {
                     Block b = Node.blockChain.getBlock(lastBlockHeight - i);
                     BlockSignature blockSig = b.applySignature(Node.signerPowMiner.GetBestSolution(0, b.blockNum), IxianHandler.getMinSignerPowDifficulty(b.blockNum, b.version, b.timestamp));
