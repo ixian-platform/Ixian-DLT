@@ -1310,9 +1310,9 @@ namespace DLT
                 }
             }
             else
-                        {
-                            stakingRewardBlockNum = block.blockNum - ConsensusConfig.sigOverlapOffset;
-                        }
+            {
+                stakingRewardBlockNum = block.blockNum - ConsensusConfig.sigOverlapOffset;
+            }
             // TODO: move this to a seperate function. Left here for now for dev purposes
             // Apply any staking transactions in the pool at this moment
             List<Transaction> staking_txs = null;
@@ -2127,4 +2127,714 @@ namespace DLT
                 Wallet orig = Node.walletState.getWallet(target_wallet_address);
                 if (orig is null)
                 {
-                    Logging.error("
+                    Logging.error("Multisig change transaction {{ {0} }} names a non-existent wallet {1}.", tx.getTxIdString(), target_wallet_address.ToString());
+                    failed_transactions.Add(tx);
+                    return null;
+                }
+                List<byte[]> related_tx_ids = getRelatedMultisigTransactions(tx.id, block);
+                // +1 because this current transaction will not be found by the search
+                int num_valid_sigs = related_tx_ids.Count + 1;
+                if (num_valid_sigs < orig.requiredSigs)
+                {
+                    Logging.error("Transaction {{ {0} }} has {1} valid signatures out of required {2}.", tx.getTxIdString(), num_valid_sigs, orig.requiredSigs);
+                    failed_transactions.Add(tx);
+                    return null;
+                }
+
+                if (multisig_type is Transaction.MultisigAddrAdd)
+                {
+                    var multisig_obj = (Transaction.MultisigAddrAdd)multisig_type;
+
+                    Address signer_address = new Address(multisig_obj.signerPubKey, multisig_obj.signerNonce);
+                    if (!orig.isValidSigner(signer_address))
+                    {
+                        Logging.warn("Tried to use Multisig transaction {{ {0} }} without being an actual owner {1}!",
+                            tx.getTxIdString(), signer_address.ToString());
+                        failed_transactions.Add(tx);
+                        return null;
+                    }
+
+                    if (orig.isValidSigner(multisig_obj.addrToAdd))
+                    {
+                        Logging.warn("Pubkey {0} is already in allowed multisig list for wallet {1}.", multisig_obj.addrToAdd.ToString(), orig.id.ToString());
+                        failed_transactions.Add(tx);
+                        return null;
+                    }
+
+                    if (orig.countAllowedSigners > 250)
+                    {
+                        Logging.warn("MS Wallet {0} attempted to add signer {1}, but it already has maximum allowed signers.", multisig_obj.addrToAdd.ToString(), orig.id.ToString());
+                        failed_transactions.Add(tx);
+                        return null;
+                    }
+
+                    Logging.info("Adding multisig address {0} to wallet {1}.", multisig_obj.addrToAdd.ToString(), orig.id.ToString());
+                    Node.walletState.addWalletAllowedSigner(orig.id, multisig_obj.addrToAdd);
+                }
+                else if (multisig_type is Transaction.MultisigAddrDel)
+                {
+                    if (orig.type != WalletType.Multisig)
+                    {
+                        Logging.error("Attempted to execute a multisig change transaction {{ {0} }} on a non-multisig wallet {1}!",
+                            tx.getTxIdString(), orig.id.ToString());
+                        failed_transactions.Add(tx);
+                        return null;
+                    }
+                    var multisig_obj = (Transaction.MultisigAddrDel)multisig_type;
+
+                    Address signer_address = new Address(multisig_obj.signerPubKey, multisig_obj.signerNonce);
+                    if (!orig.isValidSigner(signer_address))
+                    {
+                        Logging.warn("Tried to use Multisig transaction {{ {0} }} without being an actual owner {1}!",
+                            tx.getTxIdString(), signer_address.ToString());
+                        failed_transactions.Add(tx);
+                        return null;
+                    }
+
+                    if (multisig_obj.addrToDel.addressNoChecksum.SequenceEqual(orig.id.addressNoChecksum))
+                    {
+                        Logging.error("Attempted to remove wallet owner ({0}) from the multisig wallet!", multisig_obj.addrToDel.ToString());
+                        failed_transactions.Add(tx);
+                        return null;
+                    }
+
+                    bool adjust_req_sigs = false;
+                    if (orig.requiredSigs > orig.countAllowedSigners)
+                    {
+                        Logging.info("Removing a signer would make using the wallet impossible. Adjusting required signatures: {0} -> {1}.",
+                            orig.requiredSigs, orig.allowedSigners.Count);
+                        adjust_req_sigs = true;
+                    }
+                    Logging.info("Removing multisig address {0} from wallet {1}.", multisig_obj.addrToDel.ToString(), orig.id.ToString());
+                    Node.walletState.delWalletAllowedSigner(orig.id, multisig_obj.addrToDel, adjust_req_sigs);
+                }
+                else if (multisig_type is Transaction.MultisigChSig)
+                {
+                    var multisig_obj = (Transaction.MultisigChSig)multisig_type;
+                    if (orig.type != WalletType.Multisig)
+                    {
+                        Logging.error("Attempted to execute a multisig change transaction {{ {0} }} on a non-multisig wallet {1}!",
+                            tx.getTxIdString(), orig.id.ToString());
+                        failed_transactions.Add(tx);
+                        return null;
+                    }
+
+                    Address signer_address = new Address(multisig_obj.signerPubKey, multisig_obj.signerNonce);
+                    if (!orig.isValidSigner(signer_address))
+                    {
+                        Logging.warn("Tried to use Multisig transaction {{ {0} }} without being an actual owner {1}!",
+                            tx.getTxIdString(), signer_address.ToString());
+                        failed_transactions.Add(tx);
+                        return null;
+                    }
+
+                    // +1 because "allowedSigners" will contain addresses distinct from the wallet owner, but wallet owner is also one of the permitted signers
+                    if (multisig_obj.reqSigs > orig.allowedSigners.Count + 1)
+                    {
+                        Logging.error("Attempted to set required sigs for a multisig wallet to a larger value than the number of allowed pubkeys! Pubkeys = {0}, reqSigs = {1}.",
+                            orig.allowedSigners.Count, multisig_obj.reqSigs);
+                        failed_transactions.Add(tx);
+                        return null;
+                    }
+                    Logging.info("Changing multisig wallet {0} required sigs {1} -> {2}.", orig.id.ToString(), orig.requiredSigs, multisig_obj.reqSigs);
+                    Node.walletState.setWalletRequiredSignatures(orig.id, multisig_obj.reqSigs);
+                }
+
+                foreach (var entry in tx.fromList)
+                {
+                    Address tmp_address = new Address(tx.pubKey.addressNoChecksum, entry.Key);
+
+                    Wallet source_wallet = Node.walletState.getWallet(tmp_address);
+                    IxiNumber source_balance_before = source_wallet.balance;
+                    // Withdraw the full amount, including fee
+                    IxiNumber source_balance_after = source_balance_before - entry.Value;
+                    if (source_balance_after < (long)0)
+                    {
+                        Logging.warn("Transaction {{ {0} }} in block #{1} ({2}) would take wallet {3} below zero.",
+                            tx.getTxIdString(), block.blockNum, Crypto.hashToString(block.lastBlockChecksum), tmp_address.ToString());
+                        failed_transactions.Add(tx);
+                        return null;
+                    }
+
+                    Node.walletState.setWalletBalance(tmp_address, source_balance_after);
+                }
+
+                if (!Node.walletState.inTransaction)
+                {
+                    //setAppliedFlag(tx.id, block.blockNum);
+                    setReadyToApplyFlag(tx, block.blockNum);
+                }
+                return related_tx_ids;
+            }
+            return null;
+        }
+
+        public static bool applyNameTransaction(Transaction tx, Block block, out ulong expirationBlockHeight)
+        {
+            expirationBlockHeight = 0;
+
+            if (block.version < BlockVer.v11)
+            {
+                return false;
+            }
+
+            if (Config.fullBlockLogging) { Logging.info("Applying block #{0} -> transaction {1}: attempting as name transaction", block.blockNum, tx.getTxIdString()); }
+            try
+            {
+                var status = Node.regNameState.applyTransaction(tx, block.blockNum, out expirationBlockHeight);
+
+                // if apply fails and it's not updateRecord transaction, then fail completely
+                // if apply fails and it's an updateRecord transaction, then we want to spend the fees associated with it, due to processing effort (DDoS mitigation)
+                if (status.instruction != RegNameInstruction.updateRecord && !status.isApplySuccess)
+                {
+                    return false;
+                }
+            } catch (Exception e)
+            {
+                Logging.error("Error applying name transaction {0}: {1}", tx.getTxIdString(), e);
+                return false;
+            }
+
+            if (!applyNormalTransaction(tx, block))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        // Applies a normal transaction
+        public static bool applyNormalTransaction(Transaction tx, Block block)
+        {
+            // TODO: WSJ is withdrawing and depositing same addresses allowed in a single transaction?
+            ulong minBh = 0;
+            if (block.blockNum > ConsensusConfig.getRedactedWindowSize(block.version))
+            {
+                minBh = block.blockNum - ConsensusConfig.getRedactedWindowSize(block.version);
+            }
+            // Check the block height
+            if (minBh > tx.blockHeight || tx.blockHeight > block.blockNum)
+            {
+                Logging.warn("Incorrect block height for transaction {0}. Tx block height is {1}, expecting at least {2} and at most {3}", tx.getTxIdString(), tx.blockHeight, minBh, block.blockNum + 5);
+                return false;
+            }
+
+            if(!verifyPremineTransaction(tx))
+            {
+                Logging.warn("Tried to spent too much premine, too early - transaction {0}.", tx.getTxIdString());
+                return false;
+            }
+
+            // Check if the fee covers the current network minimum fee
+            // TODO: adjust this dynamically
+
+            IxiNumber expectedFee = tx.calculateMinimumFee(ConsensusConfig.transactionPrice);
+            if (tx.version == 0)
+            {
+                expectedFee = ConsensusConfig.transactionPrice;
+            }
+            if (tx.fee < expectedFee)
+            {
+                Logging.error("Transaction {{ {0} }} cannot pay minimum fee", tx.getTxIdString());
+                return false;
+            }
+
+            IxiNumber total_amount = 0;
+            foreach (var entry in tx.fromList)
+            {
+                Address tmp_address = new Address(tx.pubKey.addressNoChecksum, entry.Key);
+
+                Wallet source_wallet = Node.walletState.getWallet(tmp_address);
+                IxiNumber source_balance_before = source_wallet.balance;
+                // Withdraw the full amount, including fee
+                IxiNumber source_balance_after = source_balance_before - entry.Value;
+                if (source_balance_after < (long)0)
+                {
+                    Logging.warn("Transaction {{ {0} }} in block #{1} ({2}) would take wallet {3} below zero.",
+                        tx.getTxIdString(), block.blockNum, Crypto.hashToString(block.lastBlockChecksum), tmp_address.ToString());
+                    return false;
+                }
+
+                Node.walletState.setWalletBalance(tmp_address, source_balance_after);
+                total_amount += entry.Value;
+            }
+
+            if (tx.amount + tx.fee != total_amount)
+            {
+                Logging.error("Transaction {{ {0} }}'s input values are different than the total amount + fee", tx.getTxIdString());
+                return false;
+            }
+
+            total_amount = 0;
+            int i = 0;
+            foreach (var entry in tx.toList)
+            {
+                i++;
+                total_amount += entry.Value.amount;
+                if (i == 1
+                    && tx.type == (int)Transaction.Type.RegName
+                    && entry.Key.SequenceEqual(ConsensusConfig.rnRewardPoolAddress))
+                {
+                    continue;
+                }
+                
+                if (entry.Key.SequenceEqual(ConsensusConfig.rnRewardPoolAddress))
+                {
+                    return false;
+                }
+
+                Wallet dest_wallet = Node.walletState.getWallet(entry.Key);
+                IxiNumber dest_balance_before = dest_wallet.balance;
+
+
+                // Deposit the amount without fee, as the fee is distributed by the network a few blocks later
+                IxiNumber dest_balance_after = dest_balance_before + entry.Value.amount;
+
+
+                // Update the walletstate
+                if (Config.fullBlockLogging)
+                {
+                    Logging.info("Normal transaction {{ {3} }} updates wallet {0} balance: {1} -> {2}.",
+                        entry.Key.ToString(),
+                        dest_balance_before.ToString(),
+                        dest_balance_after.ToString(),
+                        tx.getTxIdString());
+                }
+                Node.walletState.setWalletBalance(entry.Key, dest_balance_after);
+            }
+
+            if (tx.amount != total_amount)
+            {
+                Logging.error("Transaction {{ {0} }}'s output values are different than the total amount", tx.getTxIdString());
+                return false;
+            }
+
+            if (!Node.walletState.inTransaction)
+            {
+                //setAppliedFlag(tx.id, block.blockNum);
+                setReadyToApplyFlag(tx, block.blockNum);
+            }
+
+            return true;
+        }
+
+        // Go through a dictionary of block numbers and respective miners and reward them
+        private static void rewardMiners(ulong sent_block_num, IDictionary<ulong, List<BlockSolution>> blockSolutionsDictionary)
+        {
+            foreach (var solution in blockSolutionsDictionary)
+            {
+                ulong blockNum = solution.Key;
+
+                Block block = Node.blockChain.getBlock(blockNum, true, true);
+                // Check if the block is valid
+                if (block == null)
+                {
+                    Logging.error("PoW target block {0} not found", blockNum);
+                    continue;
+                }
+
+                var miners_to_reward = blockSolutionsDictionary[blockNum];
+
+                IxiNumber miners_count = new IxiNumber(miners_to_reward.Count);
+
+                IxiNumber pow_reward = ConsensusConfig.calculateMiningRewardForBlock(blockNum);
+                IxiNumber powRewardPart = pow_reward / miners_count;
+
+                //Logging.info(String.Format("Rewarding {0} IXI to block #{1} miners", powRewardPart.ToString(), blockNum));
+                foreach (var entry in miners_to_reward)
+                {
+                    // Update the wallet state
+                    Wallet miner_wallet = Node.walletState.getWallet(entry.address);
+                    IxiNumber miner_balance_before = miner_wallet.balance;
+                    IxiNumber miner_balance_after = miner_balance_before + powRewardPart;
+                    Node.walletState.setWalletBalance(miner_wallet.id, miner_balance_after);
+
+                    if (miner_wallet.id.addressNoChecksum.SequenceEqual(IxianHandler.getWalletStorage().getPrimaryAddress().addressNoChecksum))
+                    {
+                        Node.activityStorage.updateValue(entry.tx.id, powRewardPart);
+                    }
+                }
+
+                // Ignore if we're in a bigger transaction, which is not yet complete
+                if (!Node.walletState.inTransaction)
+                {
+                    if (block.powField == null)
+                    {
+                        Node.blockChain.increaseSolvedBlocksCount();
+                        // Set the powField as a checksum of all miners for this block
+                        block.powField = BitConverter.GetBytes(sent_block_num);
+                        Node.blockChain.updateBlock(block);
+                    }
+                }
+
+            }
+        }
+
+        private static void rewardMinersV10(Block block, IDictionary<ulong, List<BlockSolution>> blockSolutionsDictionary)
+        {
+            ulong blockNum = block.blockNum;
+            if (blockSolutionsDictionary.Count > 0)
+            {
+                setPoWAppliedFlagToBlocks(blockNum, blockSolutionsDictionary);
+            }
+
+            if(blockNum <= ConsensusConfig.rewardMaturity + 1)
+            {
+                return;
+            }
+
+            if (Node.blockChain.getBlock(blockNum - ConsensusConfig.rewardMaturity - 1).version < BlockVer.v10)
+            {
+                return;
+            }
+
+            Block targetBlock = Node.blockChain.getBlock(blockNum - ConsensusConfig.rewardMaturity);
+            // Check if the block is valid
+            if (targetBlock == null)
+            {
+                Logging.error("Mining reward target block {0} not found", blockNum);
+                return;
+            }
+
+            // TODO could use caching
+            Dictionary<ulong, List<BlockSolution>> targetBlockSolutionsDictionary = new Dictionary<ulong, List<BlockSolution>>();
+            var powTransactions = TransactionPool.getFullBlockTransactions(targetBlock); // TODO TODO optimize this to fetch only PoW transactions - fetch tx by type
+            foreach (var powTx in powTransactions)
+            {
+                if(powTx.type != (int)Transaction.Type.PoWSolution)
+                {
+                    continue;
+                }
+                ulong powBlockNum = powTx.powSolution.blockNum;
+                byte[] nonce = powTx.powSolution.nonce;
+
+                // Check if we already have a key matching the block number
+                if (targetBlockSolutionsDictionary.ContainsKey(powBlockNum) == false)
+                {
+                    targetBlockSolutionsDictionary[powBlockNum] = new List<BlockSolution>();
+                }
+                Address primary_address = powTx.pubKey;
+                if (block.version < BlockVer.v2)
+                {
+                    targetBlockSolutionsDictionary[powBlockNum].Add(new BlockSolution { address = primary_address, nonce = nonce, tx = powTx });
+                }
+                else
+                {
+                    if (!targetBlockSolutionsDictionary[powBlockNum].Exists(x => x.address.addressNoChecksum.SequenceEqual(primary_address.addressNoChecksum) && x.nonce.SequenceEqual(nonce)))
+                    {
+                        // Add the miner to the block number dictionary reward list
+                        targetBlockSolutionsDictionary[powBlockNum].Add(new BlockSolution { address = primary_address, nonce = nonce, tx = powTx });
+                    }
+                    else
+                    {
+                        throw new Exception(String.Format("PoW solution for block {0} with the same signer address is already present", powBlockNum));
+                    }
+                }
+            }
+
+            foreach (var solution in targetBlockSolutionsDictionary)
+            {
+                ulong powBlockNum = solution.Key;
+
+                Block powBlock = Node.blockChain.getBlock(powBlockNum, true, true);
+                // Check if the block is valid
+                if (powBlock == null)
+                {
+                    throw new Exception(String.Format("PoW target block {0} not found", powBlockNum));
+                }
+
+                var miners_to_reward = targetBlockSolutionsDictionary[powBlockNum];
+
+                IxiNumber miners_count = new IxiNumber(miners_to_reward.Count);
+
+                IxiNumber pow_reward = ConsensusConfig.calculateMiningRewardForBlock(powBlockNum);
+                IxiNumber powRewardPart = pow_reward / miners_count;
+
+                //Logging.info(String.Format("Rewarding {0} IXI to block #{1} miners", powRewardPart.ToString(), blockNum));
+                foreach (var entry in miners_to_reward)
+                {
+                    // Update the wallet state
+                    Wallet miner_wallet = Node.walletState.getWallet(entry.address);
+                    IxiNumber miner_balance_before = miner_wallet.balance;
+                    IxiNumber miner_balance_after = miner_balance_before + powRewardPart;
+                    Node.walletState.setWalletBalance(miner_wallet.id, miner_balance_after);
+
+                    if (miner_wallet.id.addressNoChecksum.SequenceEqual(IxianHandler.getWalletStorage().getPrimaryAddress().addressNoChecksum))
+                    {
+                        Node.activityStorage.updateValue(entry.tx.id, powRewardPart);
+                    }
+                }
+            }
+        }
+
+        private static void setPoWAppliedFlagToBlocks(ulong sent_block_num, IDictionary<ulong, List<BlockSolution>> blockSolutionsDictionary)
+        {
+            foreach (var solution in blockSolutionsDictionary)
+            {
+                ulong blockNum = solution.Key;
+
+                Block block = Node.blockChain.getBlock(blockNum, true, true);
+                // Check if the block is valid
+                if (block == null)
+                {
+                    Logging.error("PoW target block {0} not found", blockNum);
+                    continue;
+                }
+
+                // Ignore if we're in a bigger transaction, which is not yet complete
+                if (!Node.walletState.inTransaction)
+                {
+                    if (block.powField == null)
+                    {
+                        Node.blockChain.increaseSolvedBlocksCount();
+                        // Set the powField as a checksum of all miners for this block
+                        block.powField = BitConverter.GetBytes(sent_block_num);
+                        Node.blockChain.updateBlock(block);
+                    }
+                }
+
+            }
+        }
+
+        // Clears all the transactions in the pool
+        public static void clear()
+        {
+            lock(stateLock)
+            {
+                appliedTransactions.Clear();
+                unappliedTransactions.Clear();
+            }
+        }
+
+        public static void performCleanup()
+        {
+            if(Node.blockSync.synchronizing)
+            {
+                return;
+            }
+
+            ulong minBlockHeight = 1;
+            if (Node.blockChain.getLastBlockNum() > ConsensusConfig.getRedactedWindowSize())
+            {
+                minBlockHeight = Node.blockChain.getLastBlockNum() - ConsensusConfig.getRedactedWindowSize();
+            }
+
+            lock (stateLock)
+            {
+                var txList = unappliedTransactions.Select(e => e.Value).Where(x => x != null && x.type == (int)Transaction.Type.PoWSolution).ToArray();
+                foreach (var entry in txList)
+                {
+                    try
+                    {
+                        ulong blocknum = entry.powSolution.blockNum;
+
+                        Block block = null;
+                        
+                        if (Node.blockChain.getLastBlockNum() < ConsensusConfig.argon2ExpirationBlockHeight)
+                        {
+                            block = Node.blockChain.getBlock(blocknum, false, false);
+                        }
+
+                        if (block == null || block.powField != null)
+                        {
+                            if (IxianHandler.isMyAddress(entry.pubKey))
+                            {
+                                Node.activityStorage.updateStatus(entry.id, ActivityStatus.Rejected, 0);
+                            }
+                            unappliedTransactions.Remove(entry.id);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Logging.error("Exception occurred in transactionPool.cleanUp() " + e);
+                        // remove invalid/corrupt transaction
+                        unappliedTransactions.Remove(entry.id);
+                    }
+                }
+
+                txList = unappliedTransactions.Values.Where(x => x != null && x.blockHeight < minBlockHeight).ToArray();
+                foreach (var entry in txList)
+                {
+                    unappliedTransactions.Remove(entry.id);
+                }
+            }
+        }
+
+
+        public static void processPendingTransactions()
+        {
+            ulong last_block_height = IxianHandler.getLastBlockHeight();
+            lock (stateLock) // this lock must be here to prevent deadlocks TODO: improve this at some point
+            {
+                lock (PendingTransactions.pendingTransactions)
+                {
+                    long cur_time = Clock.getTimestamp();
+                    List<PendingTransaction> tmp_pending_transactions = new(PendingTransactions.pendingTransactions.Values);
+                    foreach (var entry in tmp_pending_transactions)
+                    {
+                        Transaction t = entry.transaction;
+                        long tx_time = entry.addedTimestamp;
+
+                        // if transaction expired, remove it from pending transactions
+                        if (last_block_height > ConsensusConfig.getRedactedWindowSize()
+                            && t.blockHeight < last_block_height - ConsensusConfig.getRedactedWindowSize())
+                        {
+                            Logging.error("Error sending the transaction {0}, expired", t.getTxIdString());
+                            Node.activityStorage.updateStatus(t.id, ActivityStatus.Expired, 0);
+                            PendingTransactions.remove(t.id);
+                            continue;
+                        }
+
+                        // check if PoW and if already solved
+                        if (t.type == (int)Transaction.Type.PoWSolution)
+                        {
+                            ulong pow_block_num = t.powSolution.blockNum;
+
+                            Block tmpBlock = Node.blockChain.getBlock(pow_block_num, false, false);
+                            if (tmpBlock == null || tmpBlock.powField != null)
+                            {
+                                Node.activityStorage.updateStatus(t.id, ActivityStatus.Rejected, 0);
+                                PendingTransactions.remove(t.id);
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            // check if transaction is still valid
+                            if (getUnappliedTransaction(t.id) == null && !verifyTransaction(t, null, out _, false))
+                            {
+                                Node.activityStorage.updateStatus(t.id, ActivityStatus.Rejected, 0);
+                                PendingTransactions.remove(t.id);
+                                continue;
+                            }
+                        }
+
+                        if (cur_time - tx_time > 60) // if the transaction is pending for over 60 seconds, resend
+                        {
+                            Logging.warn("Transaction {0} pending for a while, resending", t.getTxIdString());
+                            CoreProtocolMessage.broadcastProtocolMessage(new char[] { 'M', 'H' }, ProtocolMessageCode.transactionData2, t.getBytes(true, true), null);
+
+                            entry.addedTimestamp = cur_time;
+                            entry.confirmedNodeList.Clear();
+                            entry.rejectedNodeList.Clear();
+                        }
+                    }
+                }
+            }
+        }
+
+        public static long getAppliedTransactionCount()
+        {
+            lock(stateLock)
+            {
+                return appliedTransactions.LongCount();
+            }
+        }
+
+        public static long getUnappliedTransactionCount()
+        {
+            lock (stateLock)
+            {
+                return unappliedTransactions.LongCount();
+            }
+        }
+
+        public static void compactTransactionsForBlock(Block b)
+        {
+            lock (stateLock)
+            {
+                foreach (var entry in b.transactions)
+                {
+                    appliedTransactions[entry] = null;
+                }
+            }
+        }
+
+        public static bool removeAppliedTransaction(byte[] txid)
+        {
+            lock (stateLock)
+            {
+                return appliedTransactions.Remove(txid);
+            }
+        }
+
+        public static bool removeUnappliedTransaction(byte[] txid)
+        {
+            lock (stateLock)
+            {
+                return unappliedTransactions.Remove(txid);
+            }
+        }
+
+        // Returns a list of transactions connected to this block 
+        public static List<Transaction> getFullBlockTransactions(Block block)
+        {
+            List<Transaction> tx_list = new List<Transaction>();
+            LinkedHashSet<byte[]> tx_ids = block.transactions;
+            foreach (var tx_id in tx_ids)
+            {
+                Transaction t = getAppliedTransaction(tx_id, block.blockNum);
+                if (t == null)
+                {
+                    Logging.error("nulltx: {0}", Transaction.getTxIdString(tx_id));
+                    continue;
+                }
+                tx_list.Add(t);
+            }
+            return tx_list;
+        }
+
+        // temporary function that will correctly JSON Serialize IxiNumber
+        public static List<Dictionary<string, object>> getFullBlockTransactionsAsArray(Block block)
+        {
+            List<Dictionary<string, object>> tx_list = new List<Dictionary<string, object>>();
+            LinkedHashSet<byte[]> tx_ids = block.transactions;
+            foreach (var tx_id in tx_ids)
+            {
+                Transaction t = getAppliedTransaction(tx_id, block.blockNum);
+                if (t == null)
+                {
+                    Logging.error("nulltx: {0}", Transaction.getTxIdString(tx_id));
+                    continue;
+                }
+
+                tx_list.Add(t.toDictionary());
+
+            }
+            return tx_list;
+        }
+
+        // Returns total value of transactions connected to this block 
+        public static IxiNumber getTotalTransactionsValueInBlock(Block block)
+        {
+            IxiNumber val = 0;
+            LinkedHashSet<byte[]> tx_ids = block.transactions;
+            foreach (var tx_id in tx_ids)
+            {
+                Transaction t = getAppliedTransaction(tx_id, block.blockNum);
+                if (t == null)
+                    Logging.error("nulltx: {0}", Transaction.getTxIdString(tx_id));
+                else
+                    val.add(t.amount);
+            }
+            return val;
+        }
+
+        public static bool unapplyTransaction(byte[] txid)
+        {
+            lock(stateLock)
+            {
+                if(appliedTransactions.ContainsKey(txid))
+                {
+                    Transaction t = appliedTransactions[txid];
+                    appliedTransactions.Remove(txid);
+
+                    t.applied = 0;
+                    unappliedTransactions.AddOrReplace(txid, t);
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+}
