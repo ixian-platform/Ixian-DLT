@@ -378,11 +378,11 @@ namespace DLT
         // Checks if the block has been sigFreezed and if all the hashes match, returns false if the block shouldn't be processed further
         public bool handleSigFreezedBlock(Block b, bool verifySigs, RemoteEndpoint endpoint = null)
         {
-            Block sigFreezingBlock = Node.blockChain.getBlock(b.blockNum + 5);
+            Block sigFreezingBlock = Node.blockChain.getBlock(b.blockNum + ConsensusConfig.sigfreezeOffset);
             byte[] sigFreezeChecksum = null;
             lock (localBlockLock)
             {
-                if (sigFreezingBlock == null && localNewBlock != null && localNewBlock.blockNum == b.blockNum + 5)
+                if (sigFreezingBlock == null && localNewBlock != null && localNewBlock.blockNum == b.blockNum + ConsensusConfig.sigfreezeOffset)
                 {
                     sigFreezingBlock = localNewBlock;
                 }
@@ -444,11 +444,11 @@ namespace DLT
 
         public bool verifySigFreezedBlock(Block b)
         {
-            Block sigFreezingBlock = Node.blockChain.getBlock(b.blockNum + 5);
+            Block sigFreezingBlock = Node.blockChain.getBlock(b.blockNum + ConsensusConfig.sigfreezeOffset);
             byte[] sigFreezeChecksum = null;
             lock (localBlockLock)
             {
-                if (sigFreezingBlock == null && localNewBlock != null && localNewBlock.blockNum == b.blockNum + 5)
+                if (sigFreezingBlock == null && localNewBlock != null && localNewBlock.blockNum == b.blockNum + ConsensusConfig.sigfreezeOffset)
                 {
                     sigFreezingBlock = localNewBlock;
                 }
@@ -588,7 +588,7 @@ namespace DLT
             // if historic block, only the sigs should be updated if not older than 5 blocks in history
             if (b.blockNum <= Node.blockChain.getLastBlockNum())
             {
-                if (b.blockNum + 5 > Node.blockChain.getLastBlockNum())
+                if (b.blockNum + ConsensusConfig.sigfreezeOffset > Node.blockChain.getLastBlockNum())
                 {
                     Logging.info(String.Format("Already processed block #{0}, doing basic verification and collecting only sigs if relevant!", b.blockNum));
                     Block localBlock = Node.blockChain.getBlock(b.blockNum);
@@ -599,7 +599,7 @@ namespace DLT
                         {
                             if (handleSigFreezedBlock(b, false, endpoint))
                             {
-                                if (b.blockNum + 4 > Node.blockChain.getLastBlockNum())
+                                if (b.blockNum + (ConsensusConfig.sigfreezeOffset - 1) > Node.blockChain.getLastBlockNum())
                                 {
                                     Block block_to_update = Node.blockChain.getBlock(b.blockNum);
                                     if (!block_to_update.calculateSignatureChecksum().SequenceEqual(b.calculateSignatureChecksum()))
@@ -652,7 +652,7 @@ namespace DLT
                             }
                         }
                     }
-                }else // b.blockNum < Node.blockChain.getLastBlockNum() - 5
+                }else // b.blockNum < Node.blockChain.getLastBlockNum() - 5 MUST BE ALWAYS ConsensusConfig.sigfreezeOffset NOT HARDCODED!!!! 
                 {
                     BlockVerifyStatus past_block_status = verifyBlock(b, true, null);
                     if(past_block_status == BlockVerifyStatus.AlreadyProcessed || past_block_status == BlockVerifyStatus.Valid)
@@ -737,7 +737,7 @@ namespace DLT
 
 
             // remove signatures without PL entry but not if we're catching up with the network or if the chain is stuck
-            if (IxianHandler.getHighestKnownNetworkBlockHeight() < b.blockNum + 5
+            if (IxianHandler.getHighestKnownNetworkBlockHeight() < b.blockNum + ConsensusConfig.sigfreezeOffset
                 && b.timestamp + CoreConfig.blockSignaturePlCheckTimeout > Clock.getNetworkTimestamp())
             {
                 if (removeSignaturesWithoutPlEntry(b))
@@ -855,7 +855,7 @@ namespace DLT
                 }
             }
 
-            if (Node.blockChain.Count > 0 && b.blockNum + 5 <= Node.blockChain.getLastBlockNum())
+            if (Node.blockChain.Count > 0 && b.blockNum + ConsensusConfig.sigfreezeOffset <= Node.blockChain.getLastBlockNum())
             {
                 Block tmpBlock = Node.blockChain.getBlock(b.blockNum, false, false);
                 if (tmpBlock == null)
@@ -1511,7 +1511,7 @@ namespace DLT
                                 var localTotalSignerDifficulty = localNewBlock.getTotalSignerDifficulty();
                                 if ((remoteBlockSigCount > localBlockSigCount)
                                     || (remoteBlockSigCount == localBlockSigCount && remoteTotalSignerDifficulty > localTotalSignerDifficulty)
-                                    || (hasRequiredSignatureCount(b) && highestNetworkBlockNum > b.blockNum + 5))
+                                    || (hasRequiredSignatureCount(b) && highestNetworkBlockNum > b.blockNum + ConsensusConfig.sigfreezeOffset))
                                 {
                                     Logging.info("Incoming block #{0} has more signatures and is the same block height, accepting instead of our own. (total signatures: {1}, election offset: {2})", b.blockNum, b.signatures.Count, getElectedNodeOffset());
                                     localNewBlock = b;
@@ -1660,10 +1660,10 @@ namespace DLT
             }
         }
 
-        // extracts required signatures from a block according to the election block (blockNum - 6)
+        // extracts required signatures from a block according to the election block (blockNum - 6) // Must be ConsensusConfig.sigOverlapOffset
         private List<BlockSignature> extractRequiredSignatures(Block block, int max_sig_count)
         {
-            Block election_block = Node.blockChain.getBlock(block.blockNum - 6);
+            Block election_block = Node.blockChain.getBlock(block.blockNum - ConsensusConfig.sigOverlapOffset);
             if(election_block == null)
             {
                 Logging.warn("Cannot extract required signatures because election block is null");
@@ -1830,12 +1830,12 @@ namespace DLT
                     // it already includes the required signatures
 
                     return true;
-                }else if (block.blockNum == last_block_num - 4)
+                }else if (block.blockNum == last_block_num - (ConsensusConfig.sigfreezeOffset - 1))
                 {
                     // sigfreezed block
 
 
-                    if (highestNetworkBlockNum > last_block_num + 5
+                    if (highestNetworkBlockNum > last_block_num + ConsensusConfig.sigfreezeOffset
                         || block.timestamp + CoreConfig.blockSignaturePlCheckTimeout < Clock.getNetworkTimestamp())
                     {
                         // catching up
@@ -2106,7 +2106,7 @@ namespace DLT
                 Block target_block = null;
                 if (localNewBlock.blockNum > 11)
                 {
-                    target_block = Node.blockChain.getBlock(localNewBlock.blockNum - 5);
+                    target_block = Node.blockChain.getBlock(localNewBlock.blockNum - ConsensusConfig.sigfreezeOffset);
                     if (target_block.frozenSignatures == null || !verifySignatureFreezeChecksum(localNewBlock, null, false))
                     {
                         freezeSignatures(target_block);
@@ -2139,9 +2139,9 @@ namespace DLT
                         }
                     }
 
-                    if (localNewBlock.blockNum + 5 >= IxianHandler.getHighestKnownNetworkBlockHeight())
+                    if (localNewBlock.blockNum + ConsensusConfig.sigfreezeOffset >= IxianHandler.getHighestKnownNetworkBlockHeight())
                     {
-                        if (Node.isMasterNode() && localNewBlock.blockNum > 7)
+                        if (Node.isMasterNode() && localNewBlock.blockNum > ConsensusConfig.requiredConsensusOffset)
                         {
                             BlockSignature signature_data = localNewBlock.applySignature(Node.signerPowMiner.GetBestSolution(0, localNewBlock.blockNum), IxianHandler.getMinSignerPowDifficulty(localNewBlock.blockNum, localNewBlock.version, localNewBlock.timestamp)); // applySignature() will return signature_data, if signature was applied and null, if signature was already present from before
                             if (signature_data != null) 
@@ -2276,7 +2276,7 @@ namespace DLT
                                 if (current_block.blockNum > 5)
                                 {
                                     // append sigfreezed block
-                                    Block tmp_block = Node.blockChain.getBlock(current_block.blockNum - 5);
+                                    Block tmp_block = Node.blockChain.getBlock(current_block.blockNum - ConsensusConfig.sigfreezeOffset);
                                     if (tmp_block != null)
                                     {
                                         if (tmp_block.frozenSignatures != null)
@@ -2403,7 +2403,7 @@ namespace DLT
 
         public bool verifySignatureFreezeChecksum(Block b, RemoteEndpoint endpoint, bool fetchMissingBlockOnFail = true)
         {
-            if(Node.blockChain.Count <= 5)
+            if(Node.blockChain.Count <= (int)ConsensusConfig.sigfreezeOffset)
             {
                 return true;
             }
@@ -2416,14 +2416,14 @@ namespace DLT
             
             if (b.signatureFreezeChecksum != null)
             {
-                Block targetBlock = Node.blockChain.getBlock(b.blockNum - 5);
+                Block targetBlock = Node.blockChain.getBlock(b.blockNum - ConsensusConfig.sigfreezeOffset);
                 if (targetBlock == null)
                 {
                     // this shouldn't be possible
-                    Logging.error("Block verification can't be done since we are missing sigfreeze checksum target block {0}.", b.blockNum - 5);
+                    Logging.error("Block verification can't be done since we are missing sigfreeze checksum target block {0}.", b.blockNum - ConsensusConfig.sigfreezeOffset);
                     if(nextBlock && fetchMissingBlockOnFail)
                     {
-                        BlockProtocolMessages.broadcastGetBlock(b.blockNum - 5, null, endpoint);
+                        BlockProtocolMessages.broadcastGetBlock(b.blockNum - ConsensusConfig.sigfreezeOffset, null, endpoint);
                     }
                     return false;
                 }
@@ -2431,10 +2431,10 @@ namespace DLT
                 if (!b.signatureFreezeChecksum.SequenceEqual(sigFreezeChecksum) || !targetBlock.verifyBlockProposer())
                 {
                     Logging.warn("Block sigFreeze verification failed for #{0}. Checksum is {1}, but should be {2}. Requesting block #{3}",
-                        b.blockNum, Crypto.hashToString(b.signatureFreezeChecksum), Crypto.hashToString(sigFreezeChecksum), b.blockNum - 5);
+                        b.blockNum, Crypto.hashToString(b.signatureFreezeChecksum), Crypto.hashToString(sigFreezeChecksum), b.blockNum - ConsensusConfig.sigfreezeOffset);
                     if (nextBlock && fetchMissingBlockOnFail)
                     {
-                        BlockProtocolMessages.broadcastGetBlock(b.blockNum - 5, null, endpoint);
+                        BlockProtocolMessages.broadcastGetBlock(b.blockNum - ConsensusConfig.sigfreezeOffset, null, endpoint);
                     }
                     return false;
                 }
@@ -2442,9 +2442,9 @@ namespace DLT
             else if (b.blockNum > 7)
             {
                 // this shouldn't be possible
-                Block targetBlock = Node.blockChain.getBlock(b.blockNum - 5);
+                Block targetBlock = Node.blockChain.getBlock(b.blockNum - ConsensusConfig.sigfreezeOffset);
                 Logging.error("Block sigFreeze verification failed for #{0}. Checksum is empty but should be {1}. Requesting block #{2}",
-                    b.blockNum, Crypto.hashToString(targetBlock.calculateSignatureChecksum()), b.blockNum - 5);
+                    b.blockNum, Crypto.hashToString(targetBlock.calculateSignatureChecksum()), b.blockNum - ConsensusConfig.sigfreezeOffset);
                 if (nextBlock && fetchMissingBlockOnFail)
                 {
                     BlockProtocolMessages.broadcastGetBlock(b.blockNum, endpoint);
@@ -2608,7 +2608,7 @@ namespace DLT
             // Obtain the 6th last block, aka target block
             Block targetBlock = null;
 
-            targetBlock = Node.blockChain.getBlock(b.blockNum - 6);
+            targetBlock = Node.blockChain.getBlock(b.blockNum - ConsensusConfig.sigOverlapOffset);
             if (targetBlock == null)
                 return;
 
@@ -2989,15 +2989,15 @@ namespace DLT
 
                     if (b.signatureFreezeChecksum != null && i > 5)
                     {
-                        Block target_block = Node.blockChain.getBlock(i - 5, true);
+                        Block target_block = Node.blockChain.getBlock(i - ConsensusConfig.sigfreezeOffset, true);
                         if (target_block == null)
                         {
-                            Logging.error("Unable to find target block {0} while creating superblock {1}.", i - 5, super_block.blockNum);
+                            Logging.error("Unable to find target block {0} while creating superblock {1}.", i - ConsensusConfig.sigfreezeOffset, super_block.blockNum);
                             return false;
                         }
                         else if (!target_block.calculateSignatureChecksum().SequenceEqual(b.signatureFreezeChecksum))
                         {
-                            Logging.error("Target block's {0} signatures don't match sigfreeze, while creating superblock {1}.", i - 5, super_block.blockNum);
+                            Logging.error("Target block's {0} signatures don't match sigfreeze, while creating superblock {1}.", i - ConsensusConfig.sigfreezeOffset, super_block.blockNum);
                             SignatureProtocolMessages.broadcastGetBlockSignatures(target_block.blockNum, target_block.blockChecksum, endpoint);
                             return false;
                         }
@@ -3092,7 +3092,7 @@ namespace DLT
                     {
                         if (localNewBlock.blockNum >= 10)
                         {
-                            stakingRewardBlockNum = localNewBlock.blockNum - 6;
+                            stakingRewardBlockNum = localNewBlock.blockNum - ConsensusConfig.sigOverlapOffset;
                         }
                     }
 
@@ -3642,7 +3642,7 @@ namespace DLT
         // Retrieve the signature freeze of the 5th last block
         public byte[] getSignatureFreeze(Block freezing_block, int block_ver)
         {
-            Block target_block = Node.blockChain.getBlock(freezing_block.blockNum - 5);
+            Block target_block = Node.blockChain.getBlock(freezing_block.blockNum - ConsensusConfig.sigfreezeOffset);
             if (target_block == null)
             {
                 BlockProtocolMessages.broadcastGetBlock(target_block.blockNum);
@@ -3720,13 +3720,16 @@ namespace DLT
             //Console.WriteLine("----STAKING REWARDS for #{0} TOTAL {1} IXIs----", targetBlock.blockNum, newIxis.ToString());
 
             // Retrieve the list of signature wallets
-            var signatureWallets = targetBlock.getSignaturesWalletAddressesWithDifficulty();
+            //var signatureWallets = targetBlock.getSignaturesWalletAddressesWithDifficulty();
+            // Replaced with new function that returns only signers with fine balance.
+            var signatureWallets = targetBlock.getAppliableSignaturesWalletAddresses();
+            if (signatureWallets.Count == 0) return null;
 
             IxiNumber totalIxisStaked = new IxiNumber(0);
             Address[] stakeWallets = new Address[signatureWallets.Count];
             BigInteger[] stakes = new BigInteger[signatureWallets.Count];
             BigInteger[] awards = new BigInteger[signatureWallets.Count];
-            BigInteger[] awardRemainders = new BigInteger[signatureWallets.Count];
+            // BigInteger[] awardRemainders = new BigInteger[signatureWallets.Count];
             // First pass, go through each wallet to find its balance
             int stakers = 0;
             foreach (var wallet_addr_diff in signatureWallets)
@@ -3736,7 +3739,7 @@ namespace DLT
                 if(block_version >= BlockVer.v10)
                 {
                     totalIxisStaked += difficulty;
-                    //Logging.info(String.Format("wallet {0} stakes {1} IXI", Base58Check.Base58CheckEncoding.EncodePlain(wallet_addr), wallet.balance.ToString()));
+                    // Logging.info(String.Format("wallet {0} stakes {1} IXI", Base58Check.Base58CheckEncoding.EncodePlain(wallet_addr), wallet.balance.ToString()));
                     stakes[stakers] = difficulty.getAmount();
                     stakeWallets[stakers] = wallet_addr;
                     stakers += 1;
@@ -3772,18 +3775,25 @@ namespace DLT
 
             // Second pass, determine awards by stake
             //Logging.info("Determining awards");
+            BigInteger totalAmount = newIxis.getAmount();
+            int stakersCount = signatureWallets.Count;
 
-            BigInteger totalAwarded = 0;
+            BigInteger baseReward = totalAmount / stakersCount;
+            BigInteger remainder = totalAmount % stakersCount;
+
+            // BigInteger totalAwarded = 0;
             for (int i = 0; i < stakers; i++)
             {
-                BigInteger p = (newIxis.getAmount() * stakes[i] * 100) / totalIxisStaked.getAmount();
+                BigInteger reward = baseReward + (i < remainder ? 1 : 0);
+                awards[i] = reward;
+                // BigInteger p = (newIxis.getAmount() * stakes[i] * 100) / totalIxisStaked.getAmount();
                 //Logging.info(String.Format("staker[{0}]: p = {1}", i, p.ToString()));
-                awardRemainders[i] = p % 100;
+                // awardRemainders[i] = p % 100;
                 //Logging.info(String.Format("staker[{0}]: awardRemainder = {1}", i, awardRemainders[i].ToString()));
-                p = p / 100;
-                awards[i] = p;
+                // p = p / 100;
+                // awards[i] = p;
                 //Logging.info(String.Format("staker[{0}]: award = {1}", i, awards[i].ToString()));
-                totalAwarded += p;
+                // totalAwarded += p;
             }
             //Logging.info(String.Format("totalAwarded = {0}", totalAwarded.ToString()));
 
@@ -3791,23 +3801,23 @@ namespace DLT
             // This essentially "rounds up" the awards for the stakers closest to the next whole amount,
             // until we bring the award difference down to zero.
             //Logging.info("Determining remainders");
-            BigInteger diffAward = newIxis.getAmount() - totalAwarded;
+            // BigInteger diffAward = newIxis.getAmount() - totalAwarded;
             //Logging.info(String.Format("diffAward = {0}", diffAward.ToString()));
-            if (diffAward > 0)
-            {
-                int[] descRemaindersIndexes = awardRemainders
-                    .Select((v, pos) => new KeyValuePair<BigInteger, int>(v, pos))
-                    .OrderByDescending(x => x.Key)
-                    .Select(x => x.Value).ToArray();
-                int currRemainderAward = 0;
-                while (diffAward > 0)
-                {
-                    awards[descRemaindersIndexes[currRemainderAward]] += 1;
-                    //Logging.info(String.Format("Increasing reward {0} by 1, to: {1}", descRemaindersIndexes[currRemainderAward], awards[descRemaindersIndexes[currRemainderAward]].ToString()));
-                    currRemainderAward += 1;
-                    diffAward -= 1;
-                }
-            }
+            // if (diffAward > 0)
+            // {
+            //     int[] descRemaindersIndexes = awardRemainders
+            //         .Select((v, pos) => new KeyValuePair<BigInteger, int>(v, pos))
+            //         .OrderByDescending(x => x.Key)
+            //         .Select(x => x.Value).ToArray();
+            //     int currRemainderAward = 0;
+            //     while (diffAward > 0)
+            //     {
+            //         awards[descRemaindersIndexes[currRemainderAward]] += 1;
+            //         //Logging.info(String.Format("Increasing reward {0} by 1, to: {1}", descRemaindersIndexes[currRemainderAward], awards[descRemaindersIndexes[currRemainderAward]].ToString()));
+            //         currRemainderAward += 1;
+            //         diffAward -= 1;
+            //     }
+            // }
 
             if (block_version < 2)
             {
@@ -3877,7 +3887,7 @@ namespace DLT
         }
 
 
-        // Distribute the staking rewards according to the 5th last block signatures
+        // Distribute the staking rewards according to the 5th last block signatures // UPDATE - only LAST_BLOCK-1 signatures using for rewards.
         public bool distributeStakingRewards(Block b)
         {
             int blockVersion = b.version;
@@ -3902,7 +3912,7 @@ namespace DLT
                 {
                     return false;
                 }
-                stakingRewardBlockNum = b.blockNum - 6;
+                stakingRewardBlockNum = b.blockNum - ConsensusConfig.sigOverlapOffset;
             }
 
             if (!Node.walletState.inTransaction)
@@ -3935,7 +3945,7 @@ namespace DLT
             ulong last_block_num = Node.blockChain.getLastBlockNum();
             ulong block_num = blockSig.blockNum;
             byte[] checksum = blockSig.blockHash;
-            if (block_num > last_block_num - 5 && block_num <= last_block_num)
+            if (block_num > last_block_num - ConsensusConfig.sigfreezeOffset && block_num <= last_block_num)
             {
                 Block b = Node.blockChain.getBlock(block_num, false, false);
                 if (b != null && b.blockChecksum.SequenceEqual(checksum))
@@ -3974,7 +3984,7 @@ namespace DLT
         // Updates the walletstate public keys. Called from BlockProcessor applyAcceptedBlock()
         public bool updateWalletStatePublicKeys(ulong blockNum)
         {
-            Block targetBlock = Node.blockChain.getBlock(blockNum - 6, false);
+            Block targetBlock = Node.blockChain.getBlock(blockNum - ConsensusConfig.sigOverlapOffset, false);
             if (targetBlock == null)
             {
                 return false;
@@ -4045,12 +4055,12 @@ namespace DLT
             lock (localBlockLock)
             {
                 var lastBlockHeight = IxianHandler.getLastBlockHeight();
-                if (lastBlockHeight < 5)
+                if (lastBlockHeight < ConsensusConfig.sigfreezeOffset)
                 {
                     return;
                 }
 
-                for (uint i = 0; i < 5; i++)
+                for (uint i = 0; i < ConsensusConfig.sigfreezeOffset; i++)
                 {
                     Block b = Node.blockChain.getBlock(lastBlockHeight - i);
                     BlockSignature blockSig = b.applySignature(Node.signerPowMiner.GetBestSolution(0, b.blockNum), IxianHandler.getMinSignerPowDifficulty(b.blockNum, b.version, b.timestamp));

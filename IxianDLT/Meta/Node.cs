@@ -853,10 +853,10 @@ namespace DLT.Meta
                 return;
             }
 
-            for (ulong blockNum = lastBlockHeight - 4; blockNum <= lastBlockHeight; blockNum++)
+            for (ulong blockNum = lastBlockHeight - (ConsensusConfig.sigfreezeOffset - 1 ); blockNum <= lastBlockHeight; blockNum++) ////!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Don't forget to check and fix  was - 4
             {
-                if (blockNum + 5 >= IxianHandler.getHighestKnownNetworkBlockHeight())
-                {
+                if (blockNum + ConsensusConfig.sigfreezeOffset >= IxianHandler.getHighestKnownNetworkBlockHeight()) ////!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Don't forget to check and fix was + 5
+                { 
                     Block b = blockChain.getBlock(blockNum);
                     BlockSignature blockSig = b.applySignature(signerPowMiner.GetBestSolution(0, b.blockNum), IxianHandler.getMinSignerPowDifficulty(b.blockNum, b.version, b.timestamp));
                     if (blockSig != null)
