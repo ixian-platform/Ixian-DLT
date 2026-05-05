@@ -3129,6 +3129,12 @@ namespace DLT
                     else
                     {
                         localNewBlock.totalFee = generateNewBlockTransactions(localNewBlock.blockNum, block_version);
+                        // Temporary enforced transaction sorting until Block v14 is activated.
+                        if (localNewBlock.version < BlockVer.v14
+                            && localNewBlock.blockNum > 5912000)
+                        {
+                            localNewBlock.transactions.SortInPlace();
+                        }
                         if (localNewBlock.blockNum == 1)
                         {
                             // Calculate signer difficulty

@@ -542,6 +542,13 @@ namespace DLT
                     InventoryCache.Instance.setProcessedFlag(InventoryItemTypes.block, block.blockChecksum);
                 }
 
+                // Temporary enforced transaction sorting until Block v14 is activated.
+                if (block.version < BlockVer.v14
+                    && block.blockNum > 5912000)
+                {
+                    block.transactions.SortInPlace();
+                }
+
                 Node.blockSync.onBlockReceived(block, endpoint);
                 Node.blockProcessor.onBlockReceived(block, endpoint);
             }
