@@ -3133,7 +3133,7 @@ namespace DLT
                         if (localNewBlock.version < BlockVer.v14
                             && localNewBlock.blockNum > 5912000)
                         {
-                            localNewBlock.transactions.SortInPlace();
+                            localNewBlock.transactions.SortInPlace(new ByteArrayComparer());
                         }
                         if (localNewBlock.blockNum == 1)
                         {

@@ -546,7 +546,7 @@ namespace DLT
                 if (block.version < BlockVer.v14
                     && block.blockNum > 5912000)
                 {
-                    block.transactions.SortInPlace();
+                    block.transactions.SortInPlace(new ByteArrayComparer());
                 }
 
                 Node.blockSync.onBlockReceived(block, endpoint);
