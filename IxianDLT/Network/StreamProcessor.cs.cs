@@ -27,9 +27,9 @@ namespace DLT.Network
             }
 
             SpixiMessage spixi_message = rdr.spixiMessage;
-            Friend friend = rdr.friend;
+            Friend? friend = rdr.friend;
             Address sender_address = rdr.senderAddress;
-            Address real_sender_address = rdr.realSenderAddress;
+            Address? group_sender_address = rdr.groupSenderAddress;
 
             if (friend != null)
             {
