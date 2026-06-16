@@ -103,14 +103,14 @@ namespace DLT
             public static ulong forceSyncToBlock = 0;
 
             // Read-only values
-            public static readonly string version = "xdc-0.9.8e"; // DLT Node version
+            public static readonly string version = "xdc-0.9.8f"; // DLT Node version
 
             public static readonly string checkVersionUrl = "https://resources.ixian.io/update.txt";
             public static readonly int checkVersionSeconds = 6 * 60 * 60; // 6 hours
 
             public static readonly ulong maxBlocksPerDatabase = 1000; // number of blocks to store in a single database file
             
-            public static readonly ulong nodeDeprecationBlock = 6200000 + (ulong)(new Random()).Next(50); // block height on which this version of Ixian DLT stops working on
+            public static readonly ulong nodeDeprecationBlock = 7200000 + (ulong)(new Random()).Next(50); // block height on which this version of Ixian DLT stops working on
 
             public static readonly ulong saveWalletStateEveryBlock = ConsensusConfig.superblockInterval; // Saves wallet state every 1000 blocks
 
@@ -599,7 +599,7 @@ namespace DLT
 
                 cmd_parser.Setup<bool>("generateWallet").Callback(value => generateWalletOnly = value).SetDefault(false);
 
-                cmd_parser.Setup<string>("walletPassword").Callback(value => dangerCommandlinePasswordCleartextUnsafe = value).SetDefault("");
+                cmd_parser.Setup<string>("walletPassword").Callback(value => dangerCommandlinePasswordCleartextUnsafe = value).Required();
 
                 cmd_parser.Setup<bool>("noNetworkSync").Callback(value => noNetworkSync = true).Required();
 
