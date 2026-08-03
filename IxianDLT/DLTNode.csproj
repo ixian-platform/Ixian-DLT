@@ -23,13 +23,14 @@
   <Import Project="..\..\Ixian-Core\IXICore.projitems" Label="Shared" />
     
   <ItemGroup>
-    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
     <PackageReference Include="FluentCommandLineParser-netstandard" Version="1.4.3.13" />
     <PackageReference Include="Mono.Nat" Version="3.0.4" />
     <PackageReference Include="RocksDB" Version="10.4.2.64152" />
-    <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
+    <PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.5" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.10" />
   </ItemGroup>
   
   <PropertyGroup>
@@ -40,7 +41,7 @@
     <AssemblyCompany>Ixian</AssemblyCompany>
     <Product>Ixian DLT</Product>
     <Copyright>Copyright © 2026 Ixian</Copyright>
-    <VersionPrefix>0.9.8.5</VersionPrefix>
+    <VersionPrefix>0.9.8.6</VersionPrefix>
     <PackageProjectUrl>https://www.ixian.io</PackageProjectUrl>
     <CLSCompliant>true</CLSCompliant>
     <ComVisible>false</ComVisible>
