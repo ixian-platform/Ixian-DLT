@@ -183,7 +183,7 @@ namespace DLT
                         Logging.error("Attempting to add a block #{0} with invalid lastBlockChecksum!", b.blockNum);
                         return false;
                     }
-                    if (b.signatureFreezeChecksum != null && blocks.Count > 5 && !blocks[b.blockNum - 5].calculateSignatureChecksum().SequenceEqual(b.signatureFreezeChecksum))
+                    if (b.signatureFreezeChecksum != null && blocks.Count > (int)ConsensusConfig.sigfreezeOffset && !blocks[b.blockNum - ConsensusConfig.sigfreezeOffset].calculateSignatureChecksum().SequenceEqual(b.signatureFreezeChecksum))
                     {
                         Logging.error("Attempting to add a block #{0} with invalid sigFreezeChecksum!", b.blockNum);
                         return false;
@@ -466,7 +466,7 @@ namespace DLT
         public int getRequiredConsensus(ulong block_num, bool adjusted_to_ratio = true)
         {
             // TODO TODO TODO TODO TODO there is an issue with calculating required consensus after blocks are compacted, for now this is resolved by increasing the compacting window
-            int block_offset = 7;
+            int block_offset = (int)ConsensusConfig.requiredConsensusOffset;
             if (block_num < (ulong)block_offset + 1) return 1; // special case for first X blocks - since sigFreeze happens n-5 blocks
             lock (blocks)
             {
@@ -522,7 +522,7 @@ namespace DLT
         public int getRequiredConsensusFromStorage(ulong block_num, bool adjusted_to_ratio = true)
         {
             // TODO TODO TODO TODO TODO there is an issue with calculating required consensus after blocks are compacted, for now this is resolved by increasing the compacting window
-            int block_offset = 7;
+            int block_offset = (int)ConsensusConfig.requiredConsensusOffset;
             if (block_num < (ulong)block_offset + 1) return 1; // special case for first X blocks - since sigFreeze happens n-5 blocks
             lock (blocks)
             {
@@ -665,7 +665,7 @@ namespace DLT
             lock (blocks)
             {
                 ulong blockNum = getLastBlockNum() + 1;
-                ulong blockOffset = 7;
+                ulong blockOffset = ConsensusConfig.requiredConsensusOffset;
                 if (blockNum < blockOffset + 1) return ConsensusConfig.minBlockSignerPowDifficulty; // special case for first X blocks - since sigFreeze happens n-5 blocks
                 
                 if (cachedRequiredSignerDifficulty.BlockNum == blockNum
@@ -734,7 +734,7 @@ namespace DLT
         private IxiNumber calculateRequiredSignerDifficulty_v1(int blockVersion)
         {
             ulong blockNum = getLastBlockNum() + 1;
-            ulong blockOffset = 7;
+            ulong blockOffset = ConsensusConfig.requiredConsensusOffset;
             IxiNumber totalDifficulty = 0;
             ulong blockCount = 0;
             ulong blocksToUseForDifficultyCalculation = ConsensusConfig.superblockInterval;
@@ -849,7 +849,7 @@ namespace DLT
                 return getRequiredSignerDifficulty(blockNum - ConsensusConfig.superblockInterval, false);
             }
 
-            ulong blockOffset = 7;
+            ulong blockOffset = ConsensusConfig.requiredConsensusOffset;
             IxiNumber totalDifficulty = 0;
             ulong blockCount = 0;
             ulong blocksToUseForDifficultyCalculation = blockNum - lastDiffChangeSuperblock.blockNum;
@@ -934,7 +934,7 @@ namespace DLT
             {
                 // we refuse to change sig numbers older than 4 blocks
                 ulong lastBlockNum = getLastBlockNum();
-                ulong sigLockHeight = lastBlockNum > 5 ? lastBlockNum - 4 : 1;
+                ulong sigLockHeight = lastBlockNum > ConsensusConfig.sigfreezeOffset ? lastBlockNum - (ConsensusConfig.sigfreezeOffset - 1) : 1;
                 if (b.blockNum <= sigLockHeight)
                 {
                     Logging.error("Trying to refresh signatures on older block {0} <= {1}", b.blockNum, sigLockHeight);
@@ -945,7 +945,7 @@ namespace DLT
             {
                 // we refuse to force change sig numbers older than 5 blocks
                 ulong lastBlockNum = getLastBlockNum();
-                ulong sigLockHeight = lastBlockNum > 6 ? lastBlockNum - 5 : 1;
+                ulong sigLockHeight = lastBlockNum > ConsensusConfig.sigOverlapOffset ? lastBlockNum - ConsensusConfig.sigfreezeOffset : 1;
                 if (b.blockNum <= sigLockHeight)
                 {
                     Logging.error("Trying to force refresh signatures on older block {0} <= {1}", b.blockNum, sigLockHeight);
@@ -1057,7 +1057,7 @@ namespace DLT
         public List<byte[]> getElectedNodeAddresses(int offset)
         {
             List<byte[]> addresses = new List<byte[]>();
-            Block targetBlock = getBlock(getLastBlockNum() - 6);
+            Block targetBlock = getBlock(getLastBlockNum() - ConsensusConfig.sigOverlapOffset);
             Block curBlock = getBlock(getLastBlockNum());
             if (targetBlock != null && curBlock != null)
             {
